@@ -4,7 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { renderer } from './renderer'
 import { getSteamAuthUrl, verifySteamAuth } from './lib/auth'
 import { getPlayerSummaries, getOwnedGames, getAppDetails } from './lib/steam'
-import { calculateGenrePreferences, scoreGameRecommendation } from './lib/recommender'
+import { calculateGenrePreferences, scoreGameRecommendation } from './recommender'
 
 type Bindings = {
   STEAM_API_KEY: string

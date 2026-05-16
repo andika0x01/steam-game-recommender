@@ -1,16 +1,7 @@
-export interface GenreWeight {
-  genre: string
-  weight: number
-}
+import { GenreWeight } from './types'
+import { trapezoid } from './fuzzyLogic'
 
-// Simple trapezoidal membership function
-function trapezoid(x: number, a: number, b: number, c: number, d: number): number {
-  if (x <= a || x >= d) return 0
-  if (x >= b && x <= c) return 1
-  if (x > a && x < b) return (x - a) / (b - a)
-  if (x > c && x < d) return (d - x) / (d - c)
-  return 0
-}
+export * from './types'
 
 export function calculateGenrePreferences(games: any[]): GenreWeight[] {
   const genreScores: Record<string, number> = {}
