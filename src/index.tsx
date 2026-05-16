@@ -6,12 +6,30 @@ import { getSteamAuthUrl, verifySteamAuth } from './lib/auth'
 import { getPlayerSummaries, getOwnedGames, getAppDetails } from './lib/steam'
 import { calculateGenrePreferences, scoreGameRecommendation } from './lib/recommender'
 
-const app = new Hono<{ Bindings: { STEAM_API_KEY: string, HOST_URL: string }, Variables: { steamId?: string } }>()
+const app = new Hono<{ 
+  Bindings: { 
+    STEAM_API_KEY: string, 
+    HOST_URL: string,
+    ASSETS: Fetcher 
+  }, 
+  Variables: { steamId?: string } 
+}>()
 
-app.use('/favicon.ico', serveStatic({ path: './public/favicon.ico' }))
-app.use('/src/*', serveStatic({ root: './' }))
-app.use('/assets/*', serveStatic({ root: './' }))
-app.use('/static/*', serveStatic({ root: './' }))
+app.use('/favicon.ico', async (c, next) => {
+  if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw)
+  await next()
+})
+
+app.use('/assets/*', async (c, next) => {
+  if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw)
+  await next()
+})
+
+app.use('/static/*', async (c, next) => {
+  if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw)
+  await next()
+})
+
 
 app.use('*', async (c, next) => {
   const steamId = getCookie(c, 'steam_id')
