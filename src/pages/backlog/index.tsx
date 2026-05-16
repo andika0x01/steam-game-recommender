@@ -65,12 +65,6 @@ app.get('/', async (c) => {
                 <img 
                   src={`https://cdn.akamai.steamstatic.com/steam/apps/${topRecommendation.appid}/library_600x900.jpg`} 
                   className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" 
-                  onError={(e: any) => {
-                    e.currentTarget.onerror = () => {
-                      e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
-                    }
-                    e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${topRecommendation.appid}/header.jpg`
-                  }}
                 />
               </div>
               <div className="space-y-8 flex-1 text-center md:text-left">
@@ -103,12 +97,6 @@ app.get('/', async (c) => {
                 <img 
                   src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} 
                   className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110" 
-                  onError={(e: any) => {
-                    e.currentTarget.onerror = () => {
-                      e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
-                    }
-                    e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
-                  }}
                 />
                 <div className="absolute top-4 right-4 glass px-3 py-1.5 rounded-full">
                   <p className="text-[10px] font-mono font-black text-white">{(game.personalMatch * 100).toFixed(0)}%</p>

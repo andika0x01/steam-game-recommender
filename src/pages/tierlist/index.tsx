@@ -77,17 +77,7 @@ app.get('/', async (c) => {
                     onDragStart={`event.dataTransfer.setData('text/plain', '${game?.appid}')`}
                     className="aspect-[3/4] rounded-lg overflow-hidden cursor-grab active:cursor-grabbing transition-all hover:scale-105"
                   >
-                    <img 
-                      src={`https://cdn.akamai.steamstatic.com/steam/apps/${game?.appid}/library_600x900.jpg`} 
-                      className="w-full h-full object-cover pointer-events-none" 
-                      alt={game?.name} 
-                      onError={(e: any) => {
-                        e.currentTarget.onerror = () => {
-                          e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
-                        }
-                        e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game?.appid}/header.jpg`
-                      }}
-                    />
+                    <img src={`https://cdn.akamai.steamstatic.com/steam/apps/${game?.appid}/library_600x900.jpg`} className="w-full h-full object-cover pointer-events-none" alt={game?.name} />
                   </div>
                 ))}
               </div>
@@ -121,17 +111,7 @@ app.get('/', async (c) => {
               onDragStart={`event.dataTransfer.setData('text/plain', '${game.appid}')`}
               className="aspect-[3/4] rounded-lg overflow-hidden cursor-grab active:cursor-grabbing transition-all hover:scale-105"
             >
-               <img 
-                src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} 
-                className="w-full h-full object-cover pointer-events-none" 
-                alt={game.name} 
-                onError={(e: any) => {
-                  e.currentTarget.onerror = () => {
-                    e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
-                  }
-                  e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
-                }}
-               />
+               <img src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} className="w-full h-full object-cover pointer-events-none" alt={game.name} />
             </div>
           ))}
         </div>

@@ -131,12 +131,6 @@ app.get('/', async (c) => {
                     src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} 
                     alt={game.name}
                     className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
-                    onError={(e: any) => {
-                      e.currentTarget.onerror = () => {
-                        e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
-                      }
-                      e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
-                    }}
                    />
                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 gap-4">
                       <p className="text-[10px] font-mono uppercase text-white">{(game.playtime_forever / 60).toFixed(1)}j Dimainkan</p>

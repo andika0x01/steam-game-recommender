@@ -69,12 +69,6 @@ app.get('/', async (c) => {
                   src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`}
                   className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110 group-hover:rotate-1"
                   alt={game.name}
-                  onError={(e: any) => {
-                    e.currentTarget.onerror = () => {
-                      e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
-                    }
-                    e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
-                  }}
                 />
                 <div className="absolute top-4 right-4 glass px-3 py-1.5 rounded-full z-20">
                   <p className="text-[10px] font-mono font-black text-white">{(game.score * 100).toFixed(0)}% Match</p>

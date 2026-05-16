@@ -146,17 +146,7 @@ app.get('/', async (c) => {
                 {recommendations.map((game, idx) => (
                   <div key={game.appid} className="group space-y-4 animate-in fade-in zoom-in-95 duration-700 hover:-translate-y-2" style={{ animationDelay: `${idx * 30}ms` }}>
                     <div className="aspect-[3/4] bg-zinc-900 rounded-[2rem] overflow-hidden relative transition-all duration-500 border border-white/5 group-hover:border-white/20 shadow-2xl">
-                      <img 
-                        src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} 
-                        alt={game.name} 
-                        className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110" 
-                        onError={(e: any) => {
-                          e.currentTarget.onerror = () => {
-                            e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
-                          }
-                          e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
-                        }}
-                      />
+                      <img src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} alt={game.name} className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110" />
                       <div className="absolute top-4 left-4 glass px-2 py-0.5 rounded-full font-mono text-[9px] font-black text-white z-20">
                         {(game.score * 100).toFixed(0)}% Group Match
                       </div>

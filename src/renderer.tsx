@@ -16,6 +16,25 @@ export const renderer = jsxRenderer(({ children, title }, c) => {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
         <Link href="/src/style.css" rel="stylesheet" />
+        <script dangerouslySetInnerHTML={{ __html: `
+          document.addEventListener('error', function(e) {
+            if (e.target.tagName !== 'IMG') return;
+            const img = e.target;
+            const src = img.src;
+            
+            if (src.includes('steamstatic.com/steam/apps/')) {
+              if (src.includes('library_600x900.jpg')) {
+                // Step 1: Fallback ke Header (Horizontal)
+                img.src = src.replace('library_600x900.jpg', 'header.jpg');
+              } else if (src.includes('header.jpg')) {
+                // Step 2: Fallback ke Placeholder Resmi Steam (Jika Header juga 404)
+                img.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app.png';
+                img.style.objectFit = 'contain';
+                img.style.background = '#1a1a1a';
+              }
+            }
+          }, true);
+        ` }} />
       </head>
       <body className="min-h-[100dvh] bg-background text-foreground selection:bg-white/20 pt-20">
         <Nav steamId={steamId} />

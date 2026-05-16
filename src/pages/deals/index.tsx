@@ -54,7 +54,7 @@ app.get('/', async (c) => {
     console.error('CheapShark fetch error:', e) 
   }
 
-  // 3. Enrichment & Scoring: Proses 40 kandidat terbaik secara mendalam
+  // 3. Enrichment & Scoring: Proses 50 kandidat terbaik secara mendalam
   const candidateDeals = rawDeals.slice(0, 50)
 
   const scoredDeals = await Promise.all(
@@ -98,37 +98,38 @@ app.get('/', async (c) => {
 
       {recommendations.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6 gap-6 md:gap-8">
-          {recommendations.map((deal: any) => (
-            <div key={deal.appid} className="group space-y-3 transition-all duration-500 hover:-translate-y-2">
-              <div className="aspect-[3/4] bg-zinc-900 rounded-xl md:rounded-2xl overflow-hidden relative transition-all duration-500 shadow-2xl">
-                <img 
-                  src={`https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/library_600x900.jpg`} 
-                  className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" 
-                  alt={deal.name}
-                  onError={(e: any) => {
-                    e.currentTarget.onerror = () => {
-                      e.currentTarget.src = originalDeal?.thumb || 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
-                    }
-                    e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`
-                  }}
-                />
-                <div className="absolute top-2 right-2 bg-white text-black px-2 py-0.5 rounded-full border border-white/10 shadow-xl z-20">
-                  <p className="text-[8px] font-mono font-black">{(deal.score * 100).toFixed(0)}% Match</p>
+          {recommendations.map((deal: any) => {
+             const originalDeal = rawDeals.find(d => parseInt(d.steamAppID) === deal.appid)
+             return (
+              <div key={deal.appid} className="group space-y-3 transition-all duration-500 hover:-translate-y-2">
+                <div className="aspect-[3/4] bg-zinc-900 rounded-xl md:rounded-2xl overflow-hidden relative transition-all duration-500 shadow-2xl">
+                  <img 
+                    src={`https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/library_600x900.jpg`} 
+                    className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" 
+                    alt={deal.name}
+                  />
+                  <div className="absolute top-2 right-2 bg-white text-black px-2 py-0.5 rounded-full border border-white/10 shadow-xl z-20">
+                    <p className="text-[8px] font-mono font-black">{(deal.score * 100).toFixed(0)}% Match</p>
+                  </div>
+                  {originalDeal && (
+                    <div className="absolute top-10 right-2 bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-xl">
+                      <p className="text-[9px] font-mono font-black">-{Math.floor(parseFloat(originalDeal.savings))}%</p>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 gap-4">
+                    {originalDeal && (
+                      <div className="text-center">
+                          <p className="text-[18px] font-black text-white leading-tight">${originalDeal.salePrice}</p>
+                          <p className="text-[10px] text-zinc-400 line-through">${originalDeal.normalPrice}</p>
+                      </div>
+                    )}
+                    <a href={`https://www.cheapshark.com/redirect?dealID=${originalDeal?.dealID}`} target="_blank" className="px-4 py-2 bg-white text-black text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all shadow-xl">Dapatkan</a>
+                  </div>
                 </div>
-                <div className="absolute top-10 right-2 bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-xl">
-                  <p className="text-[9px] font-mono font-black">-{Math.floor(parseFloat(deal.savings))}%</p>
-                </div>
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 gap-4">
-                   <div className="text-center">
-                      <p className="text-[18px] font-black text-white leading-tight">${deal.salePrice}</p>
-                      <p className="text-[10px] text-zinc-400 line-through">${deal.normalPrice}</p>
-                   </div>
-                   <a href={`https://www.cheapshark.com/redirect?dealID=${deal.dealID}`} target="_blank" className="px-4 py-2 bg-white text-black text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all shadow-xl">Dapatkan</a>
-                </div>
+                <p className="text-[9px] font-bold uppercase tracking-tighter truncate text-zinc-400 group-hover:text-white transition-colors">{deal.name}</p>
               </div>
-              <p className="text-[9px] font-bold uppercase tracking-tighter truncate text-zinc-400 group-hover:text-white transition-colors">{deal.title}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="glass p-20 rounded-[3rem] text-center border border-dashed border-white/10">
