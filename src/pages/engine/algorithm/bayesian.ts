@@ -1,47 +1,61 @@
-import { GenreWeight } from './types'
 import { trapezoid } from './fuzzyLogic'
 
-export function calculateBayesianScore(
-  gameGenres: string[],
-  userLibrary: any[]
-): number {
-  // P(Like | Genre) = (P(Genre | Like) * P(Like)) / P(Genre)
+export interface UserGenreProfile {
+  genre: string
+  prob: number
+}
+
+export function calculateUserGenreProfile(library: any[]): UserGenreProfile[] {
+  const genreTotalWeights: Record<string, number> = {}
   
-  // Fuzzy Engagement Calculation:
-  // We use a trapezoidal function to define "Like" as a continuous value [0, 1]
-  // Parameters: [low_a, low_b, med_c, med_d] -> [0, 2, 50, 1000] hours
-  const libraryWithWeights = userLibrary.map(g => {
+  // 1. Calculate Fuzzy Engagement for each game
+  const gamesWithFuzzyWeight = library.map(g => {
     const hours = (g.playtime_forever || 0) / 60
-    // Weight increases from 0 to 2 hours, stays 1 up to 1000 hours
+    // Dynamic weight: Game with > 2 hours is considered "significant"
     const weight = trapezoid(hours, 0, 2, 1000, 1000)
-    return { ...g, fuzzyWeight: weight }
+    return { ...g, weight }
   })
 
-  const totalFuzzyLikes = libraryWithWeights.reduce((sum, g) => sum + g.fuzzyWeight, 0) || 1
-  const totalGames = userLibrary.length || 1
-  const pLike = totalFuzzyLikes / totalGames
+  const totalPossibleWeight = gamesWithFuzzyWeight.reduce((sum, g) => sum + g.weight, 0) || 1
 
-  let totalProbability = pLike
+  // 2. Accumulate weights per genre
+  gamesWithFuzzyWeight.forEach(game => {
+    const genres = game.genres || []
+    genres.forEach((genreObj: any) => {
+      const genreName = typeof genreObj === 'string' ? genreObj : (genreObj.description || genreObj.name)
+      if (genreName) {
+        genreTotalWeights[genreName] = (genreTotalWeights[genreName] || 0) + game.weight
+      }
+    })
+  })
 
+  // 3. Convert to probabilities (normalized weights)
+  const totalGenreWeightSum = Object.values(genreTotalWeights).reduce((a, b) => a + b, 0) || 1
+  
+  return Object.entries(genreTotalWeights)
+    .map(([genre, weight]) => ({
+      genre,
+      prob: weight / totalGenreWeightSum
+    }))
+    .sort((a, b) => b.prob - a.prob)
+}
+
+export function calculateBayesianPreferenceScore(
+  gameGenres: string[],
+  userProfile: UserGenreProfile[]
+): number {
+  // P(Interest | Genres) ∝ P(Genres | Interest) * P(Interest)
+  // Since we want to rank, we use a scoring function derived from the profile probs
+  
+  if (gameGenres.length === 0) return 0.1
+
+  let aggregateScore = 0
   gameGenres.forEach(genre => {
-    // P(Genre | Like) using Fuzzy Weights
-    const sumFuzzyWeightWithGenre = libraryWithWeights
-      .filter(g => g.genres?.some((genreObj: any) => (genreObj.description || genreObj) === genre))
-      .reduce((sum, g) => sum + g.fuzzyWeight, 0)
-    
-    // Laplace smoothing with fuzzy weights
-    const pGenreGivenLike = (sumFuzzyWeightWithGenre + 0.1) / (totalFuzzyLikes + 0.2)
-
-    // P(Genre) - Simple frequentist approach
-    const gamesWithGenre = userLibrary.filter(g => 
-      g.genres?.some((genreObj: any) => (genreObj.description || genreObj) === genre)
-    ).length
-    const pGenre = (gamesWithGenre + 1) / (totalGames + 2)
-
-    // Bayesian update
-    totalProbability *= (pGenreGivenLike / pGenre)
+    const profileEntry = userProfile.find(p => p.genre === genre)
+    // Add smoothing for genres not in profile
+    aggregateScore += profileEntry ? profileEntry.prob : (1 / (userProfile.length + 10))
   })
 
-  // Normalize and cap
-  return Math.min(totalProbability, 1.0)
+  // Average genre affinity
+  return Math.min(1.0, aggregateScore / gameGenres.length)
 }

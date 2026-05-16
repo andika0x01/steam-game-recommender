@@ -61,34 +61,33 @@ export async function getAppDetails(kv: KVNamespace, appId: number) {
   return null
 }
 
-export async function getTopStoreGames(): Promise<any[]> {
-  // Mengambil data dari dua endpoint SteamSpy untuk cakupan kandidat yang lebih luas (~200 game)
-  const endpoints = [
-    'https://steamspy.com/api.php?request=top100in2weeks',
-    'https://steamspy.com/api.php?request=top100forever'
-  ]
-  
+export async function getGamesByTag(tag: string): Promise<any[]> {
+  const url = `https://steamspy.com/api.php?request=tag&tag=${encodeURIComponent(tag)}`
   try {
-    const results = await Promise.all(endpoints.map(url => fetch(url).then(res => res.json())))
-    const combinedGames: Record<number, any> = {}
-    
-    results.forEach(data => {
-      Object.values(data).forEach((g: any) => {
-        if (g.appid) {
-          combinedGames[g.appid] = {
-            appid: g.appid,
-            name: g.name,
-            genres: [] // Will be enriched later via KV
-          }
-        }
-      })
-    })
-
-    return Object.values(combinedGames).slice(0, 200)
+    const res = await fetch(url)
+    if (!res.ok) return []
+    const data = await res.json()
+    return Object.values(data).slice(0, 100).map((g: any) => ({
+      appid: g.appid,
+      name: g.name,
+      genres: [] // To be enriched
+    }))
   } catch (e) {
-    console.error('getTopStoreGames error:', e)
+    console.error(`getGamesByTag error for ${tag}:`, e)
     return []
   }
+}
+
+export async function getDiscoveryCandidates(topGenres: string[]): Promise<any[]> {
+  // Genre Stacking: Fetch 100 games for each of the top genres
+  const results = await Promise.all(topGenres.map(tag => getGamesByTag(tag)))
+  const combined: Record<number, any> = {}
+  
+  results.flat().forEach(g => {
+    if (g.appid) combined[g.appid] = g
+  })
+
+  return Object.values(combined)
 }
 
 export async function resolveVanityURL(apiKey: string, vanityId: string): Promise<string | null> {

@@ -7,34 +7,32 @@ export interface CandidateGame {
 
 export function runSimulatedAnnealing(
   candidates: CandidateGame[],
-  count: number = 10
+  count: number = 12
 ): CandidateGame[] {
-  // Objective: Maximize total score + Diversity penalty
+  if (candidates.length === 0) return []
+  
   // Initial solution: Take top N by score
   let currentSolution = [...candidates]
     .sort((a, b) => b.score - a.score)
     .slice(0, Math.min(count, candidates.length))
   
-  if (currentSolution.length === 0) return []
-  
   let currentEnergy = calculateEnergy(currentSolution)
   
   let temp = 100
-  const coolingRate = 0.95
+  const coolingRate = 0.96
 
   while (temp > 1) {
-    // Neighbor: Replace one game from solution with a random one from candidates
     let nextSolution = [...currentSolution]
     const idxToRemove = Math.floor(Math.random() * currentSolution.length)
     const idxToAdd = Math.floor(Math.random() * candidates.length)
     
-    // Ensure we don't add a duplicate
+    // Attempt swap
     if (!nextSolution.some(g => g.appid === candidates[idxToAdd].appid)) {
       nextSolution[idxToRemove] = candidates[idxToAdd]
       
       const nextEnergy = calculateEnergy(nextSolution)
       
-      // We want to MAXIMIZE energy, so higher is better
+      // Metropolis Criterion: Accept if better or with prob exp(deltaE/T)
       if (nextEnergy > currentEnergy || Math.random() < Math.exp((nextEnergy - currentEnergy) / temp)) {
         currentSolution = nextSolution
         currentEnergy = nextEnergy
@@ -48,11 +46,26 @@ export function runSimulatedAnnealing(
 }
 
 function calculateEnergy(solution: CandidateGame[]): number {
-  const totalScore = solution.reduce((sum, g) => sum + g.score, 0)
+  const totalAffinity = solution.reduce((sum, g) => sum + g.score, 0)
   
-  // Diversity: Count unique genres
-  const uniqueGenres = new Set(solution.flatMap(g => g.genres))
-  const diversityScore = uniqueGenres.size / 10 // Weight diversity
+  // Diversity Scoring: Genre Saturation Penalty
+  // If many games share the same genre, the reward for that genre diminishes
+  const genreCounts: Record<string, number> = {}
+  solution.flatMap(g => g.genres).forEach(genre => {
+    genreCounts[genre] = (genreCounts[genre] || 0) + 1
+  })
+
+  let diversityScore = 0
+  Object.values(genreCounts).forEach(count => {
+    // Reward unique genres, penalize over-saturation
+    // log2(count + 1) provides diminishing returns
+    diversityScore += Math.log2(count + 1)
+  })
+
+  // We want to MAXIMIZE totalAffinity and MINIMIZE diversityScore (penalty for redundancy)
+  // Or rather, we want a healthy mix. 
+  // Let's maximize (Affinity + Unique Genre Count / 10)
+  const uniqueGenreCount = Object.keys(genreCounts).length
   
-  return totalScore + diversityScore
+  return totalAffinity + (uniqueGenreCount / 10)
 }
