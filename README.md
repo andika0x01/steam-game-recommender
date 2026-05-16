@@ -85,13 +85,39 @@ npx wrangler secret put STEAM_API_KEY
 npx wrangler secret put HOST_URL
 ```
 
-## 🧠 How the Logic Works
+## 🧠 The Fuzzy Logic Engine
 
-The recommender doesn't just look at what you own; it looks at how you **play**:
+### Why Fuzzy Logic?
 
-1. **Fuzzification**: Playtime for each game is converted into fuzzy sets: `Low`, `Medium`, and `High` engagement using trapezoidal membership functions.
-2. **Preference Scoring**: Each genre from your played games is assigned a weight based on the membership value of its playtime.
-3. **Recommendation**: Backlog games are scored by aggregating your affinity weights for their specific genres, normalized to a 0-1 range.
+Traditional recommendation systems often use binary logic (e.g., "played vs. not played") or simple linear regressions. However, human interest in games is inherently **ambiguous and non-linear**:
+- Is 2 hours of playtime "low interest" or "high interest"? For a short indie game, it might be high; for an RPG, it's just the tutorial.
+- Interest isn't a toggle; it's a spectrum.
+
+**Fuzzy Logic** allows us to handle this uncertainty by using "degrees of truth" (0 to 1) rather than absolute 0 or 1. This project treats playtime as a linguistic variable that can belong to multiple categories (Low, Medium, High) simultaneously.
+
+### The Mechanism
+
+The engine operates through three main phases:
+
+#### 1. Fuzzification (Input Processing)
+Raw playtime hours are passed through **Trapezoidal Membership Functions**. A single value like `22 hours` might be:
+- **0%** "Low Engagement"
+- **60%** "Medium Engagement"
+- **20%** "High Engagement"
+
+This overlapping membership ensures smooth transitions between user behavior states.
+
+#### 2. Fuzzy Inference (Genre Weighting)
+We map these engagement levels to weighted scores for each genre associated with the game:
+- **Low Engagement** (e.g., < 5 hrs): Weighted at **0.2** (User tried it, but didn't stick).
+- **Medium Engagement** (e.g., 5-25 hrs): Weighted at **0.6** (User liked it).
+- **High Engagement** (e.g., > 30 hrs): Weighted at **1.0** (User is deeply invested).
+
+#### 3. Scoring (Output)
+The final recommendation score for a backlog game is calculated by:
+- Finding the user's affinity weight for each genre of the target game.
+- Normalizing the aggregate score to a 0-1 range.
+- This creates a **probabilistic match percentage** that reflects how well a game fits the user's historical engagement patterns.
 
 ## 📝 License
 
