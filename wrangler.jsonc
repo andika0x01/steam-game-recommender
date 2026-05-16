@@ -16,5 +16,11 @@
 			"database_name": "steam-game-recommender-db",
 			"database_id": "81a2a533-46bd-40ed-807d-e0f1ae21324e"
 		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "fd5f0792f514411cb965f2b1fa04f0e1"
+		}
 	]
 }

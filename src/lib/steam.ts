@@ -39,14 +39,21 @@ export async function getOwnedGames(apiKey: string, steamId: string): Promise<St
   }
 }
 
-export async function getAppDetails(appId: number) {
-  const url = `https://store.steampowered.com/api/appdetails?appids=${appId}`
+export async function getAppDetails(kv: KVNamespace, appId: number) {
+  const cacheKey = `app_details:${appId}`
   try {
+    const cached = await kv.get(cacheKey, 'json')
+    if (cached) return cached
+
+    const url = `https://store.steampowered.com/api/appdetails?appids=${appId}`
     const res = await fetch(url)
     if (!res.ok) return null
     const data = await res.json()
     if (data && data[appId] && data[appId].success) {
-      return data[appId].data
+      const appData = data[appId].data
+      // Cache the relevant data permanently (genres rarely change)
+      await kv.put(cacheKey, JSON.stringify(appData))
+      return appData
     }
   } catch (e) {
     console.error(`getAppDetails error for ${appId}:`, e)

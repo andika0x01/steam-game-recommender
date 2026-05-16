@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
-import { getOwnedGames } from '../../lib/steam'
+import { getOwnedGames, getAppDetails } from '../../lib/steam'
 import { calculateBayesianScore } from '../engine/algorithm/bayesian'
 
 const app = new Hono<{ Bindings: any }>()
@@ -11,7 +11,23 @@ app.get('/', async (c) => {
   if (!steamId) return c.redirect('/')
   
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
-  const playedGames = games.filter(g => Number(g.playtime_forever) > 0)
+  
+  // Ambil top 20 game untuk profil Bayesian agar akurat
+  const topPlayed = games
+    .filter(g => Number(g.playtime_forever) > 0)
+    .sort((a, b) => b.playtime_forever - a.playtime_forever)
+    .slice(0, 20)
+
+  const enrichedPlayedGames = await Promise.all(
+    topPlayed.map(async (game) => {
+      const details = await getAppDetails(c.env.KV, game.appid)
+      return {
+        ...game,
+        genres: details?.genres?.map((g: any) => g.description) || ['Indie']
+      }
+    })
+  )
+
   const ownedAppIds = new Set(games.map(g => g.appid))
   
   const cheapSharkUrl = 'https://www.cheapshark.com/api/1.0/deals?storeID=1&upperPrice=50&onSale=1'
@@ -32,11 +48,6 @@ app.get('/', async (c) => {
     console.error('CheapShark critical error:', e) 
   }
 
-  if (rawDeals.length === 0) {
-    // If API fails, we return an empty set to maintain data integrity
-    rawDeals = []
-  }
-
   let dealParams = [0.3, 0.5, 0.2]
   try {
     const user = await c.env.DB.prepare('SELECT deals_params FROM users WHERE id = ?').bind(steamId).first()
@@ -45,16 +56,34 @@ app.get('/', async (c) => {
     }
   } catch (e) { console.error('DB Error fetching deals_params:', e) }
 
-  const scoredDeals = rawDeals
+  // Filter deals yang belum dimiliki dan ambil top 20 untuk di-enrich
+  const candidateDeals = rawDeals
     .filter((deal: any) => {
       const appId = parseInt(deal.steamAppID)
       return !isNaN(appId) && !ownedAppIds.has(appId)
     })
+    .slice(0, 20)
+
+  // Enrekal (Enrichment) data genre untuk deals
+  const enrichedDeals = await Promise.all(
+    candidateDeals.map(async (deal) => {
+      const appId = parseInt(deal.steamAppID)
+      const details = await getAppDetails(c.env.KV, appId)
+      return {
+        ...deal,
+        genres: details?.genres?.map((g: any) => g.description) || ['Action']
+      }
+    })
+  )
+
+  const scoredDeals = enrichedDeals
     .map((deal: any) => {
-      const bScore = calculateBayesianScore(['Indie', 'Action', 'Adventure'], playedGames)
+      const bScore = calculateBayesianScore(deal.genres, enrichedPlayedGames)
       const savings = (parseFloat(deal.savings) || 0) / 100
       const salePrice = parseFloat(deal.salePrice) || 0
       const priceScore = salePrice > 0 ? Math.min(1, 20 / salePrice) : 1
+      
+      // PSO Weighting Logic
       const finalScore = (bScore * dealParams[0]) + (savings * dealParams[1]) + (priceScore * dealParams[2])
       
       return {

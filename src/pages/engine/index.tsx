@@ -23,15 +23,42 @@ app.get('/', async (c) => {
   }
 
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
-  const playedGames = games.filter(g => Number(g.playtime_forever) > 0)
+  
+  // Ambil top 15 game yang paling sering dimainkan untuk akurasi profil
+  const topPlayed = games
+    .filter(g => Number(g.playtime_forever) > 0)
+    .sort((a, b) => b.playtime_forever - a.playtime_forever)
+    .slice(0, 15)
+
+  // Enrekal (Enrichment) data genre untuk game milik user
+  const enrichedPlayedGames = await Promise.all(
+    topPlayed.map(async (game) => {
+      const details = await getAppDetails(c.env.KV, game.appid)
+      return {
+        ...game,
+        genres: details?.genres?.map((g: any) => g.description) || ['Indie']
+      }
+    })
+  )
   
   // REAL API FETCH: Discovery dari game terpopuler saat ini di Steam (via SteamSpy)
   const realStoreGames = await getTopStoreGames()
 
   const ownedAppIds = new Set(games.map(g => g.appid))
-  const discoveryCandidates = realStoreGames.filter(g => !ownedAppIds.has(g.appid))
+  const discoveryCandidates = realStoreGames.filter(g => !ownedAppIds.has(g.appid)).slice(0, 15)
 
-  const recommendations = await generateEnsembleRecommendations(playedGames, discoveryCandidates, 12)
+  // Enrekal (Enrichment) data genre untuk game di store
+  const enrichedDiscoveryCandidates = await Promise.all(
+    discoveryCandidates.map(async (game) => {
+      const details = await getAppDetails(c.env.KV, game.appid)
+      return {
+        ...game,
+        genres: details?.genres?.map((g: any) => g.description) || ['Action']
+      }
+    })
+  )
+
+  const recommendations = await generateEnsembleRecommendations(enrichedPlayedGames, enrichedDiscoveryCandidates, 12)
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-20">
