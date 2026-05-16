@@ -1,37 +1,54 @@
-# 02 - Detail Algoritma Computational Intelligence (CI)
+# 02 - Ensiklopedia Algoritma CI: Penjelasan untuk Semua Orang
 
-Proyek ini merupakan demonstrasi pemanfaatan suite lengkap algoritma CI. Berikut adalah detail fungsional dari tiap algoritma:
+Dokumen ini membedah "cara berpikir" setiap algoritma yang ada di dalam aplikasi ini. Kami menjelaskannya menggunakan analogi sederhana agar mudah dipahami bahkan tanpa latar belakang IT.
 
-## 1. Fuzzy Logic (Membership Modeling)
-*   **Peran**: Mengubah input kuantitatif (`playtime_forever`) menjadi variabel kualitatif (Engagement).
-*   **Fungsi Membership**: Trapezoidal.
-*   **Keunggulan**: Memungkinkan transisi halus antar kategori. Sebuah game tidak kaku dianggap "Suka" atau "Tidak", melainkan bisa memiliki derajat keanggotaan (misal: 0.7 Suka dan 0.2 Biasa Saja).
+---
 
-## 2. Genetic Algorithm / GA (Optimization)
-*   **Peran**: Tuning parameter batas fungsi Fuzzy.
-*   **Proses**: Evolusi populasi kromosom (parameter). Setiap individu diuji fitnesnya berdasarkan seberapa baik parameter tersebut dapat mendistribusikan engagement secara adil di seluruh library user.
-*   **Output**: Batas titik (a, b, c, d) yang paling optimal untuk library unik milik user.
+## 1. Fuzzy Logic (Logika Samar)
+**"Bukan sekadar Hitam dan Putih"**
 
-## 3. Particle Swarm Optimization / PSO (Global Optimization)
-*   **Peran**: Mencari bobot ideal kriteria majemuk pada fitur Deal Hunter.
-*   **Logika**: Sekumpulan partikel bergerak di ruang 3D (Bobot Afinitas, Bobot Diskon, Bobot Harga). Partikel saling berbagi informasi tentang posisi terbaik pribadi dan global untuk konvergensi ke bobot paling menguntungkan bagi user.
+*   **Masalah**: Komputer biasanya hanya tahu "Ya" atau "Tidak" (0 atau 1). Tapi, rasa suka manusia itu bertingkat.
+*   **Analogi**: Bayangkan segelas kopi. Apakah kopi itu "Panas" atau "Dingin"? Jika suhunya 40°C, dia tidak benar-benar panas, tapi juga tidak dingin. Dia "Hangat". Fuzzy Logic memungkinkan komputer mengerti konsep "Hangat" ini.
+*   **Cara Kerja di Sini**: Sistem melihat jam main Anda. Jika main 10 jam, sistem tidak langsung bilang Anda "Suka". Tapi dia bilang: "Anda 70% Suka (Medium) dan 20% Sangat Suka (High)". Ini membuat profil Anda jauh lebih akurat.
 
-## 4. Bayesian Inference (Probabilistic Prediction)
-*   **Peran**: Memberikan skor probabilitas ketertarikan.
-*   **Rumus**: $P(Like | Genres) = \frac{P(Genres | Like) \times P(Like)}{P(Genres)}$.
-*   **Logika**: Menghitung peluang user akan menyukai game baru berdasarkan seberapa dominan genre tersebut pada game-game yang sudah sering dimainkan (Liked Games).
+## 2. Genetic Algorithm (Algoritma Genetika)
+**"Evolusi Parameter agar Semakin Cerdas"**
 
-## 5. Classical Search - A* (Graph Pathfinding)
-*   **Peran**: Membuat rute multiplayer di fitur Co-op Nexus.
-*   **Node & Edge**: Tiap game adalah node. Biaya edge ditentukan oleh (1 - Kesamaan Genre).
-*   **Heuristic**: Jarak genre ke target akhir.
-*   **Hasil**: Urutan bermain yang memiliki transisi genre paling halus (smooth transition).
+*   **Masalah**: Setiap orang punya gaya main berbeda. Ada yang merasa 10 jam itu sudah lama, ada yang merasa 100 jam itu baru pemanasan.
+*   **Analogi**: Seperti menanam bunga. Anda menanam banyak benih, lalu Anda hanya memelihara bunga yang tumbuh paling indah. Bunga yang indah itu kemudian menghasilkan benih baru yang lebih kuat. Begitu seterusnya hingga Anda punya taman yang sempurna.
+*   **Cara Kerja di Sini**: Sistem mencoba ratusan kombinasi "angka batasan" untuk profil Anda. Dia membuang yang salah dan memelihara yang benar hingga menemukan angka yang paling pas untuk mengenali gaya bermain unik Anda.
 
-## 6. Ant Colony Optimization / ACO (Sequencing)
-*   **Peran**: Menyusun Campaign Map (backlog trail).
-*   **Logika**: Mensimulasikan semut yang meninggalkan feromon pada jalur game. Jalur dengan akumulasi feromon tertinggi (kombinasi skor Fuzzy rating terbaik) akan dipilih sebagai rute utama.
-*   **Keunggulan**: Sangat baik untuk masalah optimasi kombinatorial (urutan).
+## 3. Particle Swarm Optimization / PSO (Optimasi Kerumunan Partikel)
+**"Kerjasama Tim Mencari Diskon Terbaik"**
 
-## 7. Simulated Annealing / SA (Portfolio Selection)
-*   **Peran**: Memilih 12 kandidat final di Discovery Engine.
-*   **Logika**: Menerima ratusan kandidat dan melakukan iterasi suhu (annealing). Algoritma ini sesekali menerima solusi yang lebih buruk di awal untuk menghindari terjebak di *local optima*, demi mencapai set game yang skornya tinggi namun genrenya sangat beragam.
+*   **Masalah**: Di fitur *Deal Hunter*, kita harus menyeimbangkan antara: (1) Murah, (2) Diskonnya besar, dan (3) Gamenya seru. Mencari titik tengah ini sulit.
+*   **Analogi**: Bayangkan sekumpulan burung yang sedang mencari sumber makanan di hutan. Saat satu burung menemukan tempat makan yang bagus, dia akan berteriak memanggil kawanannya. Burung lain akan terbang mendekat, tapi sambil tetap mencari-cari kalau ada tempat yang lebih baik lagi. Akhirnya, seluruh kawanan berkumpul di tempat makan terbaik.
+*   **Cara Kerja di Sini**: Sistem mengirimkan puluhan "partikel virtual" untuk mencoba berbagai bobot kepentingan. Akhirnya, mereka semua sepakat pada satu settingan bobot yang memberikan Anda rekomendasi "Paling Untung".
+
+## 4. Bayesian Inference (Kesimpulan Bayesian)
+**"Belajar dari Pengalaman Masa Lalu"**
+
+*   **Masalah**: Bagaimana cara menebak Anda akan suka game baru yang belum pernah Anda sentuh?
+*   **Analogi**: Jika Anda melihat teman Anda selalu memesan nasi goreng setiap kali ke restoran, Anda bisa menebak dengan probabilitas tinggi bahwa jika ada menu nasi goreng baru, dia pasti akan menyukainya.
+*   **Cara Kerja di Sini**: Sistem menghitung statistik genre di library Anda. Jika 80% game Anda adalah 'Action', maka secara otomatis game baru bergenre 'Action' akan mendapatkan skor "Peluang Suka" yang tinggi.
+
+## 5. Classical Search - A* (Pencarian Jalur Terpendek)
+**"Mencari Jembatan Antar Genre"**
+
+*   **Masalah**: Bagaimana cara menghubungkan game favorit Anda dengan game milik teman di fitur Co-op?
+*   **Analogi**: Seperti Google Maps mencari jalan tercepat dari rumah ke kantor. Dia tidak hanya melihat jarak, tapi juga kemacetan.
+*   **Cara Kerja di Sini**: Sistem menganggap setiap game adalah sebuah kota. Jalan antar kota adalah kesamaan genrenya. A* akan mencari urutan game (rute) yang transisi genrenya paling mulus, sehingga Anda dan teman tidak merasa kaget saat berpindah dari satu game ke game lain.
+
+## 6. Ant Colony Optimization / ACO (Optimasi Koloni Semut)
+**"Menemukan Jejak di Hutan Backlog"**
+
+*   **Masalah**: Anda punya banyak game yang belum dimainkan. Mana yang harus dimainkan duluan?
+*   **Analogi**: Semut mencari makanan dengan meninggalkan jejak bau (feromon). Semakin banyak semut lewat jalan itu, baunya makin kuat, dan semut lain akan ikut.
+*   **Cara Kerja di Sini**: Sistem mensimulasikan "semut digital" yang berjalan di daftar backlog Anda. Jalur yang paling sering dilewati (karena skor Fuzzy-nya tinggi) akan menjadi rute utama di Campaign Map Anda.
+
+## 7. Simulated Annealing / SA (Pendinginan Tiruan)
+**"Memilih Daftar yang Tidak Membosankan"**
+
+*   **Masalah**: Jika sistem hanya memberi yang paling mirip, daftar Anda akan berisi 12 game yang genrenya sama semua. Itu membosankan.
+*   **Analogi**: Seperti membuat campuran kopi. Jika terlalu banyak gula, kemanisan. Jika terlalu banyak kopi, kepahitan. Kita mengocok bahan-bahannya saat masih "panas", lalu pelan-pelan kita biarkan "dingin" sampai komposisinya pas dan nikmat.
+*   **Cara Kerja di Sini**: SA mengambil hasil dari algoritma lain, lalu "mengacaknya" sedikit. Dia membuang game yang terlalu mirip dan menggantinya dengan variasi lain yang tetap berkualitas, sehingga hasil akhirnya adalah daftar 12 game yang beragam tapi tetap Anda sukai.

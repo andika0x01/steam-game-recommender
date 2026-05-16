@@ -1,24 +1,45 @@
-# 01 - Arsitektur Hybrid Parallel Ensemble
+# 01 - Arsitektur Hybrid Parallel Ensemble: Otak di Balik Rekomendasi
 
-Sistem ini tidak mengandalkan satu algoritma tunggal. Sebaliknya, ia menggunakan arsitektur **Parallel Hybrid Ensemble** untuk menghasilkan rekomendasi yang seimbang antara akurasi (relevance) dan kejutan (novelty).
+Dokumen ini menjelaskan "peta jalan" bagaimana aplikasi ini berpikir. Kita tidak menggunakan satu cara saja untuk memberi rekomendasi, melainkan menggabungkan banyak algoritma pintar yang bekerja bersamaan.
 
-## Alur Kerja Pipeline
+## Apa itu Hybrid Parallel Ensemble?
 
-### 1. Data Processing (Fuzzy Profiling)
-Sistem mengambil data library dan playtime Anda. Algoritma **Fuzzy Logic** dengan fungsi keanggotaan **Trapezoidal** (dioptimasi oleh GA) digunakan untuk mengubah angka mentah jam main menjadi kategori linguistik (Low, Medium, High engagement). Ini membangun profil preferensi genre yang lebih dinamis daripada sekadar angka rata-rata.
+Bayangkan Anda ingin membeli mobil baru. Anda tentu tidak hanya bertanya pada satu orang, bukan?
+1. Anda bertanya pada **ahli mesin** (data teknis).
+2. Anda bertanya pada **teman yang hobi balap** (pengalaman emosional).
+3. Anda melihat **daftar diskon** di koran (ekonomi).
 
-### 2. Candidate Generation (Parallel Agents)
-Dua agen bekerja secara paralel untuk mencari kandidat game baru:
-- **Bayesian Agent**: Menghitung probabilitas ketertarikan matematis berdasarkan sejarah genre di library Anda.
-- **A* Search Agent**: Navigasi graf kemiripan genre untuk mencari game yang secara struktural "dekat" dengan game favorit Anda.
+Sistem kami bekerja persis seperti itu. Kami menjalankan beberapa "agen cerdas" secara paralel (bersamaan), lalu menggabungkan saran mereka menjadi satu daftar terbaik untuk Anda.
 
-### 3. Selection & Diversity (Simulated Annealing)
-Dari ratusan kandidat yang ditemukan agen, sistem menggunakan **Simulated Annealing (SA)** untuk memilih 12 game terbaik. SA bertugas mencari kombinasi game yang memiliki total skor afinitas tinggi namun tetap menjaga **keberagaman genre (diversity)** agar daftar tidak membosankan (misal: tidak RPG semua).
+---
 
-### 4. Continuous Evolution (GA & PSO)
-Sistem memiliki memori di database D1 untuk menyimpan parameter yang sudah di-tune:
-- **GA (Genetic Algorithm)**: Digunakan untuk menyesuaikan batas-batas kategori Fuzzy agar sesuai dengan gaya bermain Anda.
-- **PSO (Particle Swarm Optimization)**: Digunakan untuk mencari bobot kepentingan kriteria (seperti diskon vs afinitas) pada fitur Deal Hunter.
+## Alur Kerja Sistem (Pipeline)
 
-## Struktur Komputasi di Edge
-Seluruh logika ini dijalankan di **Cloudflare Workers**. Penggunaan TypeScript murni pada folder `src/algorithm/` memungkinkan eksekusi matematika CI yang sangat cepat dengan latensi rendah (cold-start mendekati nol), langsung di server yang paling dekat dengan lokasi fisik pengguna.
+### Tahap 1: Mengenali Kepribadian Anda (User Profiling)
+Sebelum memberi saran, sistem harus tahu siapa Anda.
+*   **Algoritma**: *Fuzzy Logic* & *Genetic Algorithm*.
+*   **Analogi**: Seperti koki yang mencicipi masakan Anda untuk tahu apakah Anda suka pedas atau manis. Sistem melihat jam main Anda dan menentukan: "Oh, orang ini adalah penggemar berat RPG, tapi hanya pemain kasual di game FPS."
+
+### Tahap 2: Mencari Kandidat (The Search Party)
+Sistem mulai mencari game di seluruh database Steam.
+*   **Agen Bayesian**: Dia melihat data statistik. "Berdasarkan angka, ada peluang 90% Anda akan suka game ini."
+*   **Agen A***: Dia melihat hubungan antar game. "Jika Anda suka Elden Ring, maka jalur terdekat secara mekanik permainan adalah menuju Dark Souls."
+*   **Agen ACO**: Dia melihat tren. "Banyak pemain dengan selera seperti Anda berakhir sangat menyukai game tersembunyi ini."
+
+### Tahap 3: Seleksi Final (The Quality Control)
+Setelah dapat ratusan saran, sistem tidak langsung memberikan semuanya ke Anda.
+*   **Algoritma**: *Simulated Annealing*.
+*   **Analogi**: Seperti menyusun sebuah majalah. Anda tidak ingin isinya hanya tentang satu topik. Sistem memilih 12 game yang skornya paling tinggi, tapi tetap memastikan genrenya bervariasi (tidak RPG semua) agar Anda tidak bosan.
+
+### Tahap 4: Optimasi Biaya (The Deal Finder)
+Khusus untuk fitur diskon, sistem menjalankan agen tambahan.
+*   **Algoritma**: *Particle Swarm Optimization*.
+*   **Tujuan**: Mencari keseimbangan antara "sangat murah" dan "sangat cocok".
+
+---
+
+## Mengapa Menggunakan Arsitektur Ini?
+
+1.  **Akurasi Tinggi**: Karena digarap oleh banyak algoritma sekaligus.
+2.  **Kejutan (Serendipity)**: Anda bisa menemukan game yang tidak pernah Anda pikirkan sebelumnya, tapi ternyata sangat cocok.
+3.  **Personalisasi**: Sistem "belajar" dan "berevolusi" setiap kali Anda menekan tombol optimasi, sehingga saran hari ini akan lebih pintar daripada saran kemarin.

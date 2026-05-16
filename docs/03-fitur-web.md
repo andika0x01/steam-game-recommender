@@ -1,29 +1,53 @@
-# 03 - Konsep Fitur & UI/UX
+# 03 - Panduan Pengalaman Pengguna (Fitur Web)
 
-Aplikasi ini dirancang dengan antarmuka **High-Signal Glassmorphism** yang memberikan kesan futuristik dan teknis, selaras dengan pemanfaatan algoritma Computational Intelligence.
+Halaman ini menjelaskan bagaimana teknologi canggih di balik layar diubah menjadi fitur-fitur yang bisa Anda lihat dan klik di website ini.
+
+---
 
 ## 1. Discovery Engine (`/engine`)
-*   **Tujuan**: Menemukan game baru (Discovery) yang belum dimiliki.
-*   **UX**: Menggunakan *Ensemble Scorer*. Menampilkan persentase kecocokan yang sangat akurat.
-*   **Kontrol**: Tombol tunggal **"Initialize PSO"** (untuk mengaktifkan tuning) atau **"Cancel Optimization"** (untuk reset). Ini memberi user kendali penuh atas kapan evolusi profil terjadi.
+**"Mesin Pencari Jodoh Digital Anda"**
+
+*   **Apa yang dilakukannya?**
+    Discovery Engine memindai ribuan game di Steam untuk menemukan game yang Anda **belum miliki** tapi kemungkinan besar akan Anda **sangat sukai**.
+*   **Bagaimana cara kerjanya?**
+    Sistem menjalankan **Ensemble Pipeline** (Bayesian + A* + SA). Dia menghitung peluang kecocokan secara matematis dan memastikan 12 game yang tampil di layar memiliki genre yang bervariasi.
+*   **Tombol Kontrol**: 
+    - **Initialize PSO**: Mengaktifkan mesin optimasi.
+    - **Cancel Optimization**: Mengembalikan ke setelan pabrik.
 
 ## 2. Campaign Map (`/backlog`)
-*   **Tujuan**: Mengelola tumpukan game (backlog) secara strategis.
-*   **UX**: Pertama-tama menampilkan seluruh koleksi yang dirating oleh Fuzzy Logic.
-*   **Kontrol**: Tombol **"Generate Campaign Route (ACO)"** memicu simulasi semut untuk menyusun peta perjalanan bermain yang optimal (waypoint).
+**"Peta Jalan Menuju Bebas Backlog"**
+
+*   **Apa yang dilakukannya?**
+    Membantu Anda mengatasi "kebingungan memilih" (choice paralysis) dari banyaknya game yang sudah Anda beli tapi belum dimainkan.
+*   **Langkah-langkah**:
+    1. Sistem menampilkan semua koleksi Anda yang sudah dirating (0-100%) menggunakan **Fuzzy Logic**.
+    2. Saat Anda menekan tombol **Generate Campaign Route**, sistem menjalankan **Ant Colony Optimization (ACO)**.
+    3. ACO akan menyusun rute perjalanan (Waypoints) berisi urutan game yang paling seru untuk dimainkan secara berurutan.
 
 ## 3. Co-op Nexus Map (`/coop`)
-*   **Tujuan**: Menemukan game terbaik untuk dimainkan bersama teman.
-*   **UX**: Panel kiri menampilkan arsip agen (teman) yang bisa dipilih secara massal (Multi-select).
-*   **Kontrol**: Tombol **"Generate Nexus Map (A*)"** menyusun rute kemiripan genre khusus untuk game yang dimiliki bersama oleh seluruh anggota grup.
+**"Bermain Bersama Menjadi Lebih Mudah"**
+
+*   **Apa yang dilakukannya?**
+    Mencari game yang dimiliki oleh Anda dan teman-teman Anda, lalu menyusun rute bermain yang cocok untuk semua orang di grup tersebut.
+*   **Fitur Utama**:
+    - **Multi-select Friends**: Anda bisa memilih banyak teman sekaligus di panel kiri.
+    - **A* Optimized Path**: Menggunakan algoritma **A*** untuk memastikan transisi antar game dalam sesi bermain bersama terasa mulus dan tidak membosankan bagi siapa pun.
 
 ## 4. Deal Hunter (`/deals`)
-*   **Tujuan**: Berburu diskon game dengan prinsip efisiensi biaya.
-*   **UX**: Menampilkan kartu diskon yang dirating berdasarkan algoritma PSO (Value-for-Money).
-*   **Filter**: Secara otomatis menyaring game yang sudah Anda miliki agar tidak muncul kembali.
+**"Belanja Cerdas dengan Kekuatan AI"**
 
-## Estetika Visual (UI Language)
-*   **Emerald (#10b981)**: Melambangkan koneksi aktif, rute optimal, dan penghematan biaya.
-*   **Amber (#f59e0b)**: Melambangkan status tuning, optimasi, dan peringatan sistem.
-*   **Zinc/Monochrome**: Warna dasar yang tenang untuk menjaga fokus pada data (game) dan skor rating.
-*   **Mono Typography**: Menggunakan font monospace untuk angka dan status teknis agar memberikan nuansa "Command Center".
+*   **Apa yang dilakukannya?**
+    Menyisir diskon game di CheapShark dan menampilkannya kepada Anda berdasarkan prinsip **Value-for-Money**.
+*   **Algoritma Utama**: **PSO (Particle Swarm Optimization)**.
+*   **Keunikan**: Sistem tidak hanya memberi tahu apa yang murah. Dia menyeimbangkan antara: "Seberapa besar diskonnya?", "Seberapa murah harganya?", dan "Seberapa cocok dengan selera Anda?".
+*   **Fitur Reset**: Anda bisa membatalkan optimasi jika ingin melihat penawaran diskon yang lebih umum (tidak terlalu personal).
+
+---
+
+## Mengapa Antarmuka Kami Terasa "Berbeda"? (UI/UX Concept)
+
+Kami menggunakan gaya desain **Glassmorphism**:
+- **Transparansi**: Melambangkan kejujuran data yang diolah AI.
+- **Aksen Warna Emerald/Amber**: Memberikan sinyal status mesin yang sedang bekerja (seperti Command Center).
+- **Animasi Transisi**: Menunjukkan bahwa sistem kami "hidup" dan terus memproses data Anda secara real-time.
