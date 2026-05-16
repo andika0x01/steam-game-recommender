@@ -8,8 +8,9 @@ import { calculateGenrePreferences, scoreGameRecommendation } from './lib/recomm
 
 const app = new Hono<{ Bindings: { STEAM_API_KEY: string, HOST_URL: string }, Variables: { steamId?: string } }>()
 
+app.use('/favicon.ico', serveStatic({ path: './public/favicon.ico' }))
+app.use('/static/*', serveStatic({ root: './' }))
 app.use('/assets/*', serveStatic({ root: './' }))
-app.use('/favicon.ico', serveStatic({ path: './favicon.ico' }))
 
 app.use('*', async (c, next) => {
   const steamId = getCookie(c, 'steam_id')
