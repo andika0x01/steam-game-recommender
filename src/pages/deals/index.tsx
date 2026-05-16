@@ -33,12 +33,8 @@ app.get('/', async (c) => {
   }
 
   if (rawDeals.length === 0) {
-    rawDeals = [
-      { title: 'The Witcher 3: Wild Hunt', salePrice: '9.99', normalPrice: '39.99', savings: '75', steamAppID: '292030', dealID: 'mock1', thumb: '' },
-      { title: 'Cyberpunk 2077', salePrice: '29.99', normalPrice: '59.99', savings: '50', steamAppID: '1091500', dealID: 'mock2', thumb: '' },
-      { title: 'Hades', salePrice: '12.49', normalPrice: '24.99', savings: '50', steamAppID: '1145360', dealID: 'mock3', thumb: '' },
-      { title: 'Stardew Valley', salePrice: '8.99', normalPrice: '14.99', savings: '40', steamAppID: '413150', dealID: 'mock4', thumb: '' }
-    ]
+    // If API fails, we return an empty set to maintain data integrity
+    rawDeals = []
   }
 
   let dealParams = [0.3, 0.5, 0.2]
