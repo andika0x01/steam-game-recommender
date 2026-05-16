@@ -62,7 +62,16 @@ app.get('/', async (c) => {
            <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
            <div className="flex flex-col md:flex-row gap-12 items-center relative z-10">
               <div className="w-64 md:w-80 shrink-0 aspect-[3/4] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white/5 group-hover:border-indigo-500/20 transition-all duration-700">
-                <img src={`https://cdn.akamai.steamstatic.com/steam/apps/${topRecommendation.appid}/library_600x900.jpg`} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                <img 
+                  src={`https://cdn.akamai.steamstatic.com/steam/apps/${topRecommendation.appid}/library_600x900.jpg`} 
+                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" 
+                  onError={(e: any) => {
+                    e.currentTarget.onerror = () => {
+                      e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
+                    }
+                    e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${topRecommendation.appid}/header.jpg`
+                  }}
+                />
               </div>
               <div className="space-y-8 flex-1 text-center md:text-left">
                  <div className="space-y-2">
@@ -91,7 +100,16 @@ app.get('/', async (c) => {
           {sortedBacklog.slice(1).map((game, idx) => (
             <div key={game.appid} className="group space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 40}ms` }}>
               <div className="aspect-[3/4] bg-zinc-900 rounded-[2rem] overflow-hidden relative border border-white/5 group-hover:border-white/20 transition-all duration-500 shadow-2xl">
-                <img src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110" />
+                <img 
+                  src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} 
+                  className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110" 
+                  onError={(e: any) => {
+                    e.currentTarget.onerror = () => {
+                      e.currentTarget.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
+                    }
+                    e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`
+                  }}
+                />
                 <div className="absolute top-4 right-4 glass px-3 py-1.5 rounded-full">
                   <p className="text-[10px] font-mono font-black text-white">{(game.personalMatch * 100).toFixed(0)}%</p>
                 </div>

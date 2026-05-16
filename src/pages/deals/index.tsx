@@ -104,8 +104,13 @@ app.get('/', async (c) => {
                 <img 
                   src={`https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/library_600x900.jpg`} 
                   className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" 
-                  alt={deal.title}
-                  onError={(e: any) => (e.currentTarget.src = deal.thumb)}
+                  alt={deal.name}
+                  onError={(e: any) => {
+                    e.currentTarget.onerror = () => {
+                      e.currentTarget.src = originalDeal?.thumb || 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app_library_600x900.png'
+                    }
+                    e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`
+                  }}
                 />
                 <div className="absolute top-2 right-2 bg-white text-black px-2 py-0.5 rounded-full border border-white/10 shadow-xl z-20">
                   <p className="text-[8px] font-mono font-black">{(deal.score * 100).toFixed(0)}% Match</p>
