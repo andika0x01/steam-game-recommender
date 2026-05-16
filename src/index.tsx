@@ -16,17 +16,38 @@ const app = new Hono<{
 }>()
 
 app.use('/favicon.ico', async (c, next) => {
-  if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw)
+  if (c.env.ASSETS) {
+    try {
+      const res = await c.env.ASSETS.fetch(c.req.raw)
+      if (res.status !== 404) return res
+    } catch (e) {
+      console.error('ASSETS fetch error:', e)
+    }
+  }
   await next()
 })
 
 app.use('/assets/*', async (c, next) => {
-  if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw)
+  if (c.env.ASSETS) {
+    try {
+      const res = await c.env.ASSETS.fetch(c.req.raw)
+      if (res.status !== 404) return res
+    } catch (e) {
+      console.error('ASSETS fetch error:', e)
+    }
+  }
   await next()
 })
 
 app.use('/static/*', async (c, next) => {
-  if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw)
+  if (c.env.ASSETS) {
+    try {
+      const res = await c.env.ASSETS.fetch(c.req.raw)
+      if (res.status !== 404) return res
+    } catch (e) {
+      console.error('ASSETS fetch error:', e)
+    }
+  }
   await next()
 })
 
@@ -208,7 +229,7 @@ app.get('/dashboard', async (c) => {
                     src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} 
                     alt={game.name}
                     className="w-full h-full object-cover transition-all duration-700"
-                    onError={(e) => (e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`)}
+                    onError={(e: any) => (e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`)}
                    />
                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2 md:p-4">
                       <p className="text-[10px] font-mono uppercase text-white">{(game.playtime_forever / 60).toFixed(1)}h</p>
@@ -221,7 +242,7 @@ app.get('/dashboard', async (c) => {
         </div>
       </div>
     </div>,
-    { title: 'Dashboard' }
+    { title: 'Dashboard' } as any
   )
 })
 
@@ -275,7 +296,7 @@ app.get('/recommendations', async (c) => {
                 src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`}
                 className="w-full h-full object-cover transition-all duration-700"
                 alt={game.name}
-                onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/460x215?text=Artifact+Missing')}
+                onError={(e: any) => (e.currentTarget.src = 'https://via.placeholder.com/460x215?text=Artifact+Missing')}
               />
                 <div className="absolute top-4 right-4 bg-white text-black px-3 py-1 rounded-full border border-white/10 shadow-xl">
                   <p className="text-[10px] font-mono font-bold">MATCH: {(game.score * 100).toFixed(0)}%</p>
@@ -311,7 +332,7 @@ app.get('/recommendations', async (c) => {
         </div>
       )}
     </div>,
-    { title: 'Fuzzy Logic Engine' }
+    { title: 'Fuzzy Logic Engine' } as any
   )
 })
 
