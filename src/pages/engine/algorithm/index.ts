@@ -1,4 +1,4 @@
-import { calculateGenrePreferences } from '../../../algorithm'
+import { calculateGenrePreferences } from '../../shared/algorithm'
 import { calculateBayesianScore } from './bayesian'
 import { runSimulatedAnnealing, CandidateGame } from './sa'
 import { aStarSearch, GameNode } from '../../coop/algorithm/classicalSearch'

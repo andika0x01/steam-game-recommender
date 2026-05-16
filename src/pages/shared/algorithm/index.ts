@@ -24,7 +24,6 @@ export function calculateGenrePreferences(games: any[], customParams?: number[])
         }
       })
     } else {
-      // Fallback if genres are missing but game exists
       genreScores['Indie'] = (genreScores['Indie'] || 0) + engagement
     }
   })
