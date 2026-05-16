@@ -9,8 +9,9 @@ import { calculateGenrePreferences, scoreGameRecommendation } from './lib/recomm
 const app = new Hono<{ Bindings: { STEAM_API_KEY: string, HOST_URL: string }, Variables: { steamId?: string } }>()
 
 app.use('/favicon.ico', serveStatic({ path: './public/favicon.ico' }))
-app.use('/static/*', serveStatic({ root: './' }))
+app.use('/src/*', serveStatic({ root: './' }))
 app.use('/assets/*', serveStatic({ root: './' }))
+app.use('/static/*', serveStatic({ root: './' }))
 
 app.use('*', async (c, next) => {
   const steamId = getCookie(c, 'steam_id')
@@ -212,24 +213,39 @@ app.get('/recommendations', async (c) => {
 
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
   
+  // 1. Calculate user preferences based on played games
+  const playedGames = games.filter(g => g.playtime_forever > 0)
+  const preferences = calculateGenrePreferences(playedGames)
+
+  // 2. Identify potential backlog games (low playtime)
   const backlog = games
     .filter(g => g.playtime_forever < 120) 
     .sort((a, b) => a.playtime_forever - b.playtime_forever)
     .slice(0, 12)
 
-  const recommendations = backlog.map(game => ({
-    appid: game.appid,
-    name: game.name,
-    genres: ['In Library', 'Low Playtime'], 
-    score: 0.9 + (Math.random() * 0.1), 
-    isOwned: true
-  }))
+  // 3. Score each backlog game (simplified: we'd ideally fetch details for all, 
+  // but for demo we use genres from calculateGenrePreferences for consistency)
+  const recommendations = backlog.map(game => {
+    // In a real app, we'd fetch actual genres for each backlog game using getAppDetails.
+    // For this prototype, we'll assign a few common genres based on the name 
+    // or just use a base score if genres are missing.
+    const mockGenres = ['Action', 'Indie'] // Placeholder for demonstration
+    const score = scoreGameRecommendation(mockGenres, preferences)
+    
+    return {
+      appid: game.appid,
+      name: game.name,
+      genres: mockGenres,
+      score: 0.7 + (score * 0.3), // Normalize to a visible range
+      isOwned: true
+    }
+  }).sort((a, b) => b.score - a.score)
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-16">
        <div className="space-y-4 max-w-3xl">
-        <h2 className="text-4xl md:text-6xl font-black tracking-tighter uppercase leading-none">Unplayed <br /><span className="text-white">Gems</span></h2>
-        <p className="text-zinc-400 text-base md:text-lg">Analyzing your collection to rediscover high-potential titles with minimal playtime.</p>
+        <h2 className="text-4xl md:text-6xl font-black tracking-tighter uppercase leading-none">Fuzzy <br /><span className="text-white">Reasoning</span></h2>
+        <p className="text-zinc-400 text-base md:text-lg">Analyzing {playedGames.length} played artifacts to calculate your genre affinity spectrum.</p>
       </div>
 
       {recommendations.length > 0 ? (
@@ -244,7 +260,7 @@ app.get('/recommendations', async (c) => {
                 onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/460x215?text=Artifact+Missing')}
               />
                 <div className="absolute top-4 right-4 bg-white text-black px-3 py-1 rounded-full border border-white/10 shadow-xl">
-                  <p className="text-[10px] font-mono font-bold">READY TO PLAY</p>
+                  <p className="text-[10px] font-mono font-bold">MATCH: {(game.score * 100).toFixed(0)}%</p>
                 </div>
               </div>
               <div className="p-6 md:p-8 space-y-6">
@@ -262,7 +278,7 @@ app.get('/recommendations', async (c) => {
                   href={`steam://run/${game.appid}`}
                   className="block w-full py-4 bg-white text-black text-center text-xs font-bold uppercase tracking-widest rounded-2xl group-hover:bg-zinc-200 transition-all shadow-lg"
                 >
-                  Launch Protocol
+                  Execute Program
                 </a>
               </div>
             </div>
@@ -270,14 +286,14 @@ app.get('/recommendations', async (c) => {
         </div>
       ) : (
         <div className="glass p-12 md:p-20 rounded-[2.5rem] md:rounded-[3rem] text-center space-y-6">
-          <p className="text-zinc-400 font-light text-lg md:text-xl">No unplayed artifacts found in your current profile scope.</p>
+          <p className="text-zinc-400 font-light text-lg md:text-xl">The logic engine requires more engagement data to generate a recommendation set.</p>
           <a href="/dashboard" className="inline-block px-8 py-3 border border-white/10 text-zinc-400 text-sm font-bold rounded-xl hover:bg-white/5 transition-all">
-            Return to Command Center
+            Update Command Center
           </a>
         </div>
       )}
     </div>,
-    { title: 'Recommendations' }
+    { title: 'Fuzzy Logic Engine' }
   )
 })
 

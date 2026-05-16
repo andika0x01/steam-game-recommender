@@ -15,7 +15,7 @@ export const renderer = jsxRenderer(({ children, title }, c) => {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
-        <Link href="/static/src/style.css" rel="stylesheet" />
+        <Link href="/src/style.css" rel="stylesheet" />
       </head>
       <body className="min-h-[100dvh] bg-background text-foreground selection:bg-white/20 pt-20">
         <Nav steamId={steamId} />
