@@ -1,24 +1,41 @@
-# 01 - Halaman Discovery Engine
+# 01 - Alur Proses Halaman Discovery Engine
 
-Halaman **Discovery Engine** (`/engine`) adalah pusat penemuan game baru yang paling cocok dengan kepribadian bermain Anda.
-
-## Fungsi Utama (Perspektif Pengguna)
-Discovery Engine memindai ribuan game di Steam untuk menemukan "belahan jiwa digital" Anda berikutnya. Halaman ini tidak menampilkan game yang sudah Anda miliki, melainkan fokus pada apa yang harus Anda dapatkan selanjutnya agar waktu bermain Anda maksimal.
-
-## Bagaimana Cara Kerjanya? (Algoritma CI)
-Halaman ini bekerja secara prosedural menggunakan **Hybrid Ensemble Pipeline** yang terdiri dari beberapa algoritma cerdas:
-
-### 1. Profiling dengan Genetic Algorithm (GA)
-Saat Anda menekan tombol **Initialize PSO/GA**, sistem menjalankan algoritma evolusi. Ia mencoba berbagai kombinasi parameter untuk profil *Fuzzy Logic* Anda dan memilih yang paling akurat dalam mendeskripsikan library Anda saat ini.
-
-### 2. Bayesian Scorer
-Sistem menggunakan logika peluang **Bayesian**. Ia melihat genre apa yang paling sering Anda mainkan di masa lalu dan menghitung probabilitas matematis apakah Anda akan menyukai game baru tertentu. Game dengan genre yang sering Anda mainkan akan mendapatkan skor awal yang tinggi.
-
-### 3. A* Similarity Search
-Sistem membangun graf hubungan antar game. Algoritma **A*** mencari jalur terpendek (kesamaan fitur paling dekat) antara game favorit Anda dengan kandidat game baru di Steam Store. Ini memastikan rekomendasi tetap relevan secara mekanik permainan.
-
-### 4. Simulated Annealing (SA)
-Ini adalah tahap akhir. Setelah mendapatkan ratusan saran, algoritma **SA** memilih 12 game terbaik. SA memastikan daftar tersebut tidak membosankan (misal: tidak semuanya game tembak-tembakan). Ia sengaja menyisipkan variasi genre agar pengalaman penemuan Anda tetap segar.
+Halaman **Discovery Engine** (`/engine`) mendemonstrasikan penggabungan (ensemble) beberapa algoritma CI melalui alur kronologis berikut.
 
 ---
-*Fitur ini dirancang untuk memberikan jawaban atas pertanyaan: "Game hebat apa lagi yang belum saya punya?"*
+
+## 1. Fase Input & Pre-processing
+Sistem menarik data tren dari SteamSpy API. Game yang sudah dimiliki pengguna difilter keluar. Data mentah (genre) disiapkan sebagai atribut fitur.
+
+## 2. Fase Profiling: Genetic Algorithm (GA)
+GA digunakan untuk mencari parameter optimal ($P$) bagi fungsi keanggotaan Fuzzy.
+*   **Kromosom**: Vektor parameter $[a, b, c, d]$.
+*   **Fitness Function**: Memaksimalkan separabilitas data engagement:
+    $$f(P) = \sum_{i=1}^{n} \text{Engagement}_i(P)$$
+*   **Evolusi**: Menggunakan seleksi elitism, crossover seragam, dan mutasi Gaussian untuk konvergensi global.
+
+## 3. Fase Scoring: Bayesian Inference
+Sistem menghitung probabilitas ketertarikan menggunakan rumus Bayes:
+$$P(Like|Genres) = \frac{P(Genres|Like) \times P(Like)}{P(Genres)}$$
+Dimana:
+*   $P(Like)$: Rasio game yang dimainkan $> 2$ jam di library.
+*   $P(Genres|Like)$: Probabilitas munculnya genre tertentu pada game yang disukai.
+*   Digunakan **Laplace Smoothing** untuk menangani genre baru: $\frac{count + 1}{total + 2}$.
+
+## 4. Fase Similarity: A* Search
+Membangun rute kemiripan dari game terpopuler user ke kandidat baru.
+*   **Fungsi Evaluasi**: $f(n) = g(n) + h(n)$
+*   **Cost $g(n)$**: Akumulasi jarak kemiripan genre.
+*   **Heuristic $h(n)$**: Jarak genre antara node saat ini dengan target:
+    $$h(n) = 1 - \frac{|Genres_{current} \cap Genres_{target}|}{|Genres_{current} \cup Genres_{target}|}$$
+
+## 5. Fase Final: Simulated Annealing (SA)
+SA menyeleksi 12 game terbaik dari ratusan kandidat dengan menjaga diversitas.
+*   **Energi Sistem ($E$)**: Kombinasi skor afinitas ($S$) dan penalti keseragaman ($D$):
+    $$E = \sum S_i + \lambda \cdot Count(\text{Unique Genres})$$
+*   **Kriteria Penerimaan (Boltzmann)**: Probabilitas menerima solusi yang lebih buruk untuk menghindari *local optima*:
+    $$P = \exp\left(\frac{\Delta E}{T}\right)$$
+    Dimana $T$ (suhu) menurun secara eksponensial: $T_{new} = T_{old} \times \alpha$.
+
+---
+*Hasil Akhir: Daftar rekomendasi yang akurat secara matematis namun tetap bervariasi.*

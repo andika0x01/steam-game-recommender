@@ -1,22 +1,32 @@
-# 03 - Halaman Co-op Nexus
+# 03 - Alur Proses Halaman Co-op Nexus
 
-Halaman **Co-op Nexus** (`/coop`) adalah fitur sosial cerdas untuk menemukan waktu bermain yang berkualitas bersama teman-teman Anda.
-
-## Fungsi Utama (Perspektif Pengguna)
-Anda bisa memilih beberapa teman sekaligus dari daftar "Arsip Agen". Sistem akan secara otomatis mencari game apa saja yang Anda dan teman-teman Anda miliki bersama (*Shared Assets*). Kemudian, sistem akan membuat rute bermain yang seru untuk sesi *gaming* grup Anda.
-
-## Bagaimana Cara Kerjanya? (Algoritma CI)
-
-### 1. Multi-Agent Intersection
-Sistem melakukan irisan (intersection) data library antar teman secara real-time. Ini memastikan game yang disarankan benar-benar dimiliki oleh semua orang di grup tersebut.
-
-### 2. A* Search Mapping
-Saat Anda menekan tombol **Generate Nexus Map**, algoritma **A*** bekerja di balik layar.
-*   **Logika**: A* mencari jalur bermain yang memiliki transisi genre paling mulus.
-*   **Tujuan**: Menghindari perpindahan game yang terlalu drastis (misal dari game teka-teki santai langsung ke game perang kompetitif yang intens). A* menyusun rute agar suasana sesi bermain bersama tetap terjaga (*flow maintenance*).
-
-### 3. Waypoint Sequencing
-Hasil rute A* ditampilkan dengan nomor urut yang jelas. Ini berfungsi sebagai "Peta Strategi" bagi grup Anda untuk menghabiskan malam minggu atau sesi bermain bersama.
+Halaman ini mengintegrasikan data dari banyak agen untuk mencari irisan kepentingan dan rute bersama.
 
 ---
-*Fitur ini dirancang untuk menjawab pertanyaan: "Kita semua punya game apa ya yang seru buat dimainkan bareng sekarang?"*
+
+## 1. Fase Sinkronisasi (Intersection)
+Sistem melakukan operasi irisan himpunan pada ID game dari $N$ user:
+$$S = Library_1 \cap Library_2 \cap \dots \cap Library_n$$
+
+## 2. Fase Pemodelan Graf
+Membangun graf kedekatan genre untuk game di dalam set $S$. Jarak antar node $i$ dan $j$ dihitung menggunakan **Jaccard Distance** pada genre:
+$$d(i, j) = 1 - \frac{|Genres_i \cap Genres_j|}{|Genres_i \cup Genres_j|}$$
+
+## 3. Fase Pathfinding: A* Search
+Algoritma A* mencari jalur terpendek dari game awal ke game akhir di daftar bersama untuk menjaga *flow* genre.
+
+### Fungsi Heuristik
+Heuristik $h(n)$ memberikan estimasi biaya terendah dari node $n$ ke target:
+$$h(n) = \text{Minimisasi perbedaan genre terhadap target}$$
+
+### Pencarian Node
+Algoritma memelihara `Open Set` dan memilih node $n$ yang meminimalkan:
+$$f(n) = g(n) + h(n)$$
+*   $g(n)$: Biaya nyata yang sudah ditempuh dari awal.
+*   $f(n)$: Perkiraan total biaya terendah untuk rute yang melewati node $n$.
+
+## 4. Fase Output
+Menghasilkan daftar linear game yang telah diurutkan berdasarkan skor $f(n)$ terkecil. Waypoints ini kemudian divisualisasikan dengan konektor dinamis di UI.
+
+---
+*Hasil Akhir: Strategi bermain grup yang meminimalkan hambatan transisi genre bagi seluruh anggota.*

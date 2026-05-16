@@ -1,35 +1,40 @@
-# 05 - Arsitektur Prosedural Modular
+# 05 - Panduan Arsitektur Prosedural Modular
 
-Dokumen ini menjelaskan struktur teknis kode sumber aplikasi ini. Aplikasi ini dibangun dengan prinsip **Prosedural Murni per Halaman**.
+Aplikasi ini tidak mengikuti standar arsitektur perangkat lunak komersial pada umumnya. Sebaliknya, ia menggunakan pendekatan **Prosedural Murni per Halaman** yang dirancang khusus untuk transparansi akademik dan kemudahan pemahaman algoritma.
 
-## Apa maksudnya Prosedural per Halaman?
+---
 
-Biasanya, pengembang perangkat lunak menumpuk semua algoritma di satu folder pusat. Namun, untuk aplikasi ini, kami mengambil pendekatan berbeda:
-*   Setiap halaman (Page) adalah satu kesatuan yang utuh.
-*   Logika algoritma berada langsung di dalam folder halaman tersebut (`src/pages/[nama-halaman]/algorithm/`).
-*   Jika sebuah halaman membutuhkan algoritma Fuzzy, maka kode Fuzzy tersebut ada di dalam foldernya sendiri.
+## 1. Konsep Dasar
+Dalam arsitektur tradisional, pengembang cenderung menumpuk semua logika di satu tempat terpusat (Shared Library). Namun, pada proyek ini:
+*   Setiap halaman (`/engine`, `/backlog`, dll) dianggap sebagai satu unit mandiri.
+*   Logika algoritma berada di dalam folder halaman tersebut (`algorithm/`).
+*   Proses berjalan secara linear: **Menerima Data API -> Memproses via Algoritma Lokal -> Merender UI**.
 
-## Mengapa Pendekatan Ini Diambil?
+## 2. Alasan Akademis (Mengapa Prosedural?)
+Pendekatan ini diambil untuk mempermudah penilaian Tugas Besar:
+1.  **Transparansi Alur**: Penilai dapat melihat dengan jelas bagaimana data mengalir di satu halaman tanpa harus mencari file referensi di folder lain yang jauh.
+2.  **Isolasi Kegagalan**: Jika ada perubahan pada algoritma di halaman Deals, hal tersebut tidak akan merusak kestabilan halaman Engine. Ini sangat penting saat melakukan eksperimen algoritma.
+3.  **Independensi Modul**: Setiap folder halaman bisa dilepas dan dijalankan secara mandiri, memudahkan pengujian unit (unit testing) untuk setiap fitur spesifik.
 
-1.  **Kemudahan Pemahaman**: Seseorang yang ingin mempelajari cara kerja "Campaign Map" tidak perlu mencari-cari kode di folder lain. Semuanya ada di `src/pages/backlog/`.
-2.  **Isolasi Kegagalan**: Kesalahan pada algoritma di halaman Deals tidak akan mempengaruhi kinerja algoritma di halaman Engine.
-3.  **Prosedural dari Nol**: Setiap halaman memulai operasinya secara mandiri, memudahkan penilaian akademis terhadap alur proses dari input (data Steam) hingga output (rekomendasi di UI).
-
-## Struktur Folder Teknis
+## 3. Pembedahan Struktur Folder
+Berikut adalah peta jalan kode sumber:
 
 ```text
 src/
 └── pages/
-    ├── engine/             # Fitur Discovery
-    │   ├── index.tsx       # Alur Prosedural Halaman
-    │   └── algorithm/      # Otak Bayesian, SA, GA
-    ├── backlog/            # Fitur Campaign Map
-    │   ├── index.tsx       # Alur Prosedural Halaman
-    │   └── algorithm/      # Otak ACO, Fuzzy
-    ├── coop/               # Fitur Nexus
-    │   ├── index.tsx       # Alur Prosedural Halaman
-    │   └── algorithm/      # Otak A* Search
-    └── ...
+    ├── dashboard/       # Logika Persona & Profiling Dasar
+    ├── engine/          # [Pusat CI] Pipeline Ensemble (Bayesian, A*, SA)
+    │   └── algorithm/   # Otak cerdas khusus Discovery
+    ├── backlog/         # [Pusat CI] Sequencing (ACO, Fuzzy)
+    │   └── algorithm/   # Otak cerdas khusus Campaign Map
+    ├── coop/            # [Pusat CI] Pathfinding (A*)
+    │   └── algorithm/   # Otak cerdas khusus Nexus
+    └── deals/           # [Pusat CI] Multi-Objective Opt (PSO)
+        └── algorithm/   # Otak cerdas khusus Deal Hunter
 ```
 
-Pendekatan ini memastikan bahwa setiap baris kode memiliki "rumah" yang jelas dan tujuan yang spesifik dalam alur kerja pengguna.
+## 4. Keunggulan untuk Pengembangan Masa Depan
+Jika Anda ingin menambahkan fitur baru, Anda hanya perlu membuat satu folder baru di bawah `src/pages/`. Anda tidak perlu khawatir merusak logika yang sudah ada. Arsitektur ini mengutamakan **Integritas Data** dan **Kejujuran Algoritma** di atas efisiensi pengetikan kode.
+
+---
+*Kesimpulan: Arsitektur ini adalah jembatan antara dunia riset algoritma dengan aplikasi web modern.*

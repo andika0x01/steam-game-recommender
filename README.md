@@ -4,79 +4,51 @@ Sistem rekomendasi game Steam canggih yang mentenagai Tugas Besar mata kuliah *C
 
 ## 🚀 Ikhtisar Proyek
 
-Steam Game Recommender bukan sekadar aplikasi daftar game. Ini adalah **Discovery Engine** yang mempelajari perilaku bermain Anda menggunakan *Hybrid Parallel Ensemble Pipeline*. Sistem ini memahami spektrum preferensi genre Anda secara matematis untuk menemukan permata tersembunyi di luar pustaka Anda atau menyusun rute bermain terbaik dari koleksi yang sudah ada.
+Steam Game Recommender bukan sekadar aplikasi daftar game biasa. Ini adalah **Intelligence-Powered Discovery Hub** yang mempelajari perilaku bermain Anda. Sistem ini memahami spektrum preferensi genre Anda secara matematis untuk menemukan permata tersembunyi di pasar Steam atau menyusun rute bermain terbaik dari koleksi yang sudah Anda miliki.
 
-### Fitur Utama & Algoritma CI
+### Fitur Utama & Alur Algoritma
 
-- **CI Ensemble Discovery Engine (`/engine`)**: Pipeline paralel yang menggabungkan Bayesian Scoring dan A* Similarity Search, dengan seleksi akhir menggunakan Simulated Annealing untuk menjaga keberagaman genre.
-- **Campaign Map (`/backlog`)**: Peta jalan bermain untuk menaklukkan koleksi game Anda.
-  - **Fuzzy Logic**: Merating seluruh koleksi berdasarkan afinitas.
-  - **ACO**: Menyusun rute (waypoints) bermain yang paling optimal berdasarkan skor rating.
-- **Multiplayer Nexus Map (`/coop`)**: Mencari irisan preferensi antar teman dan menggunakan **A*** untuk membuat peta strategi bermain bersama.
-- **Deal Hunter (`/deals`)**: Berburu diskon CheapShark menggunakan pembobotan **PSO** (Price vs Affinity) yang dinamis.
-- **Dynamic Optimization**: Tombol *Toggle* (Initialize/Cancel) untuk memicu evolusi algoritma (GA/PSO) secara real-time di database D1.
+- **Discovery Engine (`/engine`)**: Menemukan game baru (Discovery) menggunakan pipeline paralel Bayesian dan A*, disempurnakan dengan Simulated Annealing untuk keberagaman genre.
+- **Campaign Map (`/backlog`)**: Mengelola tumpukan game (backlog) dengan cara merating seluruh koleksi menggunakan Fuzzy Logic dan menyusun rute Waypoint menggunakan Ant Colony Optimization (ACO).
+- **Multiplayer Nexus Map (`/coop`)**: Mencari irisan aset bersama teman dan menggunakan algoritma A* untuk menciptakan peta strategi bermain grup yang mulus.
+- **Deal Hunter (`/deals`)**: Berburu diskon cerdas menggunakan optimasi multi-kriteria berbasis Particle Swarm Optimization (PSO) untuk menyeimbangkan harga dan minat.
 
 ## 🛠️ Tech Stack
 
-- **Framework**: [Hono](https://hono.dev/) (Web framework ultra-cepat untuk Cloudflare Workers)
-- **Runtime**: [Cloudflare Workers](https://workers.cloudflare.com/) (Edge Computing)
+- **Framework**: [Hono](https://hono.dev/) (Web framework ultra-cepat untuk Edge Computing)
 - **Frontend**: React (JSX) dengan Tailwind CSS & Glassmorphism Aesthetics.
-- **Database**: Cloudflare D1 (SQLite SQL di Edge).
+- **Database**: Cloudflare D1 (SQLite di Edge).
 - **Core Logic**: Suite Algoritma CI murni (TypeScript).
 
-## 📁 Struktur Proyek
+## 📁 Struktur Proyek (Arsitektur Prosedural)
 
 ```text
 src/
-├── algorithm/          # Core Logic (Matematika & CI)
-│   ├── fuzzyLogic.ts   # Pemodelan Linguistik (Engagement)
-│   ├── ga.ts           # Genetic Algorithm (Tuning Parameter Fuzzy)
-│   ├── pso.ts          # Particle Swarm Optimization (Weight Tuning)
-│   ├── bayesian.ts     # Bayesian Inference (Probabilistic Scoring)
-│   ├── classicalSearch.ts # A* Search (Graph Pathfinding)
-│   ├── aco.ts          # Ant Colony Optimization (Trail Sequencing)
-│   ├── sa.ts           # Simulated Annealing (Diversity Optimizer)
-│   └── index.ts        # Entry point Ensemble Pipeline
-├── docs/               # Dokumentasi Teknis Akademis
-├── lib/                # Wrapper API & Auth
-└── index.tsx           # Route, Controller & UI Rendering
+├── pages/              # Modul Mandiri Per Halaman
+│   ├── engine/         # Discovery: Bayesian, A*, SA, GA
+│   ├── backlog/        # Campaign Map: ACO, Fuzzy Rating
+│   ├── coop/           # Nexus Map: A* Search
+│   ├── deals/          # Deal Hunter: PSO, Bayesian
+│   └── ...             # Halaman Pendukung lainnya
+├── lib/                # Integrasi API (Steam, SteamSpy, CheapShark)
+└── index.tsx           # Orchestrator & Middleware
 ```
 
 ## ⚙️ Persiapan & Instalasi
 
-### Pengembangan Lokal
+1. **Konfigurasi Variabel**: Edit `.dev.vars` dan masukkan `STEAM_API_KEY` Anda.
+2. **Migrasi Database**: Jalankan `npx wrangler d1 migrations apply steam-recommender --local`.
+3. **Jalankan Server**: `npm run dev`.
 
-1. **Clone & Install**:
-   ```bash
-   npm install
-   ```
+## 🚢 Dokumentasi Alur Kronologis (A-to-Z)
 
-2. **Konfigurasi Variabel**:
-   Edit file `.dev.vars`:
-   ```text
-   STEAM_API_KEY=api_key_anda
-   HOST_URL=http://localhost:5173
-   ```
+Dokumentasi di bawah ini menjelaskan setiap fitur dari fase input data hingga visualisasi di layar, lengkap dengan pembedahan algoritma yang bekerja:
 
-3. **Migrasi Database**:
-   ```bash
-   npx wrangler d1 migrations apply steam-recommender --local
-   ```
-
-4. **Jalankan Server**:
-   ```bash
-   npm run dev
-   ```
-
-## 🚢 Dokumentasi Mendalam (Berbasis Halaman)
-
-Silakan telusuri folder `docs/` untuk penjelasan akademis yang sangat mendetail, menggunakan analogi sederhana agar mudah dipahami:
-
-1. [Halaman Discovery Engine](./docs/01-halaman-discovery-engine.md) - Bedah algoritma Bayesian, A*, dan Simulated Annealing.
-2. [Halaman Campaign Map (Backlog)](./docs/02-halaman-campaign-backlog.md) - Cara kerja Ant Colony Optimization dan Fuzzy Logic Rating.
-3. [Halaman Co-op Nexus](./docs/03-halaman-coop-nexus.md) - Pemanfaatan algoritma A* untuk strategi bermain bersama.
-4. [Halaman Deal Hunter](./docs/04-halaman-deal-hunter.md) - Optimasi nilai menggunakan Particle Swarm Optimization (PSO).
-5. [Arsitektur Prosedural Modular](./docs/05-arsitektur-prosedural.md) - Penjelasan struktur kode program yang mandiri per halaman.
+1. [Pembedahan Discovery Engine](./docs/01-halaman-discovery-engine.md) - Alur Pipeline Ensemble (Bayesian, A*, SA).
+2. [Pembedahan Campaign Map](./docs/02-halaman-campaign-backlog.md) - Alur Rating Fuzzy dan Rute ACO.
+3. [Pembedahan Co-op Nexus](./docs/03-halaman-coop-nexus.md) - Alur Sinkronisasi Agen dan Rute A*.
+4. [Pembedahan Deal Hunter](./docs/04-halaman-deal-hunter.md) - Alur Optimasi PSO untuk nilai belanja.
+5. [Arsitektur Prosedural Modular](./docs/05-arsitektur-prosedural.md) - Mengapa kode dipisah mandiri per halaman.
 
 ---
-*Dikembangkan sebagai solusi cerdas bagi gamer yang ingin memaksimalkan investasi waktu dan biaya di platform Steam.*
+*Dikembangkan dengan standar integritas data 100% menggunakan API Steam dunia nyata.*
