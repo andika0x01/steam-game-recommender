@@ -1,41 +1,35 @@
-# 01 - Alur Proses Halaman Discovery Engine
+# 01 - Alur Proses Halaman Discovery Engine (Deep Personalization Edition)
 
-Halaman **Discovery Engine** (`/engine`) mendemonstrasikan penggabungan (ensemble) beberapa algoritma CI melalui alur kronologis berikut.
+Halaman **Discovery Engine** (`/engine`) telah dirombak total untuk memberikan personalisasi mendalam dengan meninggalkan metode mainstream. Sistem ini sekarang menggunakan fusi **Fuzzy Logic** dan **Bayesian Inference** yang dioptimalkan oleh **Simulated Annealing**.
 
 ---
 
-## 1. Fase Input & Pre-processing
-Sistem menarik data tren dari SteamSpy API. Game yang sudah dimiliki pengguna difilter keluar. Data mentah (genre) disiapkan sebagai atribut fitur.
+## 1. Fase Input & Discovery Expansion
+Sistem menarik kandidat dari dua sumber sekaligus (Top 100 2 Weeks & Top 100 Forever) untuk menciptakan pool **200+ game**. Game yang sudah dimiliki difilter, dan kandidat yang tersisa diperkaya (Enriched) dengan data genre asli dari Steam Store melalui **Cloudflare KV Cache**.
 
-## 2. Fase Profiling: Genetic Algorithm (GA)
-GA digunakan untuk mencari parameter optimal ($P$) bagi fungsi keanggotaan Fuzzy.
-*   **Kromosom**: Vektor parameter $[a, b, c, d]$.
-*   **Fitness Function**: Memaksimalkan separabilitas data engagement:
-    $$f(P) = \sum_{i=1}^{n} \text{Engagement}_i(P)$$
-*   **Evolusi**: Menggunakan seleksi elitism, crossover seragam, dan mutasi Gaussian untuk konvergensi global.
+## 2. Fase Profiling: Fuzzy Engagement Modeling
+Alih-alih menggunakan ambang batas (threshold) kaku, sistem menggunakan **Fuzzy Logic** untuk menilai seberapa besar user menyukai sebuah game di library mereka.
+*   **Variabel Input**: Playtime (Jam).
+*   **Fungsi Keanggotaan**: Trapesium ($\mu(x)$) digunakan untuk menghitung bobot keterikatan user ($W$):
+    $$W_i = \text{trapezoid}(\text{playtime}_i, 0, 2, 1000, 1000)$$
+    *Game dengan playtime sangat rendah (< 2 jam) memiliki bobot rendah, sementara game kronis memiliki bobot penuh (1.0).*
 
-## 3. Fase Scoring: Bayesian Inference
-Sistem menghitung probabilitas ketertarikan menggunakan rumus Bayes:
+## 3. Fase Scoring: Fuzzy-Bayesian Fusion
+Sistem menghitung probabilitas ketertarikan menggunakan rumus Bayes yang telah dimodifikasi untuk menerima input kontinu dari Fuzzy Logic:
 $$P(Like|Genres) = \frac{P(Genres|Like) \times P(Like)}{P(Genres)}$$
+
 Dimana:
-*   $P(Like)$: Rasio game yang dimainkan $> 2$ jam di library.
-*   $P(Genres|Like)$: Probabilitas munculnya genre tertentu pada game yang disukai.
-*   Digunakan **Laplace Smoothing** untuk menangani genre baru: $\frac{count + 1}{total + 2}$.
+*   **Prior $P(Like)$**: Total Fuzzy Weight dibagi jumlah game di library.
+    $$P(Like) = \frac{\sum W_i}{N}$$
+*   **Likelihood $P(Genre|Like)$**: Menggunakan bobot fuzzy sebagai sinyal probabilitas:
+    $$P(Genre|Like) = \frac{\sum (W_i \cdot I(G_{ij})) + \epsilon}{\sum W_i + \alpha}$$
+    Dimana $I(G_{ij})$ adalah indikator (1 jika game $i$ memiliki genre $j$, 0 jika tidak).
 
-## 4. Fase Similarity: A* Search
-Membangun rute kemiripan dari game terpopuler user ke kandidat baru.
-*   **Fungsi Evaluasi**: $f(n) = g(n) + h(n)$
-*   **Cost $g(n)$**: Akumulasi jarak kemiripan genre.
-*   **Heuristic $h(n)$**: Jarak genre antara node saat ini dengan target:
-    $$h(n) = 1 - \frac{|Genres_{current} \cap Genres_{target}|}{|Genres_{current} \cup Genres_{target}|}$$
-
-## 5. Fase Final: Simulated Annealing (SA)
-SA menyeleksi 12 game terbaik dari ratusan kandidat dengan menjaga diversitas.
-*   **Energi Sistem ($E$)**: Kombinasi skor afinitas ($S$) dan penalti keseragaman ($D$):
-    $$E = \sum S_i + \lambda \cdot Count(\text{Unique Genres})$$
-*   **Kriteria Penerimaan (Boltzmann)**: Probabilitas menerima solusi yang lebih buruk untuk menghindari *local optima*:
-    $$P = \exp\left(\frac{\Delta E}{T}\right)$$
-    Dimana $T$ (suhu) menurun secara eksponensial: $T_{new} = T_{old} \times \alpha$.
+## 4. Fase Final: Simulated Annealing (Diversity Optimizer)
+SA menyeleksi 12 game terbaik dengan memaksimalkan skor Bayesian sambil menjaga variasi genre agar tidak membosankan.
+*   **Energi Sistem ($E$)**:
+    $$E = \sum P(Like|Genres)_k + \lambda \cdot Count(\text{Unique Genres})$$
+*   **Optimization**: Sistem melakukan iterasi pendinginan (cooling) untuk menemukan kombinasi 12 game yang memiliki skor personalisasi tertinggi namun tetap beragam secara genre.
 
 ---
-*Hasil Akhir: Daftar rekomendasi yang akurat secara matematis namun tetap bervariasi.*
+*Hasil Akhir: Rekomendasi yang secara genetik sangat mirip dengan perilaku bermain user (bukan sekadar game populer).*

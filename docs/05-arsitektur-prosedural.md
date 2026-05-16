@@ -23,13 +23,13 @@ Berikut adalah peta jalan kode sumber:
 src/
 └── pages/
     ├── dashboard/       # Logika Persona & Profiling Dasar
-    ├── engine/          # [Pusat CI] Pipeline Ensemble (Bayesian, A*, SA)
-    │   └── algorithm/   # Otak cerdas khusus Discovery
+    ├── engine/          # [Pusat CI] Deep Personalization (Fuzzy, Bayesian, SA)
+    │   └── algorithm/   # Otak cerdas khusus Discovery (Library-Centric)
     ├── backlog/         # [Pusat CI] Sequencing (ACO, Fuzzy)
     │   └── algorithm/   # Otak cerdas khusus Campaign Map
     ├── coop/            # [Pusat CI] Pathfinding (A*)
     │   └── algorithm/   # Otak cerdas khusus Nexus
-    └── deals/           # [Pusat CI] Multi-Objective Opt (PSO)
+    └── deals/           # [Pusat CI] Value Optimization (PSO, Bayesian)
         └── algorithm/   # Otak cerdas khusus Deal Hunter
 ```
 
