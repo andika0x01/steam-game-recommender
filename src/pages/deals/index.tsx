@@ -38,10 +38,18 @@ app.get('/', async (c) => {
         headers: { 'User-Agent': 'Mozilla/5.0' }
       }).then(res => res.json())
     ))
-    rawDeals = results.flat().filter((deal: any) => {
+    
+    const uniqueDeals: Record<number, any> = {}
+    results.flat().forEach((deal: any) => {
       const appId = parseInt(deal.steamAppID)
-      return !isNaN(appId) && !ownedAppIds.has(appId)
+      if (!isNaN(appId) && !ownedAppIds.has(appId)) {
+        // Simpan deal dengan diskon tertinggi jika ada duplikat AppID
+        if (!uniqueDeals[appId] || parseFloat(deal.savings) > parseFloat(uniqueDeals[appId].savings)) {
+          uniqueDeals[appId] = deal
+        }
+      }
     })
+    rawDeals = Object.values(uniqueDeals)
   } catch (e) { 
     console.error('CheapShark fetch error:', e) 
   }

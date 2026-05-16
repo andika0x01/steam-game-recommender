@@ -10,11 +10,20 @@ export function runSimulatedAnnealing(
   count: number = 12
 ): CandidateGame[] {
   if (candidates.length === 0) return []
+
+  // Failsafe: Pastikan kandidat unik berdasarkan appid
+  const uniqueMap = new Map<number, CandidateGame>()
+  candidates.forEach(c => {
+    if (!uniqueMap.has(c.appid) || c.score > uniqueMap.get(c.appid)!.score) {
+      uniqueMap.set(c.appid, c)
+    }
+  })
+  const uniqueCandidates = Array.from(uniqueMap.values())
   
-  // Initial solution: Take top N by score
-  let currentSolution = [...candidates]
+  // Initial solution: Ambil top N dari kolam unik
+  let currentSolution = [...uniqueCandidates]
     .sort((a, b) => b.score - a.score)
-    .slice(0, Math.min(count, candidates.length))
+    .slice(0, Math.min(count, uniqueCandidates.length))
   
   let currentEnergy = calculateEnergy(currentSolution)
   
@@ -24,15 +33,16 @@ export function runSimulatedAnnealing(
   while (temp > 1) {
     let nextSolution = [...currentSolution]
     const idxToRemove = Math.floor(Math.random() * currentSolution.length)
-    const idxToAdd = Math.floor(Math.random() * candidates.length)
+    const idxToAdd = Math.floor(Math.random() * uniqueCandidates.length)
     
-    // Attempt swap
-    if (!nextSolution.some(g => g.appid === candidates[idxToAdd].appid)) {
-      nextSolution[idxToRemove] = candidates[idxToAdd]
+    const candidateToAdd = uniqueCandidates[idxToAdd]
+
+    // Hanya ganti jika tidak menyebabkan duplikat di solusi saat ini
+    if (!nextSolution.some(g => g.appid === candidateToAdd.appid)) {
+      nextSolution[idxToRemove] = candidateToAdd
       
       const nextEnergy = calculateEnergy(nextSolution)
       
-      // Metropolis Criterion: Accept if better or with prob exp(deltaE/T)
       if (nextEnergy > currentEnergy || Math.random() < Math.exp((nextEnergy - currentEnergy) / temp)) {
         currentSolution = nextSolution
         currentEnergy = nextEnergy
