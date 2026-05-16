@@ -117,7 +117,12 @@ We map these engagement levels to weighted scores for each genre associated with
 The final recommendation score for a backlog game is calculated by:
 - Finding the user's affinity weight for each genre of the target game.
 - Normalizing the aggregate score to a 0-1 range.
-- This creates a **probabilistic match percentage** that reflects how well a game fits the user's historical engagement patterns.
+- **Baseline Bias**: In the current implementation, we apply a **70% baseline floor** (`0.7 + (score * 0.3)`).
+
+**Why are the percentages so high?**
+1. **Encouraging Discovery**: Since the engine analyzes games you *already own* in your backlog, a high baseline ensures the system remains encouraging. A 70% match means "This is a safe bet since you already bought it," while the remaining 30% is the "Fuzzy Boost" based on your specific habits.
+2. **Genre Density**: Most popular games share broad genres (e.g., "Action," "Indie"). If your library is dense with these, the overlap will naturally result in higher base scores.
+3. **Probabilistic Confidence**: In fuzzy systems, we often prefer "High Confidence" outputs for recommendations to reduce user friction.
 
 ## 📝 License
 
