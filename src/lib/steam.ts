@@ -71,3 +71,18 @@ export async function getAppDetails(appId: number) {
   }
   return null
 }
+
+export async function resolveVanityURL(apiKey: string, vanityId: string): Promise<string | null> {
+  const url = `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${apiKey}&vanityurl=${vanityId}`
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data && data.response && data.response.success === 1) {
+      return data.response.steamid
+    }
+  } catch (e) {
+    console.error(`resolveVanityURL error for ${vanityId}:`, e)
+  }
+  return null
+}

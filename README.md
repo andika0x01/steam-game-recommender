@@ -1,132 +1,81 @@
-# Steam Game Recommender 🎮
+# Steam Game Recommender (Hybrid CI Edition) 🎮
 
-An advanced game recommendation engine powered by **Fuzzy Logic** and **Steam engagement data**. Built with a modern tech stack and designed for performance on the edge.
+Sistem rekomendasi game Steam canggih yang mentenagai Tugas Besar mata kuliah *Computational Intelligence*. Aplikasi ini menggabungkan berbagai algoritma CI seperti **Fuzzy Logic**, **Genetic Algorithm (GA)**, **Particle Swarm Optimization (PSO)**, **A***, **Ant Colony Optimization (ACO)**, **Simulated Annealing (SA)**, dan **Bayesian Inference** untuk memberikan rekomendasi yang presisi, beragam, dan teroptimasi.
 
-## 🚀 Overview
+## 🚀 Ikhtisar Proyek
 
-Steam Game Recommender analyzes your Steam library and playtime history using a fuzzy reasoning engine to calculate your "Genre Affinity Spectrum." It identifies hidden gems in your backlog that align with your actual playing habits, rather than just raw popularity.
+Steam Game Recommender bukan sekadar aplikasi daftar game. Ini adalah **Discovery Engine** yang mempelajari perilaku bermain Anda menggunakan *Hybrid Parallel Ensemble Pipeline*. Sistem ini memahami spektrum preferensi genre Anda secara matematis untuk menemukan permata tersembunyi di luar pustaka Anda atau menyusun rute bermain terbaik dari koleksi yang sudah ada.
 
-### Key Features
+### Fitur Utama & Algoritma CI
 
-- **Fuzzy Logic Engine**: Uses trapezoidal membership functions to calculate engagement scores based on playtime.
-- **Steam OpenID Integration**: Secure authentication directly with Valve's ecosystem.
-- **Genre Affinity Mapping**: Dynamically weights your preferences across various genres.
-- **Edge Computing**: Deployed on Cloudflare Workers for global low-latency performance.
-- **Modern UI**: Polished, high-signal interface with a "brutalist-modern" aesthetic.
+- **CI Ensemble Discovery Engine (`/engine`)**: Pipeline paralel yang menggabungkan Bayesian Scoring dan A* Similarity Search, dengan seleksi akhir menggunakan Simulated Annealing untuk menjaga keberagaman genre.
+- **Campaign Map (`/backlog`)**: Peta jalan bermain untuk menaklukkan koleksi game Anda.
+  - **Fuzzy Logic**: Merating seluruh koleksi berdasarkan afinitas.
+  - **ACO**: Menyusun rute (waypoints) bermain yang paling optimal berdasarkan skor rating.
+- **Multiplayer Nexus Map (`/coop`)**: Mencari irisan preferensi antar teman dan menggunakan **A*** untuk membuat peta strategi bermain bersama.
+- **Deal Hunter (`/deals`)**: Berburu diskon CheapShark menggunakan pembobotan **PSO** (Price vs Affinity) yang dinamis.
+- **Dynamic Optimization**: Tombol *Toggle* (Initialize/Cancel) untuk memicu evolusi algoritma (GA/PSO) secara real-time di database D1.
 
 ## 🛠️ Tech Stack
 
-- **Framework**: [Hono](https://hono.dev/) (Ultra-fast web framework for the edge)
-- **Runtime**: [Cloudflare Workers](https://workers.cloudflare.com/)
-- **Frontend**: React (JSX) with Vanilla CSS and Tailwind for layout.
-- **Logic**: Custom Fuzzy Inference System (FIS).
-- **Bundler**: Vite.
+- **Framework**: [Hono](https://hono.dev/) (Web framework ultra-cepat untuk Cloudflare Workers)
+- **Runtime**: [Cloudflare Workers](https://workers.cloudflare.com/) (Edge Computing)
+- **Frontend**: React (JSX) dengan Tailwind CSS & Glassmorphism Aesthetics.
+- **Database**: Cloudflare D1 (SQLite SQL di Edge).
+- **Core Logic**: Suite Algoritma CI murni (TypeScript).
 
-## 📁 Project Structure
+## 📁 Struktur Proyek
 
 ```text
 src/
-├── recommender/        # Fuzzy logic engine & preference calculations
-│   ├── fuzzyLogic.ts   # Membership functions (Trapezoidal)
-│   ├── types.ts        # Recommender-specific types
-│   └── index.ts        # Scoring logic
-├── lib/
-│   ├── auth.ts         # Steam OpenID implementation
-│   └── steam.ts        # Steam API wrapper (Web API)
-├── components/         # Reusable UI components
-├── index.tsx           # Main application routes & server-side rendering
-└── style.css           # Global aesthetics
+├── algorithm/          # Core Logic (Matematika & CI)
+│   ├── fuzzyLogic.ts   # Pemodelan Linguistik (Engagement)
+│   ├── ga.ts           # Genetic Algorithm (Tuning Parameter Fuzzy)
+│   ├── pso.ts          # Particle Swarm Optimization (Weight Tuning)
+│   ├── bayesian.ts     # Bayesian Inference (Probabilistic Scoring)
+│   ├── classicalSearch.ts # A* Search (Graph Pathfinding)
+│   ├── aco.ts          # Ant Colony Optimization (Trail Sequencing)
+│   ├── sa.ts           # Simulated Annealing (Diversity Optimizer)
+│   └── index.ts        # Entry point Ensemble Pipeline
+├── docs/               # Dokumentasi Teknis Akademis
+├── lib/                # Wrapper API & Auth
+└── index.tsx           # Route, Controller & UI Rendering
 ```
 
-## ⚙️ Setup & Installation
+## ⚙️ Persiapan & Instalasi
 
-### Prerequisites
+### Pengembangan Lokal
 
-- Node.js (Latest LTS)
-- A Steam API Key (Get it at [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey))
-- Cloudflare Account (for deployment)
-
-### Local Development
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/yourusername/steam-game-recommender.git
-   cd steam-game-recommender
-   ```
-
-2. **Install dependencies**:
+1. **Clone & Install**:
    ```bash
    npm install
    ```
 
-3. **Configure Environment**:
-   Create a `.dev.vars` file for local development:
+2. **Konfigurasi Variabel**:
+   Edit file `.dev.vars`:
    ```text
-   STEAM_API_KEY=your_api_key_here
+   STEAM_API_KEY=api_key_anda
    HOST_URL=http://localhost:5173
    ```
 
-4. **Run development server**:
+3. **Migrasi Database**:
+   ```bash
+   npx wrangler d1 migrations apply steam-recommender --local
+   ```
+
+4. **Jalankan Server**:
    ```bash
    npm run dev
    ```
 
-## 🚢 Deployment
+## 🚢 Dokumentasi Detail (Bahasa Indonesia)
 
-Deploy to Cloudflare Workers using Wrangler:
+Silakan telusuri folder `docs/` untuk penjelasan akademis mendalam:
 
-```bash
-npm run deploy
-```
-
-Make sure to set your production secrets on Cloudflare:
-```bash
-npx wrangler secret put STEAM_API_KEY
-npx wrangler secret put HOST_URL
-```
-
-## 🧠 The Fuzzy Logic Engine
-
-### Why Fuzzy Logic?
-
-Traditional recommendation systems often use binary logic (e.g., "played vs. not played") or simple linear regressions. However, human interest in games is inherently **ambiguous and non-linear**:
-- Is 2 hours of playtime "low interest" or "high interest"? For a short indie game, it might be high; for an RPG, it's just the tutorial.
-- Interest isn't a toggle; it's a spectrum.
-
-**Fuzzy Logic** allows us to handle this uncertainty by using "degrees of truth" (0 to 1) rather than absolute 0 or 1. This project treats playtime as a linguistic variable that can belong to multiple categories (Low, Medium, High) simultaneously.
-
-### The Mechanism
-
-The engine operates through three main phases:
-
-#### 1. Fuzzification (Input Processing)
-Raw playtime hours are passed through **Trapezoidal Membership Functions**. A single value like `22 hours` might be:
-- **0%** "Low Engagement"
-- **60%** "Medium Engagement"
-- **20%** "High Engagement"
-
-This overlapping membership ensures smooth transitions between user behavior states.
-
-#### 2. Fuzzy Inference (Genre Weighting)
-We map these engagement levels to weighted scores for each genre associated with the game:
-- **Low Engagement** (e.g., < 5 hrs): Weighted at **0.2** (User tried it, but didn't stick).
-- **Medium Engagement** (e.g., 5-25 hrs): Weighted at **0.6** (User liked it).
-- **High Engagement** (e.g., > 30 hrs): Weighted at **1.0** (User is deeply invested).
-
-#### 3. Scoring (Output)
-The final recommendation score for a backlog game is calculated by:
-- Finding the user's affinity weight for each genre of the target game.
-- Normalizing the aggregate score to a 0-1 range.
-- **Baseline Bias**: In the current implementation, we apply a **70% baseline floor** (`0.7 + (score * 0.3)`).
-
-**Why are the percentages so high?**
-1. **Encouraging Discovery**: Since the engine analyzes games you *already own* in your backlog, a high baseline ensures the system remains encouraging. A 70% match means "This is a safe bet since you already bought it," while the remaining 30% is the "Fuzzy Boost" based on your specific habits.
-2. **Genre Density**: Most popular games share broad genres (e.g., "Action," "Indie"). If your library is dense with these, the overlap will naturally result in higher base scores.
-3. **Probabilistic Confidence**: In fuzzy systems, we often prefer "High Confidence" outputs for recommendations to reduce user friction.
-
-## 📝 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
+1. [Arsitektur Hybrid Ensemble](./docs/01-arsitektur-sistem.md) - Alur kerja sistem secara keseluruhan.
+2. [Detail Algoritma CI](./docs/02-algoritma-ci.md) - Penjelasan logis dan matematis tiap algoritma.
+3. [Konsep Fitur & UI/UX](./docs/03-fitur-web.md) - Bagaimana algoritma mentenagai pengalaman pengguna.
+4. [Panduan Pengembangan](./docs/04-panduan-pengembangan.md) - Cara menambah fitur dan algoritma baru.
 
 ---
-*Built with ❤️ for gamers who can't decide what to play next.*
+*Dikembangkan sebagai solusi cerdas bagi gamer yang ingin memaksimalkan investasi waktu dan biaya di platform Steam.*

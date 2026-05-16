@@ -26,7 +26,7 @@ export const Nav = ({ steamId }: { steamId?: string }) => {
 
           {/* Navigation Links Overlay/Menu */}
           <div className="
-            fixed inset-0 bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center gap-8 
+            fixed inset-0 bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center gap-6 
             transition-all duration-500 ease-in-out opacity-0 pointer-events-none -translate-y-10
             peer-checked:opacity-100 peer-checked:pointer-events-auto peer-checked:translate-y-0
             md:relative md:inset-auto md:bg-transparent md:backdrop-blur-none md:flex-row md:opacity-100 md:pointer-events-auto md:translate-y-0 md:gap-2 md:glass md:px-2 md:py-2 md:rounded-2xl md:border-white/5
@@ -41,7 +41,11 @@ export const Nav = ({ steamId }: { steamId?: string }) => {
             ) : (
               <>
                 <NavLink href="/dashboard" label="Dashboard" isLarge />
-                <NavLink href="/recommendations" label="Library" isLarge />
+                <NavLink href="/engine" label="Engine" isLarge />
+                <NavLink href="/backlog" label="Backlog" isLarge />
+                <NavLink href="/coop" label="Co-op" isLarge />
+                <NavLink href="/deals" label="Deals" isLarge />
+                <NavLink href="/tierlist" label="Tiers" isLarge />
                 <a href="/auth/logout" className="px-10 md:px-5 py-5 md:py-2.5 border border-white/10 text-zinc-400 text-sm md:text-xs font-black uppercase tracking-[0.2em] rounded-2xl md:rounded-xl hover:bg-white/5 transition-all">
                   Logout
                 </a>
@@ -57,7 +61,7 @@ export const Nav = ({ steamId }: { steamId?: string }) => {
 const NavLink = ({ href, label, isLarge }: { href: string; label: string; isLarge?: boolean }) => (
   <a 
     href={href} 
-    className={`px-4 py-2 font-black uppercase tracking-[0.2em] text-zinc-500 hover:text-white transition-colors ${isLarge ? 'text-4xl md:text-xs' : 'text-xs'}`}
+    className={`px-4 py-2 font-black uppercase tracking-[0.2em] text-zinc-500 hover:text-white transition-colors ${isLarge ? 'text-2xl md:text-xs' : 'text-xs'}`}
   >
     {label}
   </a>

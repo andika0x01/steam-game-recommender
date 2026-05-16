@@ -1,13 +1,20 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "kecerdasan-komputasional",
-  "compatibility_date": "2025-08-03",
-  "main": "src/index.tsx",
-  "assets": {
-    "directory": "dist/client",
-    "binding": "ASSETS"
-  },
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "kecerdasan-komputasional",
+	"compatibility_date": "2025-08-03",
+	"main": "src/index.tsx",
+	"assets": {
+		"directory": "dist/client",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "steam-game-recommender-db",
+			"database_id": "81a2a533-46bd-40ed-807d-e0f1ae21324e"
+		}
+	]
 }
