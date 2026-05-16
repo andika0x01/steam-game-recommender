@@ -7,37 +7,36 @@ Dokumen ini ditujukan bagi pengembang atau asisten laboratorium yang ingin memer
 ## 1. Arsitektur Kode (Logic Isolation)
 
 Kami memisahkan total antara antarmuka (UI) dengan logika cerdas (Algorithm).
-*   **Folder `src/algorithm/`**: Berisi file TypeScript murni tanpa ketergantungan pada React. Ini memudahkan pengujian matematis tanpa gangguan tampilan.
-*   **Folder `src/lib/`**: Berisi wrapper API untuk berkomunikasi dengan Steam dan CheapShark.
-*   **File `src/index.tsx`**: Bertindak sebagai "Konduktor" yang mengatur alur data dari API, memprosesnya melalui algoritma, dan mengirimkannya ke layar.
+*   **Pusat Logika (`src/pages/engine/algorithm/`)**: Berisi otak utama aplikasi (Fuzzy, Bayesian, SA). Halaman lain mengimpor logika dari sini untuk menjaga konsistensi profil user.
+*   **Folder `src/lib/`**: Berisi wrapper API (Steam, SteamSpy, CheapShark) dan manajemen **Cloudflare KV Cache** untuk metadata genre.
+*   **File Halaman (`src/pages/*/index.tsx`)**: Bertindak sebagai konduktor yang mengatur alur data dan merender visualisasi.
 
-## 2. Cara Kerja Penyimpanan (D1 Database)
+## 2. Integritas Data & Caching (KV Store)
 
-Sistem menggunakan database relasional SQLite di Edge (Cloudflare D1).
-*   **Optimasi Persisten**: Saat user menekan tombol "Initialize PSO/GA", parameter yang dihasilkan algoritma disimpan di kolom `engine_params` atau `deals_params`.
-*   **Efisiensi**: Sistem tidak perlu melakukan evolusi (GA/PSO) setiap kali halaman dimuat, cukup sekali saja dan hasilnya akan diingat selamanya hingga user melakukan Reset.
+Sistem menggunakan **Cloudflare KV** sebagai lapisan memori jangka panjang untuk metadata Steam.
+*   **Enrichment**: Karena API Steam `GetOwnedGames` tidak menyertakan genre, sistem melakukan fetch detail secara real-time dan menyimpannya di KV.
+*   **Efisiensi**: Game yang sudah pernah di-enrich oleh satu user akan tersedia secara instan untuk user lainnya, meminimalkan hit ke API Steam Store yang memiliki rate limit ketat.
 
 ## 3. Instruksi Penambahan Algoritma Baru
 
-Aplikasi ini didesain secara modular. Untuk menambahkan algoritma baru (misal: *Reinforcement Learning* sederhana):
+Aplikasi ini didesain secara modular di dalam suite **Deep Personalization**:
 
-1.  **Langkah 1**: Buat file di `src/algorithm/reinforcement.ts`.
-2.  **Langkah 2**: Daftarkan fungsi tersebut di `src/algorithm/index.ts`.
-3.  **Langkah 3**: Masukkan fungsi baru tersebut ke dalam *Ensemble Pipeline* di fungsi `generateEnsembleRecommendations`.
-4.  **Langkah 4**: Perbarui UI di `index.tsx` jika ada parameter baru yang perlu ditampilkan.
+1.  **Langkah 1**: Tambahkan fungsi matematis baru di `src/pages/engine/algorithm/`.
+2.  **Langkah 2**: Integrasikan ke dalam pipeline di halaman tujuan (misal: Engine atau Deals).
+3.  **Langkah 3**: Jika algoritma baru membutuhkan data tambahan, perbarui wrapper di `src/lib/steam.ts`.
 
-## 4. Pengujian Stabilitas (Statistical Validation)
+## 4. Pengujian Stabilitas (Deep Personalization)
 
-Karena algoritma CI seperti PSO, GA, dan ACO bersifat stokastik (ada unsur acak), kami menyarankan pengujian dengan cara:
-1.  Jalankan fungsi rekomendasi 10 kali untuk user yang sama.
-2.  Amati persentase kecocokan. Jika variasi hasilnya di bawah 5%, maka algoritma dianggap **Stabil**.
-3.  Periksa log terminal server untuk melihat kurva fitnes/energi (jika log debug aktif).
+Algoritma dalam sistem ini bersifat deterministik pada tahap Bayesian, namun stokastik pada tahap **Simulated Annealing (SA)**.
+1.  **Validasi Profil**: Pastikan `calculateUserGenreProfile` menghasilkan distribusi probabilitas yang logis sesuai library user.
+2.  **Uji Konvergensi SA**: Jalankan rekomendasi berkali-kali. SA yang optimal akan menghasilkan set yang berbeda secara item namun konsisten secara kualitas (skor Match tetap tinggi).
+3.  **Genre Balance**: Periksa apakah hasil akhir mengandung variasi genre yang sehat (efek dari *Saturation Penalty* di SA).
 
 ## 5. Deployment ke Produksi
 
 Sistem ini dioptimasi untuk berjalan di **Cloudflare Workers**.
 ```bash
-# Untuk mendeploy perubahan terbaru ke internet secara global
+# Untuk mendeploy perubahan terbaru
 npm run deploy
 ```
-Pastikan seluruh file migrasi SQL di folder `migrations/` sudah diterapkan ke remote database menggunakan perintah `wrangler d1 migrations apply`.
+Pastikan `wrangler.jsonc` telah dikonfigurasi dengan binding D1 dan KV yang benar.
