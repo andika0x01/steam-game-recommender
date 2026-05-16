@@ -1,34 +1,25 @@
-# 04 - Alur Proses Halaman Deal Hunter
+# 04 - Alur Proses Halaman Deal Hunter (Deep Value Optimizer)
 
-Halaman ini mendemonstrasikan optimasi multi-kriteria untuk memaksimalkan kepuasan belanja pengguna.
-
----
-
-## 1. Fase Input
-Mengambil data diskon real-time dari CheapShark API. Menyiapkan variabel: Persentase Diskon ($S$), Harga Sale ($P$), dan Skor Afinitas Bayesian ($A$).
-
-## 2. Fase Optimasi: Particle Swarm Optimization (PSO)
-PSO digunakan untuk mencari vektor bobot $[w_1, w_2, w_3]$ yang paling seimbang.
-
-### Update Kecepatan Partikel
-$$v_i(t+1) = w \cdot v_i(t) + c_1 r_1 (\text{pbest}_i - x_i(t)) + c_2 r_2 (\text{gbest} - x_i(t))$$
-Dimana:
-*   $v_i$: Kecepatan partikel $i$.
-*   $x_i$: Posisi saat ini (nilai bobot).
-*   $\text{pbest}$: Posisi terbaik pribadi.
-*   $\text{gbest}$: Posisi terbaik global dalam koloni burung virtual.
-*   $c_1, c_2$: Koefisien akselerasi.
-
-### Update Posisi Partikel
-$$x_i(t+1) = x_i(t) + v_i(t+1)$$
-
-## 3. Fase Scoring (Value-for-Money)
-Skor akhir setiap penawaran diskon dihitung menggunakan kombinasi linier teroptimasi:
-$$\text{Total Score} = (A \cdot w_1) + (S \cdot w_2) + (\frac{1}{P} \cdot w_3)$$
-Hasilnya kemudian dinormalisasi ke rentang $[0, 1]$ untuk keperluan visualisasi persentase kecocokan.
-
-## 4. Fase Visualisasi
-Menampilkan kartu diskon dengan indikator "Match Percentage" yang merupakan representasi visual dari hasil optimasi PSO.
+Halaman ini melakukan optimasi multi-kriteria untuk menemukan penawaran diskon yang paling bernilai bagi profil personal pengguna.
 
 ---
-*Hasil Akhir: Rekomendasi diskon yang memprioritaskan game dengan kombinasi harga terendah dan ketertarikan tertinggi.*
+
+## 1. Fase Input & Enrichment
+Sistem menarik data diskon dari CheapShark API dan memperkaya metadata setiap diskon dengan genre asli dari Steam via **KV Cache**.
+
+## 2. Fase Scoring: Bayesian Value Metric
+Skor dasar setiap deal ($M$) dihitung menggunakan kombinasi linier dari tiga faktor:
+1.  **Bayesian Match ($B$)**: Probabilitas seleramu terhadap genre game tersebut (Bobot: 60%).
+2.  **Savings Factor ($S$)**: Persentase diskon (Bobot: 30%).
+3.  **Price Efficiency ($P$)**: Skor harga murah dibandingkan harga standar (Bobot: 10%).
+
+$$Match = (B \cdot 0.6) + (S \cdot 0.3) + (P \cdot 0.1)$$
+
+## 3. Fase Optimasi: Simulated Annealing (SA)
+Setelah ratusan deal diskor, sistem tidak langsung menampilkan yang tertinggi. SA digunakan untuk memilih 24 penawaran terbaik yang memiliki variasi genre yang luas.
+
+### Kriteria Boltzmann
+SA memastikan bahwa daftar diskon yang ditampilkan tidak hanya berisi game murah, tetapi juga game yang memiliki kualitas genre yang seimbang dengan selera library user.
+
+---
+*Hasil Akhir: Rekomendasi belanja yang cerdas, personal, dan teroptimasi secara ekonomi.*
