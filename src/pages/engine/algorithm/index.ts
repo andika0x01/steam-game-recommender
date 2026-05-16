@@ -1,119 +1,62 @@
 import { GenreWeight } from './types'
-import { trapezoid } from './fuzzyLogic'
 import { calculateBayesianScore } from './bayesian'
 import { runSimulatedAnnealing, CandidateGame } from './sa'
-import { aStarSearch, GameNode } from '../../coop/algorithm/classicalSearch'
 
 export * from './types'
 export * from './fuzzyLogic'
-export * from './ga'
 export * from './bayesian'
 export * from './sa'
 export type { CandidateGame }
 
-export function calculateGenrePreferences(games: any[], customParams?: number[]): GenreWeight[] {
-  const genreScores: Record<string, number> = {}
-  const p = customParams || [1, 5, 2, 5, 15, 25, 20, 30, 0.2, 0.6, 1.0]
-
-  games.forEach((game) => {
-    const hours = game.playtime_forever / 60
-    const low = trapezoid(hours, 0, 0, p[0], p[1])
-    const medium = trapezoid(hours, p[2], p[3], p[4], p[5])
-    const high = trapezoid(hours, p[6], p[7], 1000, 1000)
-    const engagement = (low * p[8]) + (medium * p[9]) + (high * p[10])
-
-    if (game.genres && Array.isArray(game.genres)) {
-      game.genres.forEach((genre: any) => {
-        const name = typeof genre === 'string' ? genre : (genre.description || genre.name)
-        if (name) {
-          genreScores[name] = (genreScores[name] || 0) + engagement
-        }
-      })
-    } else {
-      genreScores['Indie'] = (genreScores['Indie'] || 0) + engagement
-    }
-  })
-
-  const total = Object.values(genreScores).reduce((a, b) => a + b, 0)
-  return Object.entries(genreScores).map(([genre, score]) => ({
-    genre,
-    weight: total > 0 ? score / total : 0
-  })).sort((a, b) => b.weight - a.weight)
-}
-
-export function scoreGameRecommendation(gameGenres: string[], userPreferences: GenreWeight[]): number {
-  let score = 0
-  gameGenres.forEach((genre) => {
-    const pref = userPreferences.find((p) => p.genre === genre)
-    if (pref) score += pref.weight
-  })
-  return score / (gameGenres.length || 1)
-}
-
-export async function generateEnsembleRecommendations(
-  userGames: any[],
-  allAvailableGames: any[],
-  count: number = 10
+export async function generateDeepPersonalizedRecommendations(
+  userLibrary: any[],
+  candidates: any[],
+  kv: any,
+  count: number = 12
 ): Promise<CandidateGame[]> {
-  const preferences = calculateGenrePreferences(userGames)
-  
-  // 1. Generate Candidates using Bayesian
-  const bayesianCandidates: CandidateGame[] = allAvailableGames.map(game => {
-    let genres = game.genres?.map((g: any) => typeof g === 'string' ? g : g.description) || []
-    if (genres.length === 0) genres = ['Indie', 'Action']
-    const bScore = calculateBayesianScore(genres, userGames)
-    return {
-      appid: game.appid,
-      name: game.name,
-      genres,
-      score: 0.5 + (bScore * 0.5)
-    }
-  })
-
-  // 2. Generate Candidates using A* (Similarity paths)
-  const topGame = userGames.sort((a, b) => b.playtime_forever - a.playtime_forever)[0]
-  let aStarCandidates: CandidateGame[] = []
-  
-  if (topGame) {
-    const startNode: GameNode = { 
-      id: topGame.appid, 
-      name: topGame.name, 
-      genres: topGame.genres?.map((g: any) => typeof g === 'string' ? g : g.description) || [] 
-    }
-    
-    const goals = allAvailableGames.sort(() => 0.5 - Math.random()).slice(0, 5)
-    goals.forEach(goal => {
-      const goalNode: GameNode = { 
-        id: goal.appid, 
-        name: goal.name, 
-        genres: goal.genres?.map((g: any) => typeof g === 'string' ? g : g.description) || [] 
+  // 1. Scoring Phase: Calculate Bayesian Probability for ALL candidates
+  // We process in batches to handle KV enrichment
+  const scoredCandidates: CandidateGame[] = await Promise.all(
+    candidates.map(async (game) => {
+      // Ensure we have genre data (Enrichment from KV)
+      let genres = game.genres || []
+      if (genres.length === 0) {
+        const details = await fetchAppDetailsWithCache(kv, game.appid)
+        genres = details?.genres?.map((g: any) => g.description) || ['Indie']
       }
-      const path = aStarSearch(startNode, goalNode, allAvailableGames.map(g => ({
-        id: g.appid,
-        name: g.name,
-        genres: g.genres?.map((g: any) => typeof g === 'string' ? g : g.description) || []
-      })))
-      
-      if (path.length > 0) {
-        path.forEach(node => {
-          aStarCandidates.push({
-            appid: node.id,
-            name: node.name,
-            genres: node.genres,
-            score: 0.8
-          })
-        })
+
+      const score = calculateBayesianScore(genres, userLibrary)
+      return {
+        appid: game.appid,
+        name: game.name,
+        genres,
+        score
       }
     })
-  }
+  )
 
-  const combined = [...bayesianCandidates, ...aStarCandidates]
-  const uniqueMap = new Map<number, CandidateGame>()
-  combined.forEach(c => {
-    if (!uniqueMap.has(c.appid) || uniqueMap.get(c.appid)!.score < c.score) {
-      uniqueMap.set(c.appid, c)
+  // 2. Optimization Phase: Simulated Annealing
+  // SA will select the best 'count' games, maximizing score while ensuring diversity
+  return runSimulatedAnnealing(scoredCandidates, count)
+}
+
+// Helper internal to avoid circular deps or redundant code
+async function fetchAppDetailsWithCache(kv: any, appId: number) {
+  const cacheKey = `app_details:${appId}`
+  const cached = await kv.get(cacheKey, 'json')
+  if (cached) return cached
+
+  const url = `https://store.steampowered.com/api/appdetails?appids=${appId}`
+  try {
+    const res = await fetch(url)
+    if (res.ok) {
+      const data = await res.json()
+      if (data[appId]?.success) {
+        const appData = data[appId].data
+        await kv.put(cacheKey, JSON.stringify(appData))
+        return appData
+      }
     }
-  })
-
-  return runSimulatedAnnealing(Array.from(uniqueMap.values()), count)
+  } catch (e) {}
+  return null
 }

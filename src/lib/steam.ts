@@ -62,17 +62,29 @@ export async function getAppDetails(kv: KVNamespace, appId: number) {
 }
 
 export async function getTopStoreGames(): Promise<any[]> {
-  // Mengambil 30 game terpopuler saat ini via SteamSpy API
-  const url = `https://steamspy.com/api.php?request=top100in2weeks`
+  // Mengambil data dari dua endpoint SteamSpy untuk cakupan kandidat yang lebih luas (~200 game)
+  const endpoints = [
+    'https://steamspy.com/api.php?request=top100in2weeks',
+    'https://steamspy.com/api.php?request=top100forever'
+  ]
+  
   try {
-    const res = await fetch(url)
-    if (!res.ok) return []
-    const data = await res.json()
-    return Object.values(data).slice(0, 30).map((g: any) => ({
-      appid: g.appid,
-      name: g.name,
-      genres: [] 
-    }))
+    const results = await Promise.all(endpoints.map(url => fetch(url).then(res => res.json())))
+    const combinedGames: Record<number, any> = {}
+    
+    results.forEach(data => {
+      Object.values(data).forEach((g: any) => {
+        if (g.appid) {
+          combinedGames[g.appid] = {
+            appid: g.appid,
+            name: g.name,
+            genres: [] // Will be enriched later via KV
+          }
+        }
+      })
+    })
+
+    return Object.values(combinedGames).slice(0, 200)
   } catch (e) {
     console.error('getTopStoreGames error:', e)
     return []

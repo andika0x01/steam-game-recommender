@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
 import { getOwnedGames, getTopStoreGames, getAppDetails } from '../../lib/steam'
-import { generateEnsembleRecommendations, runGA } from './algorithm'
+import { generateDeepPersonalizedRecommendations } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -10,55 +10,41 @@ app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
 
-  const error = c.req.query('error')
-  
-  let customParams = undefined
-  try {
-    const user = await c.env.DB.prepare('SELECT engine_params FROM users WHERE id = ?').bind(steamId).first()
-    if (user && (user as any).engine_params) {
-      customParams = JSON.parse((user as any).engine_params)
-    }
-  } catch (e) {
-    console.error('DB Error fetching engine_params:', e)
-  }
-
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
   
-  // Ambil top 15 game yang paling sering dimainkan untuk akurasi profil
-  const topPlayed = games
+  // 1. Enrich Library: Ambil genre asli untuk SEMUA game yang pernah dimainkan user
+  // (Dibatasi top 30 untuk efisiensi fetch, tapi ini sudah sangat mencukupi profil personal)
+  const playedGames = games
     .filter(g => Number(g.playtime_forever) > 0)
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 15)
+    .slice(0, 30)
 
-  // Enrekal (Enrichment) data genre untuk game milik user
-  const enrichedPlayedGames = await Promise.all(
-    topPlayed.map(async (game) => {
+  const enrichedLibrary = await Promise.all(
+    playedGames.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
       return {
         ...game,
-        genres: details?.genres?.map((g: any) => g.description) || ['Indie']
+        genres: details?.genres?.map((g: any) => g.description) || []
       }
     })
   )
   
-  // REAL API FETCH: Discovery dari game terpopuler saat ini di Steam (via SteamSpy)
-  const realStoreGames = await getTopStoreGames()
-
+  // 2. Expand Candidate Pool: Ambil 200 game populer/kronis
+  const discoveryCandidates = await getTopStoreGames()
   const ownedAppIds = new Set(games.map(g => g.appid))
-  const discoveryCandidates = realStoreGames.filter(g => !ownedAppIds.has(g.appid)).slice(0, 15)
+  
+  // Filter yang belum dimiliki & ambil 40 kandidat teratas untuk diproses mendalam
+  const filteredCandidates = discoveryCandidates
+    .filter(g => !ownedAppIds.has(g.appid))
+    .slice(0, 40)
 
-  // Enrekal (Enrichment) data genre untuk game di store
-  const enrichedDiscoveryCandidates = await Promise.all(
-    discoveryCandidates.map(async (game) => {
-      const details = await getAppDetails(c.env.KV, game.appid)
-      return {
-        ...game,
-        genres: details?.genres?.map((g: any) => g.description) || ['Action']
-      }
-    })
+  // 3. Deep Personalization: Bayesian + SA
+  const recommendations = await generateDeepPersonalizedRecommendations(
+    enrichedLibrary, 
+    filteredCandidates, 
+    c.env.KV, 
+    12
   )
-
-  const recommendations = await generateEnsembleRecommendations(enrichedPlayedGames, enrichedDiscoveryCandidates, 12)
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-20">
@@ -66,26 +52,12 @@ app.get('/', async (c) => {
         <div className="space-y-6 max-w-3xl">
           <div className="inline-flex items-center gap-3 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Neural Nexus Active</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Deep Personalization Active</span>
           </div>
-          <h2 className="text-5xl md:text-8xl font-black tracking-tighter uppercase leading-[0.85]">CI Ensemble <br /><span className="text-white/20 outline-text">Discovery</span></h2>
+          <h2 className="text-5xl md:text-8xl font-black tracking-tighter uppercase leading-[0.85]">Personal <br /><span className="text-white/20 outline-text">Discovery</span></h2>
           <p className="text-zinc-400 text-lg md:text-xl font-light leading-relaxed max-w-2xl">
-            Pipeline multi-agen yang memanfaatkan probabilitas Bayesian, graf kemiripan A*, dan Simulated Annealing untuk mengkurasi obsesi digital Anda berikutnya.
+            Mesin yang dilatih khusus pada library Anda. Menggunakan Bayesian sejati yang diboboti oleh Fuzzy Engagement untuk menemukan game yang beneran "Gue Banget".
           </p>
-        </div>
-        
-        <div className="flex flex-col gap-4 w-full md:w-auto">
-          <form method="POST" action={customParams ? "/engine/reset" : "/engine/tune"} className="w-full">
-            <button 
-              type="submit" 
-              className={`w-full md:w-auto px-10 py-4 ${customParams ? 'bg-white/5 border border-white/10 text-white hover:bg-rose-500/20 hover:border-rose-500/40' : 'bg-white text-black hover:scale-105'} text-xs font-black uppercase tracking-[0.2em] rounded-2xl active:scale-95 transition-all shadow-2xl text-center`}
-            >
-              {customParams ? 'Batalkan Optimasi' : 'Inisialisasi PSO'}
-            </button>
-          </form>
-          {customParams && (
-            <p className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest text-right px-2">Status Evolusi: Teroptimasi</p>
-          )}
         </div>
       </div>
 
@@ -101,7 +73,7 @@ app.get('/', async (c) => {
                 onError={(e: any) => (e.currentTarget.src = `https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`)}
               />
                 <div className="absolute top-4 right-4 glass px-3 py-1.5 rounded-full z-20">
-                  <p className="text-[10px] font-mono font-black text-white">{(game.score * 100).toFixed(0)}%</p>
+                  <p className="text-[10px] font-mono font-black text-white">{(game.score * 100).toFixed(0)}% Match</p>
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-end p-6 gap-5">
                    <div className="space-y-2">
@@ -136,51 +108,12 @@ app.get('/', async (c) => {
               <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <div className="space-y-3">
-            <p className="text-white text-xl font-bold uppercase tracking-widest">Kekosongan Terdeteksi</p>
-            <p className="text-zinc-500 font-light text-base md:text-lg max-w-md mx-auto">Mesin ensemble memerlukan densitas data interaksi yang lebih tinggi untuk menghasilkan set rekomendasi yang valid.</p>
-          </div>
-          <a href="/dashboard" className="inline-block px-10 py-4 bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-white/10 transition-all">
-            Kembali ke Komando
-          </a>
+          <p className="text-zinc-500 font-light text-base md:text-lg max-w-md mx-auto">Menganalisa library Anda untuk presisi maksimum...</p>
         </div>
       )}
     </div>,
-    { title: 'CI Ensemble Engine' } as any
+    { title: 'Personal Discovery Engine' } as any
   )
-})
-
-app.post('/tune', async (c) => {
-  const steamId = getCookie(c, 'steam_id')
-  if (!steamId) return c.redirect('/')
-
-  const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
-  if (games.length < 1) return c.redirect('/engine?error=too_few_games')
-
-  const optimizedParams = runGA(games, 20)
-
-  try {
-    await c.env.DB.prepare(`
-      INSERT INTO users (id, name, avatar, engine_params) 
-      VALUES (?, 'Operative', '', ?)
-      ON CONFLICT(id) DO UPDATE SET engine_params = excluded.engine_params
-    `)
-      .bind(steamId, JSON.stringify(optimizedParams))
-      .run()
-  } catch (e: any) {
-    console.error(`[DB CRITICAL ERROR] Failed to upsert engine_params: ${e.message}`)
-  }
-
-  return c.redirect('/engine')
-})
-
-app.post('/reset', async (c) => {
-  const steamId = getCookie(c, 'steam_id')
-  if (!steamId) return c.redirect('/')
-  try {
-    await c.env.DB.prepare('UPDATE users SET engine_params = NULL WHERE id = ?').bind(steamId).run()
-  } catch (e) { console.error('DB Error resetting engine_params:', e) }
-  return c.redirect('/engine')
 })
 
 export default app
