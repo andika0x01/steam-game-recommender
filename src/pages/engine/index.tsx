@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
-import { getOwnedGames } from '../../lib/steam'
+import { getOwnedGames, getTopStoreGames } from '../../lib/steam'
 import { generateEnsembleRecommendations, runGA } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
@@ -25,24 +25,11 @@ app.get('/', async (c) => {
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
   const playedGames = games.filter(g => Number(g.playtime_forever) > 0)
   
-  // Ensemble Discovery Engine - Fokus pada Afinitas (Game yang tidak dimiliki)
-  const popularStoreGames = [
-    { appid: 105600, name: 'Terraria', genres: ['Indie', 'Adventure', 'RPG'] },
-    { appid: 1091500, name: 'Cyberpunk 2077', genres: ['RPG', 'Action', 'Open World'] },
-    { appid: 1145360, name: 'Hades', genres: ['Action', 'Roguelike', 'Indie'] },
-    { appid: 413150, name: 'Stardew Valley', genres: ['Indie', 'RPG', 'Simulation'] },
-    { appid: 1245620, name: 'Elden Ring', genres: ['RPG', 'Action', 'Souls-like'] },
-    { appid: 271590, name: 'Grand Theft Auto V', genres: ['Action', 'Adventure', 'Open World'] },
-    { appid: 550, name: 'Left 4 Dead 2', genres: ['Action', 'Zombies', 'Co-op'] },
-    { appid: 400, name: 'Portal', genres: ['Puzzle', 'Adventure', 'Singleplayer'] },
-    { appid: 1174180, name: 'Red Dead Redemption 2', genres: ['Open World', 'Story Rich', 'Adventure'] },
-    { appid: 1446780, name: 'Monster Hunter Rise', genres: ['Action', 'RPG', 'Co-op'] },
-    { appid: 1938090, name: 'Call of Duty', genres: ['FPS', 'Action', 'Multiplayer'] },
-    { appid: 730, name: 'Counter-Strike 2', genres: ['FPS', 'Shooter', 'Competitive'] }
-  ]
+  // REAL API FETCH: Discovery dari game terpopuler saat ini di Steam (via SteamSpy)
+  const realStoreGames = await getTopStoreGames()
 
   const ownedAppIds = new Set(games.map(g => g.appid))
-  const discoveryCandidates = popularStoreGames.filter(g => !ownedAppIds.has(g.appid))
+  const discoveryCandidates = realStoreGames.filter(g => !ownedAppIds.has(g.appid))
 
   const recommendations = await generateEnsembleRecommendations(playedGames, discoveryCandidates, 12)
 

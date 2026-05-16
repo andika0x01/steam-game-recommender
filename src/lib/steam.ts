@@ -18,12 +18,6 @@ export async function getPlayerSummaries(apiKey: string, steamId: string): Promi
   try {
     const res = await fetch(url)
     if (!res.ok) return null
-    
-    const contentType = res.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      return null
-    }
-
     const data = await res.json()
     return data?.response?.players?.[0] || null
   } catch (e) {
@@ -37,12 +31,6 @@ export async function getOwnedGames(apiKey: string, steamId: string): Promise<St
   try {
     const res = await fetch(url)
     if (!res.ok) return []
-
-    const contentType = res.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      return []
-    }
-
     const data = await res.json()
     return data?.response?.games || []
   } catch (e) {
@@ -56,12 +44,6 @@ export async function getAppDetails(appId: number) {
   try {
     const res = await fetch(url)
     if (!res.ok) return null
-
-    const contentType = res.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      return null
-    }
-
     const data = await res.json()
     if (data && data[appId] && data[appId].success) {
       return data[appId].data
@@ -70,6 +52,24 @@ export async function getAppDetails(appId: number) {
     console.error(`getAppDetails error for ${appId}:`, e)
   }
   return null
+}
+
+export async function getTopStoreGames(): Promise<any[]> {
+  // Mengambil 30 game terpopuler saat ini via SteamSpy API
+  const url = `https://steamspy.com/api.php?request=top100in2weeks`
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return []
+    const data = await res.json()
+    return Object.values(data).slice(0, 30).map((g: any) => ({
+      appid: g.appid,
+      name: g.name,
+      genres: [] 
+    }))
+  } catch (e) {
+    console.error('getTopStoreGames error:', e)
+    return []
+  }
 }
 
 export async function resolveVanityURL(apiKey: string, vanityId: string): Promise<string | null> {
