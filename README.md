@@ -68,14 +68,15 @@ src/
    npm run dev
    ```
 
-## 🚢 Dokumentasi Detail (Bahasa Indonesia)
+## 🚢 Dokumentasi Mendalam (Berbasis Halaman)
 
-Silakan telusuri folder `docs/` untuk penjelasan akademis mendalam:
+Silakan telusuri folder `docs/` untuk penjelasan akademis yang sangat mendetail, menggunakan analogi sederhana agar mudah dipahami:
 
-1. [Arsitektur Hybrid Ensemble](./docs/01-arsitektur-sistem.md) - Alur kerja sistem secara keseluruhan.
-2. [Detail Algoritma CI](./docs/02-algoritma-ci.md) - Penjelasan logis dan matematis tiap algoritma.
-3. [Konsep Fitur & UI/UX](./docs/03-fitur-web.md) - Bagaimana algoritma mentenagai pengalaman pengguna.
-4. [Panduan Pengembangan](./docs/04-panduan-pengembangan.md) - Cara menambah fitur dan algoritma baru.
+1. [Halaman Discovery Engine](./docs/01-halaman-discovery-engine.md) - Bedah algoritma Bayesian, A*, dan Simulated Annealing.
+2. [Halaman Campaign Map (Backlog)](./docs/02-halaman-campaign-backlog.md) - Cara kerja Ant Colony Optimization dan Fuzzy Logic Rating.
+3. [Halaman Co-op Nexus](./docs/03-halaman-coop-nexus.md) - Pemanfaatan algoritma A* untuk strategi bermain bersama.
+4. [Halaman Deal Hunter](./docs/04-halaman-deal-hunter.md) - Optimasi nilai menggunakan Particle Swarm Optimization (PSO).
+5. [Arsitektur Prosedural Modular](./docs/05-arsitektur-prosedural.md) - Penjelasan struktur kode program yang mandiri per halaman.
 
 ---
 *Dikembangkan sebagai solusi cerdas bagi gamer yang ingin memaksimalkan investasi waktu dan biaya di platform Steam.*

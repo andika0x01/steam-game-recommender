@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
 import { getOwnedGames } from '../../lib/steam'
-import { calculateGenrePreferences, scoreGameRecommendation } from '../shared/algorithm'
+import { calculateGenrePreferences, scoreGameRecommendation } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
