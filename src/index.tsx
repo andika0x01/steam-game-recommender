@@ -6,16 +6,20 @@ import { getSteamAuthUrl, verifySteamAuth } from './lib/auth'
 import { getPlayerSummaries, getOwnedGames, getAppDetails } from './lib/steam'
 import { calculateGenrePreferences, scoreGameRecommendation } from './lib/recommender'
 
-const app = new Hono<{ 
-  Bindings: { 
-    STEAM_API_KEY: string, 
-    HOST_URL: string,
-    ASSETS: Fetcher 
-  }, 
-  Variables: { steamId?: string } 
-}>()
+type Bindings = {
+  STEAM_API_KEY: string
+  HOST_URL: string
+  ASSETS: Fetcher
+}
 
-app.use('/favicon.ico', async (c, next) => {
+type Variables = {
+  steamId?: string
+}
+
+const app = new Hono<{ Bindings: Bindings, Variables: Variables }>()
+
+// Static asset serving with ASSETS binding
+const serveAssets = async (c: any, next: any) => {
   if (c.env.ASSETS) {
     try {
       const res = await c.env.ASSETS.fetch(c.req.raw)
@@ -25,32 +29,12 @@ app.use('/favicon.ico', async (c, next) => {
     }
   }
   await next()
-})
+}
 
-app.use('/assets/*', async (c, next) => {
-  if (c.env.ASSETS) {
-    try {
-      const res = await c.env.ASSETS.fetch(c.req.raw)
-      if (res.status !== 404) return res
-    } catch (e) {
-      console.error('ASSETS fetch error:', e)
-    }
-  }
-  await next()
-})
-
-app.use('/static/*', async (c, next) => {
-  if (c.env.ASSETS) {
-    try {
-      const res = await c.env.ASSETS.fetch(c.req.raw)
-      if (res.status !== 404) return res
-    } catch (e) {
-      console.error('ASSETS fetch error:', e)
-    }
-  }
-  await next()
-})
-
+app.use('/favicon.ico', serveAssets)
+app.use('/assets/*', serveAssets)
+app.use('/static/*', serveAssets)
+app.use('/src/*', serveAssets)
 
 app.use('*', async (c, next) => {
   const steamId = getCookie(c, 'steam_id')
@@ -262,23 +246,30 @@ app.get('/recommendations', async (c) => {
     .sort((a, b) => a.playtime_forever - b.playtime_forever)
     .slice(0, 12)
 
-  // 3. Score each backlog game (simplified: we'd ideally fetch details for all, 
-  // but for demo we use genres from calculateGenrePreferences for consistency)
-  const recommendations = backlog.map(game => {
-    // In a real app, we'd fetch actual genres for each backlog game using getAppDetails.
-    // For this prototype, we'll assign a few common genres based on the name 
-    // or just use a base score if genres are missing.
-    const mockGenres = ['Action', 'Indie'] // Placeholder for demonstration
-    const score = scoreGameRecommendation(mockGenres, preferences)
+  // 3. Score each backlog game
+  const recommendations = await Promise.all(backlog.map(async (game) => {
+    // For the top 3 recommendations, we fetch actual genres for a more "real" demo
+    // We'll limit this to avoid hitting API rate limits too hard during a single request
+    let genres = ['Indie', 'Action']
+    if (backlog.indexOf(game) < 3) {
+      const details = await getAppDetails(game.appid)
+      if (details && details.genres) {
+        genres = details.genres.map((g: any) => g.description)
+      }
+    }
+    
+    const score = scoreGameRecommendation(genres, preferences)
     
     return {
       appid: game.appid,
       name: game.name,
-      genres: mockGenres,
-      score: 0.7 + (score * 0.3), // Normalize to a visible range
+      genres: genres,
+      score: 0.7 + (score * 0.3),
       isOwned: true
     }
-  }).sort((a, b) => b.score - a.score)
+  }))
+
+  recommendations.sort((a, b) => b.score - a.score)
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-16">
@@ -289,7 +280,7 @@ app.get('/recommendations', async (c) => {
 
       {recommendations.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
-          {recommendations.map((game, i) => (
+          {recommendations.map((game) => (
             <div key={game.appid} className="group relative glass p-3 rounded-[2rem] md:rounded-[2.5rem] border border-white/5 hover:border-white/20 transition-all duration-500 hover:-translate-y-2">
               <div className="aspect-[16/9] bg-zinc-900 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden relative">
               <img 
