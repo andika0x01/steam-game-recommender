@@ -438,11 +438,12 @@ app.post('/engine/tune', async (c) => {
   const optimizedParams = runGA(games, 20)
 
   try {
-    await c.env.DB.prepare('UPDATE users SET engine_params = ? WHERE id = ?')
+    const result = await c.env.DB.prepare('UPDATE users SET engine_params = ? WHERE id = ?')
       .bind(JSON.stringify(optimizedParams), steamId)
       .run()
-  } catch (e) {
-    console.error('DB Error saving tuned params:', e)
+    console.log(`[DB SUCCESS] Engine params updated for ${steamId}. Success: ${result.success}`)
+  } catch (e: any) {
+    console.error(`[DB CRITICAL ERROR] Failed to save engine_params: ${e.message}`, e)
   }
 
   return c.redirect('/engine')
