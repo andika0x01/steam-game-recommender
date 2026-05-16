@@ -135,7 +135,13 @@ app.get('/', async (c) => {
                   <p className="text-[10px] font-mono font-black text-white">{(game.fuzzyRating * 100).toFixed(0)}%</p>
                 </div>
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-center p-6">
-                   <a href={`steam://run/${game.appid}`} className="px-6 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all">Luncurkan</a>
+                   <a 
+                    href={`https://store.steampowered.com/app/${game.appid}`}
+                    target="_blank"
+                    className="px-6 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all shadow-xl"
+                  >
+                    Lihat Game
+                  </a>
                 </div>
               </div>
               <div className="px-2 text-center">

@@ -136,10 +136,11 @@ app.get('/', async (c) => {
                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 gap-4">
                       <p className="text-[10px] font-mono uppercase text-white">{(game.playtime_forever / 60).toFixed(1)}j Dimainkan</p>
                       <a 
-                        href={`steam://run/${game.appid}`}
+                        href={`https://store.steampowered.com/app/${game.appid}`}
+                        target="_blank"
                         className="px-6 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all shadow-xl"
                       >
-                        Luncurkan
+                        Lihat Game
                       </a>
                    </div>
                 </div>

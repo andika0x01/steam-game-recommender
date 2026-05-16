@@ -231,10 +231,11 @@ app.get('/', async (c) => {
                      />
                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-center p-6">
                         <a 
-                          href={`steam://run/${game.appid}`}
+                          href={`https://store.steampowered.com/app/${game.appid}`}
+                          target="_blank"
                           className="px-4 py-1.5 bg-white text-black text-[8px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all shadow-xl"
                         >
-                          Luncurkan
+                          Lihat Game
                         </a>
                      </div>
                   </div>

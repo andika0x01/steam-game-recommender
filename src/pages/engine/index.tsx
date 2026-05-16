@@ -88,10 +88,11 @@ app.get('/', async (c) => {
                       </div>
                    </div>
                    <a 
-                    href={`steam://run/${game.appid}`}
+                    href={`https://store.steampowered.com/app/${game.appid}`}
+                    target="_blank"
                     className="w-full py-3 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-zinc-200 transition-all text-center"
                   >
-                    Eksekusi
+                    Lihat Game
                   </a>
                 </div>
               </div>
