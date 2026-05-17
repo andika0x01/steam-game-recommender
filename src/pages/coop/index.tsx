@@ -38,14 +38,15 @@ app.get('/', async (c) => {
       const topPlayed = games
         .filter(g => Number(g.playtime_forever) > 0)
         .sort((a, b) => b.playtime_forever - a.playtime_forever)
-        .slice(0, 15)
+        .slice(0, 30) // Ambil lebih banyak untuk kompensasi filter non-game
 
-      const enrichedLibrary = await Promise.all(
+      const enrichedLibrary = (await Promise.all(
         topPlayed.map(async (game) => {
           const details = await getAppDetails(c.env.KV, game.appid)
+          if (details?.type !== 'game') return null
           return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
         })
-      )
+      )).filter((g): g is any => g !== null).slice(0, 15)
 
       return { id: fId, profile, games, profileData: calculateUserGenreProfile(enrichedLibrary) }
     })
@@ -61,11 +62,18 @@ app.get('/', async (c) => {
   }
 
   // 3. Konvergensi Bayesian: Cari game yang memuaskan SEMUA profil secara kolektif
-  const candidatePool = sharedGames.slice(0, 40)
+  const candidatePool = sharedGames.slice(0, 100)
   
-  const scoredSharedGames = await Promise.all(
+  const scoredSharedGames = (await Promise.all(
     candidatePool.map(async (g) => {
       const details = await getAppDetails(c.env.KV, g.appid)
+      if (details?.type !== 'game') return null
+
+      // Multiplayer Categories Filter (1: Multi-player, 9: Co-op, 36: Online PvP, 38: Online Co-op)
+      const categories = details?.categories?.map((cat: any) => cat.id) || []
+      const isMultiplayer = categories.some((id: number) => [1, 9, 36, 38].includes(id))
+      if (!isMultiplayer) return null
+
       const genres = details?.genres?.map((gen: any) => gen.description) || ['Multiplayer']
       
       let totalConvergenceScore = 0
@@ -79,7 +87,7 @@ app.get('/', async (c) => {
         score: totalConvergenceScore / groupProfiles.length
       }
     })
-  )
+  )).filter((g): g is any => g !== null)
 
   // 4. Optimization: Pilih 12 game terbaik & beragam untuk sesi mabar
   const recommendations = runSimulatedAnnealing(scoredSharedGames, 12)

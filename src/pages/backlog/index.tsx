@@ -16,28 +16,30 @@ app.get('/', async (c) => {
   const topPlayed = games
     .filter(g => Number(g.playtime_forever) > 0)
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 30)
+    .slice(0, 50) // Ambil lebih banyak untuk kompensasi filter non-game
 
-  const enrichedPlayed = await Promise.all(
+  const enrichedPlayed = (await Promise.all(
     topPlayed.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
+      if (details?.type !== 'game') return null
       return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
     })
-  )
+  )).filter((g): g is any => g !== null).slice(0, 30)
 
   const userProfile = calculateUserGenreProfile(enrichedPlayed)
 
   // 2. Bayesian Scoring untuk Backlog (Playtime < 2 Jam)
   const backlogCandidates = games.filter(g => g.playtime_forever < 120).slice(0, 50)
 
-  const ratedBacklog = await Promise.all(
+  const ratedBacklog = (await Promise.all(
     backlogCandidates.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
+      if (details?.type !== 'game') return null
       const genres = details?.genres?.map((g: any) => g.description) || ['Indie']
       const score = calculateBayesianPreferenceScore(genres, userProfile)
       return { ...game, genres, personalMatch: score }
     })
-  )
+  )).filter((g): g is any => g !== null)
 
   const sortedBacklog = ratedBacklog.sort((a, b) => b.personalMatch - a.personalMatch)
   const topRecommendation = sortedBacklog[0]

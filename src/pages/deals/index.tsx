@@ -16,14 +16,15 @@ app.get('/', async (c) => {
   const topPlayed = games
     .filter(g => Number(g.playtime_forever) > 0)
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 30)
+    .slice(0, 50) // Ambil lebih banyak untuk kompensasi filter non-game
 
-  const enrichedLibrary = await Promise.all(
+  const enrichedLibrary = (await Promise.all(
     topPlayed.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
+      if (details?.type !== 'game') return null
       return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
     })
-  )
+  )).filter((g): g is any => g !== null).slice(0, 30)
   
   const userProfile = calculateUserGenreProfile(enrichedLibrary)
   const ownedAppIds = new Set(games.map(g => g.appid))
@@ -57,10 +58,12 @@ app.get('/', async (c) => {
   // 3. Enrichment & Scoring: Proses 50 kandidat terbaik secara mendalam
   const candidateDeals = rawDeals.slice(0, 50)
 
-  const scoredDeals = await Promise.all(
+  const scoredDeals = (await Promise.all(
     candidateDeals.map(async (deal) => {
       const appId = parseInt(deal.steamAppID)
       const details = await getAppDetails(c.env.KV, appId)
+      if (details?.type !== 'game') return null
+      
       const genres = details?.genres?.map((g: any) => g.description) || ['Indie']
       
       const bScore = calculateBayesianPreferenceScore(genres, userProfile)
@@ -78,7 +81,7 @@ app.get('/', async (c) => {
         score: finalScore
       }
     })
-  )
+  )).filter((d): d is any => d !== null)
 
   // 4. Optimization: Gunakan SA untuk memilih 24 penawaran terbaik & beragam
   const recommendations = runSimulatedAnnealing(scoredDeals, 24)

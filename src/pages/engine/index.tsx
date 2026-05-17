@@ -16,14 +16,15 @@ app.get('/', async (c) => {
   const playedGames = games
     .filter(g => Number(g.playtime_forever) > 0)
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 40)
+    .slice(0, 60) // Ambil lebih banyak untuk kompensasi filter non-game
 
-  const enrichedLibrary = await Promise.all(
+  const enrichedLibrary = (await Promise.all(
     playedGames.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
+      if (details?.type !== 'game') return null
       return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
     })
-  )
+  )).filter((g): g is any => g !== null).slice(0, 40)
 
   const userProfile = calculateUserGenreProfile(enrichedLibrary)
   const top3Genres = userProfile.slice(0, 3).map(p => p.genre)
@@ -35,12 +36,13 @@ app.get('/', async (c) => {
   // Filter & Ambil 60 kandidat untuk di-enrich (KV Cache akan sangat membantu di sini)
   const discoveryCandidates = rawCandidates.filter(g => !ownedAppIds.has(g.appid)).slice(0, 60)
 
-  const enrichedCandidates = await Promise.all(
+  const enrichedCandidates = (await Promise.all(
     discoveryCandidates.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
+      if (details?.type !== 'game') return null
       return { ...game, genres: details?.genres?.map((g: any) => g.description) || ['Indie'] }
     })
-  )
+  )).filter((g): g is any => g !== null)
 
   // 3. Smart Recommendations: Bayesian + SA
   const recommendations = await getSmartRecommendations(enrichedLibrary, enrichedCandidates, 12)
