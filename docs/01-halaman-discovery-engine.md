@@ -6,6 +6,7 @@ Halaman **Discovery Engine** (`/engine`) telah dirombak total menggunakan strate
 
 ## 1. Fase Profiling: Genre Fingerprinting
 Sistem tidak lagi sekadar melihat library, tapi menghitung "Sidik Jari Genre" Anda menggunakan **Fuzzy Logic**.
+*   **Unrated Exclusion**: Game dengan jam main 0-30 menit diabaikan dari data latih untuk menghindari bias data yang belum matang.
 *   **Fuzzy Engagement**: Jam main dikonversi menjadi bobot kontinu $[0, 1]$ menggunakan fungsi Trapesium.
 *   **Top Genre Extraction**: Sistem mengidentifikasi 3 genre yang paling mendominasi perilaku bermain Anda berdasarkan akumulasi bobot fuzzy.
 
@@ -24,7 +25,7 @@ Setiap kandidat dari pool game tersebut diskor menggunakan **Naive Bayes Classif
 ## 4. Fase Final: MMR Optimization (Maximal Marginal Relevance)
 Menggantikan Simulated Annealing dengan **MMR** untuk menyeleksi 12 game terbaik secara deterministik:
 *   **Relevance vs Diversity**: Menyeimbangkan antara skor prediksi tinggi dan keunikan tags dibanding game yang sudah terpilih.
-*   **Cosine Similarity**: Menghitung kemiripan antar game menggunakan bobot/vote dari tags untuk mencegah saturasi tag yang sama di hasil akhir.
+*   **Weighted Cosine Similarity**: Menghitung kemiripan antar game menggunakan bobot **TF-IDF** dari tags untuk memberikan penekanan pada tag yang langka dan unik.
 
 ---
 *Hasil Akhir: Penemuan game yang benar-benar personal, cerdas, dan bervariasi.*

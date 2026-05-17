@@ -25,5 +25,8 @@ export async function getCoopConvergence(
     }
   })
 
-  return runMMROptimization(scoredSharedGames, count)
+  // Use the tagIdf from the first member's profile for diversity weighting
+  const sampleTagIdf = groupProfiles[0]?.profileData?.tagIdf || {}
+
+  return runMMROptimization(scoredSharedGames, count, 0.7, sampleTagIdf)
 }

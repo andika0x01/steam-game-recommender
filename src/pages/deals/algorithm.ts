@@ -15,12 +15,12 @@ export async function getDealRecommendations(
     // Base recommendation score (NB + Review + Time Decay)
     const baseScore = calculateFinalScore(deal, model)
     
-    // Custom Deal Factors: Focus on Savings (Discount %)
+    // Custom Deal Factors: Multiplicative Boost
+    // Discount percentage (savings) boosts the base score
     const savings = (parseFloat(deal.savings) || 0) / 100
     
-    // Final Weighted Score for Deals: 50% Match, 50% Savings
-    // Removed absolute price limit to prioritize relative value (discount %)
-    const finalScore = (baseScore * 0.5) + (savings * 0.5)
+    // Multiplicative scoring: Discount only boosts games you actually might like
+    const finalScore = baseScore * (1 + savings)
     
     return {
       ...deal,
@@ -28,5 +28,6 @@ export async function getDealRecommendations(
     }
   })
 
-  return runMMROptimization(scoredDeals, count)
+  // Pass tagIdf to MMR for weighted diversity calculation
+  return runMMROptimization(scoredDeals, count, 0.7, model.tagIdf)
 }

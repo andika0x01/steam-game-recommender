@@ -21,20 +21,40 @@ export interface NaiveBayesModel {
   defaultLikelihoodDisliked: number
 }
 
-export function trainNaiveBayes(library: any[]): NaiveBayesModel {
+export function trainNaiveBayes(library: any[]): NaiveBayesModel & { tagIdf: Record<string, number> } {
   let totalLikedWeight = 0
   let totalDislikedWeight = 0
   
   const tagCountsLiked: Record<string, number> = {}
   const tagCountsDisliked: Record<string, number> = {}
+  const tagDocCounts: Record<string, number> = {}
 
-  // Calculate dynamic threshold: 15% of average playtime in library
-  const avgPlaytime = library.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / (library.length || 1)
-  const dynamicThreshold = Math.max(1, (avgPlaytime / 60) * 0.15) // Min 1 hour
+  // Filter out unrated games (0-30 mins)
+  const ratedLibrary = library.filter(g => (g.playtime_forever || 0) > 30)
+  const totalDocs = ratedLibrary.length || 1
 
-  library.forEach(game => {
+  // Calculate average playtime per primary genre
+  const genrePlaytimes: Record<string, { total: number, count: number }> = {}
+  ratedLibrary.forEach(g => {
+    // Assume first tag is primary genre or use a heuristic
+    const primaryGenre = Object.keys(g.tags || {})[0] || 'Unknown'
+    if (!genrePlaytimes[primaryGenre]) genrePlaytimes[primaryGenre] = { total: 0, count: 0 }
+    genrePlaytimes[primaryGenre].total += g.playtime_forever || 0
+    genrePlaytimes[primaryGenre].count++
+  })
+
+  const genreThresholds: Record<string, number> = {}
+  Object.keys(genrePlaytimes).forEach(genre => {
+    const avg = genrePlaytimes[genre].total / genrePlaytimes[genre].count
+    genreThresholds[genre] = Math.max(1, (avg / 60) * 0.15)
+  })
+
+  ratedLibrary.forEach(game => {
     const hours = (game.playtime_forever || 0) / 60
-    // Fuzzified playtime score (0.0 to 1.0) using dynamic threshold
+    const primaryGenre = Object.keys(game.tags || {})[0] || 'Unknown'
+    const dynamicThreshold = genreThresholds[primaryGenre] || 2
+    
+    // Fuzzified playtime score (0.0 to 1.0) using genre-specific dynamic threshold
     const fuzzyScore = trapezoid(hours, 0, dynamicThreshold, 1000, 1000)
     
     const likedWeight = fuzzyScore
@@ -53,7 +73,14 @@ export function trainNaiveBayes(library: any[]): NaiveBayesModel {
     topTags.forEach(tag => {
       tagCountsLiked[tag] = (tagCountsLiked[tag] || 0) + likedWeight
       tagCountsDisliked[tag] = (tagCountsDisliked[tag] || 0) + dislikedWeight
+      tagDocCounts[tag] = (tagDocCounts[tag] || 0) + 1
     })
+  })
+
+  // Calculate IDF
+  const tagIdf: Record<string, number> = {}
+  Object.keys(tagDocCounts).forEach(tag => {
+    tagIdf[tag] = Math.log(totalDocs / (1 + tagDocCounts[tag]))
   })
 
   // Laplace Smoothing
@@ -77,7 +104,8 @@ export function trainNaiveBayes(library: any[]): NaiveBayesModel {
     tagLikelihoodsLiked,
     tagLikelihoodsDisliked,
     defaultLikelihoodLiked: alpha / (totalLikedWeight + alpha * V),
-    defaultLikelihoodDisliked: alpha / (totalDislikedWeight + alpha * V)
+    defaultLikelihoodDisliked: alpha / (totalDislikedWeight + alpha * V),
+    tagIdf
   }
 }
 
@@ -163,15 +191,21 @@ export interface ScoredCandidate {
   [key: string]: any
 }
 
-function calculateCosineSimilarity(tagsA: Record<string, number>, tagsB: Record<string, number>): number {
+function calculateCosineSimilarity(
+  tagsA: Record<string, number>, 
+  tagsB: Record<string, number>,
+  tagIdf: Record<string, number> = {}
+): number {
   const allTags = new Set([...Object.keys(tagsA), ...Object.keys(tagsB)])
   let dotProduct = 0
   let normA = 0
   let normB = 0
 
   for (const tag of allTags) {
-    const valA = tagsA[tag] || 0
-    const valB = tagsB[tag] || 0
+    const idf = tagIdf[tag] || 1
+    const valA = (tagsA[tag] || 0) * idf
+    const valB = (tagsB[tag] || 0) * idf
+    
     dotProduct += valA * valB
     normA += valA * valA
     normB += valB * valB
@@ -184,7 +218,8 @@ function calculateCosineSimilarity(tagsA: Record<string, number>, tagsB: Record<
 export function runMMROptimization(
   candidates: ScoredCandidate[],
   count: number,
-  lambda: number = 0.7
+  lambda: number = 0.7,
+  tagIdf: Record<string, number> = {}
 ): ScoredCandidate[] {
   if (candidates.length === 0) return []
 
@@ -212,7 +247,7 @@ export function runMMROptimization(
         const candidateTags = candidate.tags || {}
         for (const s of selected) {
           const sTags = s.tags || {}
-          const sim = calculateCosineSimilarity(candidateTags, sTags)
+          const sim = calculateCosineSimilarity(candidateTags, sTags, tagIdf)
           if (sim > maxSim) maxSim = sim
         }
       }

@@ -6,7 +6,8 @@ Halaman ini menggunakan kecerdasan komputasional untuk menyusun urutan prioritas
 
 ## 1. Fase Profiling: Naive Bayes Training
 Sistem melatih model klasifikasi berdasarkan library yang sudah dimainkan oleh pengguna.
-*   **Fuzzy Playtime**: Jam main dikonversi menjadi probabilitas "Liked" menggunakan fungsi trapesium dengan ambang batas dinamis (15% dari rata-rata jam main library).
+*   **Unrated Exclusion**: Game dengan jam main 0-30 menit diabaikan untuk menjaga kemurnian data latih.
+*   **Fuzzy Playtime**: Jam main dikonversi menjadi probabilitas "Liked" menggunakan fungsi trapesium dengan ambang batas dinamis berbasis rata-rata per **Genre Utama**.
 *   **Tag Likelihood**: Menghitung probabilitas setiap tag SteamSpy muncul dalam game yang disukai vs tidak disukai (dibatasi 5 tag terpopuler per game).
 
 ## 2. Fase Scoring: Posterior Calculation

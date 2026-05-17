@@ -8,16 +8,16 @@ Halaman ini melakukan optimasi multi-kriteria untuk menemukan penawaran diskon y
 Sistem menarik data diskon dari CheapShark API dan memperkaya metadata setiap diskon dengan genre asli dari Steam via **KV Cache**.
 
 ## 2. Fase Scoring: Naive Bayes Value Metric
-Skor dasar setiap deal ($M$) dihitung menggunakan kombinasi personal match dan nilai ekonomi:
-1.  **Naive Bayes Match ($B$)**: Probabilitas seleramu berdasarkan top 5 SteamSpy Tags, Review Score, dan **Time Decay** (Peluruhan eksponensial). Bobot: 50%.
-2.  **Savings Factor ($S$)**: Persentase diskon dari CheapShark. Mengutamakan besarnya diskon daripada batasan harga absolut. Bobot: 50%.
+Skor dasar setiap deal ($M$) dihitung menggunakan model **Multiplikatif** untuk memastikan diskon besar hanya mem-boost game yang benar-benar relevan:
+1.  **Base Match Score ($B$)**: Probabilitas seleramu berdasarkan top 5 SteamSpy Tags, Review Score, dan **Time Decay**.
+2.  **Savings Boost ($S$)**: Persentase diskon dari CheapShark dihitung sebagai pengali $(1 + \text{Savings})$.
 
-$$Match = (B \cdot 0.5) + (S \cdot 0.5)$$
+$$FinalScore = B \cdot (1 + S)$$
 
 ## 3. Fase Optimasi: MMR Selection
 Menggunakan **Maximal Marginal Relevance (MMR)** untuk memilih 24 penawaran terbaik.
-*   **Diverse Value**: Menghindari penumpukan game dari satu genre/tag (misal: tidak menampilkan 24 game RPG sekaligus) menggunakan **Cosine Similarity**.
-*   **Deterministic Ranking**: Hasil yang stabil dan dapat diprediksi tanpa elemen acak dari Simulated Annealing.
+*   **Diverse Value**: Menghindari penumpukan genre menggunakan **Weighted Cosine Similarity** (TF-IDF).
+*   **Deterministic Ranking**: Hasil yang stabil dan dapat diprediksi tanpa elemen acak.
 
 ---
 *Hasil Akhir: Rekomendasi belanja yang cerdas, personal, dan teroptimasi secara ekonomi.*

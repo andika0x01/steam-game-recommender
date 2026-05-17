@@ -24,6 +24,6 @@ export async function getSmartRecommendations(
     }
   })
 
-  // 3. Optimization Phase: MMR for Diversity
-  return runMMROptimization(scoredCandidates, count)
+  // 3. Optimization Phase: MMR for Diversity (passing tagIdf)
+  return runMMROptimization(scoredCandidates, count, 0.7, model.tagIdf)
 }
