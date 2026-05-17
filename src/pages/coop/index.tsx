@@ -6,28 +6,90 @@ import { calculateUserGenreProfile, getCoopConvergence } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
+const resolveInputToSteamId = async (apiKey: string, input: string) => {
+  input = input.trim()
+  if (!input) return null
+  if (/^[0-9]{17}$/.test(input)) return input
+  const profileMatch = input.match(/\/profiles\/([0-9]{17})/)
+  if (profileMatch) return profileMatch[1]
+  const vanityMatch = input.match(/\/id\/([^\/]+)/)
+  const vanityId = vanityMatch ? vanityMatch[1] : (!input.includes('/') ? input : null)
+  if (vanityId) return await resolveVanityURL(apiKey, vanityId)
+  return null
+}
+
+app.post('/', async (c) => {
+  const steamId = getCookie(c, 'steam_id')
+  if (!steamId) return c.redirect('/')
+
+  const body = await c.req.parseBody()
+  const friendsInput = body['friends'] as string
+  if (!friendsInput) return c.redirect('/coop')
+
+  const inputs = friendsInput.split(',').map(s => s.trim()).filter(Boolean)
+  for (const input of inputs) {
+    const fId = await resolveInputToSteamId(c.env.STEAM_API_KEY, input)
+    if (fId && fId !== steamId) {
+      const player = await getPlayerSummaries(c.env.STEAM_API_KEY, fId)
+      if (player) {
+        // Upsert to users first
+        await c.env.DB.prepare(
+          'INSERT OR REPLACE INTO users (id, name, avatar) VALUES (?, ?, ?)'
+        ).bind(fId, player.personaname, player.avatarfull).run()
+        
+        // Then insert to friends
+        await c.env.DB.prepare(
+          'INSERT OR IGNORE INTO friends (user_id, friend_id) VALUES (?, ?)'
+        ).bind(steamId, fId).run()
+      }
+    }
+  }
+
+  return c.redirect('/coop')
+})
+
+app.post('/remove', async (c) => {
+  const steamId = getCookie(c, 'steam_id')
+  const body = await c.req.parseBody()
+  const friendId = body['friendId'] as string
+  if (!steamId || !friendId) return c.redirect('/coop')
+  
+  await c.env.DB.prepare('DELETE FROM friends WHERE user_id = ? AND friend_id = ?')
+    .bind(steamId, friendId)
+    .run()
+    
+  return c.redirect('/coop')
+})
+
+app.post('/clear', async (c) => {
+  const steamId = getCookie(c, 'steam_id')
+  if (!steamId) return c.redirect('/coop')
+  
+  await c.env.DB.prepare('DELETE FROM friends WHERE user_id = ?')
+    .bind(steamId)
+    .run()
+    
+  return c.redirect('/coop')
+})
+
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
 
-  const friendsQuery = c.req.query('friends') || ''
-  
-  const resolveInputToSteamId = async (input: string) => {
-    input = input.trim()
-    if (!input) return null
-    if (/^[0-9]{17}$/.test(input)) return input
-    const profileMatch = input.match(/\/profiles\/([0-9]{17})/)
-    if (profileMatch) return profileMatch[1]
-    const vanityMatch = input.match(/\/id\/([^\/]+)/)
-    const vanityId = vanityMatch ? vanityMatch[1] : (!input.includes('/') ? input : null)
-    if (vanityId) return await resolveVanityURL(c.env.STEAM_API_KEY, vanityId)
-    return null
-  }
+  // Ambil teman yang tersimpan di DB
+  const savedFriends = await c.env.DB.prepare(
+    'SELECT friend_id FROM friends WHERE user_id = ?'
+  ).bind(steamId).all()
+  const savedFriendIds = savedFriends.results.map((r: any) => r.friend_id)
 
+  const friendsQuery = c.req.query('friends') || ''
   const friendIdsResults = await Promise.all(
-    friendsQuery.split(',').map(resolveInputToSteamId)
+    friendsQuery.split(',').map(f => resolveInputToSteamId(c.env.STEAM_API_KEY, f))
   )
-  const friendIds = [steamId, ...friendIdsResults.filter((id): id is string => id !== null && id !== steamId)]
+  
+  // Gabungkan teman dari DB dan Query Param (untuk backward compatibility)
+  const combinedFriendIds = [...new Set([...savedFriendIds, ...friendIdsResults.filter((id): id is string => id !== null && id !== steamId)])]
+  const friendIds = [steamId, ...combinedFriendIds]
   
   // 1. Profiling Multi-Agen: Ambil genre asli untuk SETIAP member
   const groupProfiles = await Promise.all(
@@ -101,14 +163,13 @@ app.get('/', async (c) => {
               <p className="text-zinc-500 text-xs font-mono uppercase tracking-[0.2em]">Analisis Minat Kolektif Multi-Agen</p>
            </div>
            <div className="glass p-6 rounded-[2.5rem] border border-white/5 bg-white/[0.01] shadow-2xl">
-              <form method="get" action="/coop" className="flex flex-col gap-4">
+              <form method="post" action="/coop" className="flex flex-col gap-4">
                 <div className="space-y-2">
                   <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 px-1">Deploy Kredensial Agen</p>
                   <input 
                     type="text" 
                     name="friends" 
                     placeholder="SteamID atau Tautan Profil..." 
-                    defaultValue={friendsQuery}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-white/10 transition-all text-xs font-mono shadow-inner"
                   />
                 </div>
@@ -116,6 +177,13 @@ app.get('/', async (c) => {
                   Sinkronkan Agen
                 </button>
               </form>
+              {savedFriendIds.length > 0 && (
+                <form method="post" action="/coop/clear" className="mt-4">
+                  <button type="submit" className="w-full py-2 text-zinc-500 hover:text-rose-500 text-[10px] font-black uppercase tracking-widest transition-colors">
+                    Bersihkan Daftar Agen
+                  </button>
+                </form>
+              )}
            </div>
         </div>
       </aside>
@@ -128,12 +196,18 @@ app.get('/', async (c) => {
                     <p className="text-[11px] font-black uppercase tracking-[0.3em] text-emerald-500 bg-emerald-500/5 px-4 py-1.5 rounded-full border border-emerald-500/10 shadow-lg animate-glow">Nexus Terjalin</p>
                     <div className="flex -space-x-4">
                       {groupProfiles.map((d, i) => d.profile && (
-                        <img 
-                          key={d.id} 
-                          src={d.profile.avatarfull} 
-                          className="w-12 h-12 rounded-2xl border-4 border-[#09090b] ring-1 ring-white/10 relative shadow-2xl hover:translate-y-[-4px] transition-transform duration-500" 
-                          style={{ zIndex: groupProfiles.length - i }}
-                        />
+                        <div key={d.id} className="relative group/avatar" style={{ zIndex: groupProfiles.length - i }}>
+                          {d.id !== steamId && (
+                            <form method="post" action="/coop/remove" className="absolute -top-2 -right-2 z-30 opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                              <input type="hidden" name="friendId" value={d.id} />
+                              <button type="submit" className="bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] border-2 border-[#09090b] font-bold hover:scale-110 active:scale-90 transition-all">×</button>
+                            </form>
+                          )}
+                          <img 
+                            src={d.profile.avatarfull} 
+                            className="w-12 h-12 rounded-2xl border-4 border-[#09090b] ring-1 ring-white/10 shadow-2xl hover:translate-y-[-4px] transition-transform duration-500" 
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
