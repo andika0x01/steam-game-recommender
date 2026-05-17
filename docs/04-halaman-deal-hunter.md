@@ -1,14 +1,14 @@
 # 04 - Alur Proses Halaman Deal Hunter (Deep Value Optimizer)
 
-Halaman ini melakukan optimasi multi-kriteria untuk menemukan penawaran diskon yang paling bernilai bagi profil personal pengguna, dengan kemampuan optimasi budget yang sangat dalam.
+Halaman ini melakukan optimasi multi-kriteria untuk menemukan penawaran diskon yang paling bernilai bagi profil personal pengguna, dengan kemampuan optimasi budget yang sangat dalam dan agresif.
 
 ---
 
 ## 1. Fase Input & Data Integrity
-Sistem menarik data diskon dari CheapShark API secara masif (720 deal terbaru) dan melakukan proses **Data Integrity**:
+Sistem menarik data diskon dari CheapShark API secara masif (**1.200 deal terbaru** dari 20 halaman) dan melakukan proses **Data Integrity**:
 *   **Enrichment**: Metadata diperkaya dengan genre Steam via **KV Cache**.
-*   **Asset Validation**: Server melakukan verifikasi aset (HEAD/GET) ke Steam CDN. Game tanpa cover tegak atau yang diarahkan ke placeholder `unknown_app.png` secara otomatis dibuang untuk menjamin kualitas visual.
-*   **Deep Pool**: Mengolah hingga 400 kandidat terverifikasi untuk memastikan variasi game premium dan budget.
+*   **Asset Validation**: Menggunakan pendeteksian client-side berbasis resolusi (`naturalWidth`) untuk memastikan aset visual yang ditampilkan bukan placeholder `unknown_app.png`.
+*   **Radical Pool**: Mengolah hingga 500 kandidat terverifikasi untuk memastikan ketersediaan game premium guna menghabiskan budget besar.
 
 ## 2. Fase Scoring: Naive Bayes Value Metric
 Skor dasar setiap deal dihitung menggunakan model **Multiplikatif**:
@@ -17,17 +17,19 @@ Skor dasar setiap deal dihitung menggunakan model **Multiplikatif**:
 
 ---
 
-## 3. Fase Optimasi
-Terdapat dua mode optimasi tergantung pada input pengguna:
+## 3. Fase Optimasi & Budget Maximization
+Terdapat dua lapis optimasi untuk memastikan efisiensi maksimal:
 
-### A. Mode Standard (Tanpa Budget)
-Menggunakan **Maximal Marginal Relevance (MMR)** untuk memilih 24 penawaran terbaik dengan diversitas genre yang terjaga.
+### A. Core Optimization (Simulated Annealing)
+Menggunakan algoritma SA (10.000 iterasi) untuk mencari kombinasi game terbaik yang memaksimalkan skor total tanpa melewati budget. Mendukung *multi-item swapping* untuk menukar banyak game murah dengan game AAA.
 
-### B. Mode Deep Optimization (Dengan Budget)
-Menggunakan algoritma **Simulated Annealing (SA)** untuk memecahkan masalah *Bounded Knapsack*:
-*   **Dynamic Item Limit**: Jumlah game yang dipilih menyesuaikan besar budget (hingga 100 game).
-*   **Exploration-Exploitation**: Melakukan 10.000 iterasi untuk mencari kombinasi game terbaik yang memaksimalkan skor total tanpa melewati budget.
-*   **Multi-Item Swapping**: Algoritma dapat menukar sekelompok game murah dengan 1 game premium mahal jika terbukti meningkatkan relevansi belanja.
+### B. Greedy-Fill Pass (Budget Exhaustion)
+Jika setelah optimasi utama masih terdapat sisa budget yang signifikan, sistem menjalankan *Greedy-Fill*:
+*   Memilih game termahal yang tersisa di pasar yang masih masuk dalam budget.
+*   Memasukkan game tersebut ke keranjang secara agresif hingga budget mendekati nol atau batas 150 item tercapai.
+
+### C. Ultimate Discovery Guard
+Menjamin bagian **Market Discovery** selalu terisi minimal 60 game dengan cara menarik cadangan data dari pool mentah jika hasil seleksi personal terlalu sedikit.
 
 ---
-*Hasil Akhir: Rekomendasi belanja yang cerdas, personal, dan teroptimasi secara ekonomi dengan visual aset yang sempurna.*
+*Hasil Akhir: Rekomendasi belanja yang cerdas, personal, dan dijamin menghabiskan budget secara maksimal dengan visual aset yang bersih.*

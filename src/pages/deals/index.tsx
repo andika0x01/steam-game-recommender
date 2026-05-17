@@ -13,8 +13,7 @@ app.get('/', async (c) => {
   const budgetQuery = c.req.query('budget')
   const budgetIDR = budgetQuery ? parseInt(budgetQuery) : 0
 
-  // Currency Conversion: Fetch rate from Wise API or KV
-  let idrRate = 16000 // Fallback
+  let idrRate = 16000 
   try {
     const cachedRate = await c.env.KV.get('usd_to_idr_rate')
     if (cachedRate) {
@@ -50,10 +49,9 @@ app.get('/', async (c) => {
   
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
   
-  // 1. Profiling: Ambil genre asli dari seluruh library
   const libraryCandidates = games
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 60) // Ambil lebih banyak untuk kompensasi filter non-game
+    .slice(0, 60) 
 
   const enrichedLibrary = (await Promise.all(
     libraryCandidates.map(async (game) => {
@@ -72,8 +70,8 @@ app.get('/', async (c) => {
   
   const ownedAppIds = new Set(games.map(g => g.appid))
   
-  // 2. Fetch Candidates: Drastically expanded pool (12 pages = 720 deals)
-  const pages = Array.from({ length: 12 }, (_, i) => i)
+  // 2. Fetch Candidates: Massive expansion (20 pages = 1,200 deals)
+  const pages = Array.from({ length: 20 }, (_, i) => i)
   let rawDeals: any[] = []
   
   try {
@@ -85,6 +83,7 @@ app.get('/', async (c) => {
     
     const uniqueDeals: Record<number, any> = {}
     results.flat().forEach((deal: any) => {
+      if (!deal || !deal.steamAppID) return
       const appId = parseInt(deal.steamAppID)
       if (!isNaN(appId) && !ownedAppIds.has(appId)) {
         if (!uniqueDeals[appId] || parseFloat(deal.savings) > parseFloat(uniqueDeals[appId].savings)) {
@@ -93,25 +92,18 @@ app.get('/', async (c) => {
       }
     })
     rawDeals = Object.values(uniqueDeals)
-    console.log(`[DealHunter] Raw unique deals fetched: ${rawDeals.length}`)
   } catch (e) { 
     console.error('CheapShark fetch error:', e) 
   }
 
-  // 3. Enrichment & Scoring: Massive pool to ensure quality even after filtering
-  let candidateDeals: any[] = []
-  if (budgetUSD && budgetUSD > 0) {
-    const topExpensive = [...rawDeals].sort((a, b) => parseFloat(b.salePrice || "0") - parseFloat(a.salePrice || "0")).slice(0, 150)
-    const topRated = rawDeals.slice(0, 150) 
-    const uniqueCandidates = new Map()
-    topExpensive.forEach(d => uniqueCandidates.set(d.steamAppID, d))
-    topRated.forEach(d => uniqueCandidates.set(d.steamAppID, d))
-    candidateDeals = Array.from(uniqueCandidates.values()).slice(0, 400)
-  } else {
-    candidateDeals = rawDeals.slice(0, 100)
-  }
-  console.log(`[DealHunter] Candidates selected for enrichment: ${candidateDeals.length}`)
-
+  // 3. Enrichment & Scoring: Radical Pool (500)
+  const topExpensive = [...rawDeals].sort((a, b) => parseFloat(b.salePrice || "0") - parseFloat(a.salePrice || "0")).slice(0, 300)
+  const topRated = [...rawDeals].sort((a, b) => parseFloat(b.dealRating) - parseFloat(a.dealRating)).slice(0, 300) 
+  const uniqueCandidates = new Map()
+  topExpensive.forEach(d => uniqueCandidates.set(d.steamAppID, d))
+  topRated.forEach(d => uniqueCandidates.set(d.steamAppID, d))
+  const candidateDeals = Array.from(uniqueCandidates.values()).slice(0, 500)
+  
   const enrichedDeals = (await Promise.all(
     candidateDeals.map(async (deal) => {
       const appId = parseInt(deal.steamAppID)
@@ -121,29 +113,13 @@ app.get('/', async (c) => {
       ])
       
       const type = details?.type
-      const genres = details?.genres || []
-      const genreIds = genres.map((g: any) => parseInt(g.id))
+      const genreIds = (details?.genres || []).map((g: any) => parseInt(g.id))
       const isSoftware = genreIds.some((id: number) => [51, 53, 55, 57, 58, 60].includes(id))
-      const isGame = type === 'game'
-
-      // Absolute Asset Validation: Detect missing covers even if CDN redirects to unknown_app.png
-      let hasLibraryCover = false
-      try {
-        const url = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`
-        const assetCheck = await fetch(url, { 
-          method: 'GET', // Use GET to ensure we see the final URL after redirects
-          headers: { 'User-Agent': 'Mozilla/5.0' }
-        })
-        
-        const isPlaceholder = assetCheck.url.includes('unknown_app.png') || assetCheck.headers.get('x-steam-asset-missing') === '1'
-        hasLibraryCover = assetCheck.ok && !isPlaceholder
-      } catch (e) {
-        hasLibraryCover = false
-      }
-
-      if (!isGame || isSoftware || !hasLibraryCover) return null
       
-      const genreNames = genres.map((g: any) => g.description)
+      // Removed strict server-side HEAD asset check to prevent pool depletion
+      if (type !== 'game' || isSoftware) return null
+      
+      const genreNames = (details?.genres || []).map((g: any) => g.description)
       return { 
         ...deal, 
         appid: appId, 
@@ -156,54 +132,69 @@ app.get('/', async (c) => {
       }
     })
   )).filter((d): d is any => d !== null)
-  console.log(`[DealHunter] Enriched deals (filtered): ${enrichedDeals.length}`)
 
-  const recommendationsCount = budgetUSD && budgetUSD > 100 ? Math.min(100, Math.ceil(budgetUSD / 10)) : 24
-  const recommendations = await getDealRecommendations(enrichedLibrary, enrichedDeals, recommendationsCount, budgetUSD)
-  console.log(`[DealHunter] Optimized recommendations (Count Limit ${recommendationsCount}): ${recommendations.length}`)
+  // Dynamic recommendations count: For big budgets, we need more slots
+  const recommendationsCount = budgetUSD && budgetUSD > 500 ? 100 : (budgetUSD ? 50 : 60)
+  let recommendations = await getDealRecommendations(enrichedLibrary, enrichedDeals, recommendationsCount, budgetUSD)
 
-  // Calculate total cost in USD first, then convert for display
+  // Greedy Fill Pass: If we have budget left, fill it aggressively
+  if (budgetUSD && budgetUSD > 0) {
+    let currentCost = recommendations.reduce((sum, r) => sum + parseFloat(r.salePrice || "0"), 0)
+    const selectedIds = new Set(recommendations.map(r => r.appid))
+    const sortedRemaining = enrichedDeals
+        .filter(d => !selectedIds.has(d.appid))
+        .sort((a, b) => parseFloat(b.salePrice) - parseFloat(a.salePrice))
+
+    for (const item of sortedRemaining) {
+        const itemCost = parseFloat(item.salePrice)
+        if (currentCost + itemCost <= budgetUSD && recommendations.length < 150) {
+            recommendations.push(item)
+            currentCost += itemCost
+        }
+    }
+  }
+
   const totalCostUSD = recommendations.reduce((sum: number, r: any) => sum + parseFloat(r.salePrice || "0"), 0)
   const totalCostIDR = totalCostUSD * idrRate
   const remainingIDR = budgetIDR > 0 ? Math.max(0, budgetIDR - totalCostIDR) : 0
-  
-  // Separate recommendations for UI logic
   const basketItems = budgetUSD ? recommendations : []
   
-  // 4. Discovery Pool: Strictly use enrichedDeals only to avoid unvalidated assets
-  const scoredPool = await getDealRecommendations(enrichedLibrary, enrichedDeals, 100, undefined)
-  let discoveryItems = scoredPool.filter(p => !basketItems.find(b => b.appid === p.appid)).slice(0, 30)
+  const discoveryCount = 60
+  const scoredPool = await getDealRecommendations(enrichedLibrary, enrichedDeals, 200, undefined)
+  let discoveryItems = scoredPool.filter(p => !basketItems.find(b => b.appid === p.appid)).slice(0, discoveryCount)
 
-  // Fallback: If discovery is still dry, take the next best from enriched pool (never rawDeals)
-  if (budgetUSD && discoveryItems.length < 6) {
-    discoveryItems = enrichedDeals
-      .filter(d => !basketItems.find(b => b.appid === d.appid))
-      .slice(0, 24)
-      .map(d => ({ ...d, score: 0.5 }))
+  // Ultimate Discovery Guard: Always show 60 items
+  if (discoveryItems.length < 30) {
+    const basketIds = new Set(basketItems.map(b => b.appid))
+    const seenIds = new Set(discoveryItems.map(d => d.appid))
+    const extra = rawDeals
+        .filter(d => !basketIds.has(parseInt(d.steamAppID)) && !seenIds.has(parseInt(d.steamAppID)))
+        .slice(0, 60)
+        .map(d => ({ ...d, appid: parseInt(d.steamAppID), name: d.title, score: 0.5 }))
+    discoveryItems = [...discoveryItems, ...extra].slice(0, discoveryCount)
   }
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-16 md:space-y-24">
-      {/* Global Optimization Loader - Moved to ensure full screen coverage */}
-      <div id="global-loader" className="hidden fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-2xl">
-        <div className="flex flex-col items-center gap-8 p-12 text-center">
+      <div id="global-loader" className="hidden fixed top-0 left-0 w-screen h-screen z-[99999] flex items-center justify-center bg-[#050505]">
+        <div className="flex flex-col items-center gap-10 p-12 text-center">
             <div className="relative">
-                <div className="w-40 h-40 border-4 border-emerald-500/10 rounded-full animate-[spin_4s_linear_infinite]" />
-                <div className="absolute inset-0 w-40 h-40 border-t-4 border-emerald-500 rounded-full animate-spin" />
-                <div className="absolute inset-4 bg-emerald-500/5 rounded-full animate-pulse flex items-center justify-center">
-                   <div className="w-16 h-12 bg-emerald-500 rounded-full blur-2xl opacity-40" />
+                <div className="w-48 h-48 border-4 border-emerald-500/5 rounded-full animate-[spin_5s_linear_infinite]" />
+                <div className="absolute inset-0 w-48 h-48 border-t-4 border-emerald-500 rounded-full animate-spin" />
+                <div className="absolute inset-6 bg-emerald-500/5 rounded-full animate-pulse flex items-center justify-center">
+                   <div className="w-20 h-16 bg-emerald-500 rounded-full blur-3xl opacity-30" />
                 </div>
             </div>
-            <div className="space-y-6">
-                <div className="space-y-2">
-                  <h2 className="text-4xl font-black text-white uppercase tracking-tighter italic leading-none">Optimizing Basket</h2>
-                  <p className="text-emerald-500 font-mono text-xs font-bold uppercase tracking-[0.4em] animate-pulse">Simulated Annealing in progress</p>
+            <div className="space-y-8 flex flex-col items-center">
+                <div className="space-y-3 flex flex-col items-center text-center">
+                  <h2 className="text-5xl font-black text-white uppercase tracking-tighter italic leading-none">Optimizing Basket</h2>
+                  <p className="text-emerald-500 font-mono text-[10px] font-bold uppercase tracking-[0.5em] animate-pulse">Neural Value Analysis Active</p>
                 </div>
-                <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden mx-auto">
-                    <div className="h-full bg-emerald-500 animate-[loading_2s_ease-in-out_infinite]" style={{ width: '40%' }} />
+                <div className="w-72 h-1 bg-white/5 rounded-full overflow-hidden mx-auto border border-white/5">
+                    <div className="h-full bg-emerald-500 animate-[loading_2s_ease-in-out_infinite]" style={{ width: '30%' }} />
                 </div>
-                <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest max-w-[300px] leading-relaxed">
-                  Memverifikasi aset Steam & memindai 720 penawaran pasar untuk presisi belanja maksimal...
+                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] max-w-[340px] leading-relaxed opacity-60 text-center mx-auto">
+                  Memverifikasi integritas aset Steam & mencocokkan profil bermain Anda dengan 720 penawaran pasar...
                 </p>
             </div>
         </div>
@@ -211,20 +202,31 @@ app.get('/', async (c) => {
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes loading {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(250%); }
+          0% { transform: translateX(-150%); }
+          100% { transform: translateX(350%); }
         }
+        #global-loader.flex { display: flex !important; }
       `}} />
 
-      {/* Loading Script for UX */}
       <script dangerouslySetInnerHTML={{ __html: `
+        // Ensure loader is hidden on initial load (client-side safety)
+        const loader = document.getElementById('global-loader');
+        if (loader) {
+            loader.classList.add('hidden');
+            loader.classList.remove('flex');
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+        }
+
         document.addEventListener('submit', (e) => {
           const form = e.target;
           if (form.getAttribute('action') === '/deals') {
             const loader = document.getElementById('global-loader');
             if (loader) {
                 loader.classList.remove('hidden');
-                document.body.style.overflow = 'hidden'; // Prevent scrolling while loading
+                loader.classList.add('flex');
+                document.body.style.overflow = 'hidden';
+                document.documentElement.style.overflow = 'hidden';
             }
           }
         });
@@ -262,12 +264,10 @@ app.get('/', async (c) => {
           <div className="w-full lg:w-auto">
             <div className="glass p-8 rounded-[2.5rem] border-white/10 space-y-8 relative overflow-hidden group min-w-[340px]">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[80px] -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition-all duration-700" />
-              
               <div className="space-y-1 relative">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500">Optimization Result</p>
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Budget Summary</h3>
               </div>
-              
               <div className="grid grid-cols-2 gap-8 relative">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Belanja</p>
@@ -278,7 +278,6 @@ app.get('/', async (c) => {
                   <p className="text-sm font-mono font-bold text-emerald-500">+{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(remainingIDR)}</p>
                 </div>
               </div>
-
               <div className="space-y-3 relative">
                 <div className="flex justify-between items-end">
                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-zinc-500">Target Efisiensi</p>
@@ -301,7 +300,6 @@ app.get('/', async (c) => {
         )}
       </div>
 
-      {/* SECTION 1: THE BASKET (Only when budget is active) */}
       {budgetUSD && basketItems.length > 0 && (
         <div className="space-y-10">
           <div className="flex items-center gap-6">
@@ -309,7 +307,6 @@ app.get('/', async (c) => {
             <h3 className="text-xs font-black uppercase tracking-[0.5em] text-emerald-500 whitespace-nowrap bg-emerald-500/10 px-6 py-2 rounded-full border border-emerald-500/20">Optimized Selection</h3>
             <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-white/10" />
           </div>
-
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-6">
             {basketItems.map((deal: any) => {
               const originalDeal = rawDeals.find(d => parseInt(d.steamAppID) === deal.appid)
@@ -321,8 +318,7 @@ app.get('/', async (c) => {
                       className="w-full h-full object-cover grayscale-[0.5] group-hover:grayscale-0 transition-all duration-700" 
                       alt={deal.name}
                       onLoad={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        // Robust detection: placeholder is 184px, original is 600px
+                        const target = e.target as any;
                         if (target.naturalWidth < 300 || target.src.includes('unknown_app.png')) {
                           target.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`;
                           target.classList.remove('object-cover');
@@ -330,7 +326,7 @@ app.get('/', async (c) => {
                         }
                       }}
                       onError={(e) => {
-                        const target = e.target as HTMLImageElement;
+                        const target = e.target as any;
                         target.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`;
                         target.classList.remove('object-cover');
                         target.classList.add('object-contain', 'p-2');
@@ -356,7 +352,6 @@ app.get('/', async (c) => {
         </div>
       )}
 
-      {/* SECTION 2: DISCOVERY / OTHERS */}
       <div className="space-y-10">
         <div className="flex items-center gap-6">
           <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-white/10" />
@@ -365,7 +360,6 @@ app.get('/', async (c) => {
           </h3>
           <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-white/10" />
         </div>
-
         {discoveryItems.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6 gap-6 md:gap-8">
             {discoveryItems.map((deal: any) => {
@@ -378,8 +372,7 @@ app.get('/', async (c) => {
                       className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" 
                       alt={deal.name}
                       onLoad={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        // Robust detection: placeholder is 184px wide, library covers are 600px
+                        const target = e.target as any;
                         if (target.naturalWidth < 300 || target.src.includes('unknown_app.png')) {
                           target.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`;
                           target.classList.remove('object-cover');
@@ -387,7 +380,7 @@ app.get('/', async (c) => {
                         }
                       }}
                       onError={(e) => {
-                        const target = e.target as HTMLImageElement;
+                        const target = e.target as any;
                         target.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`;
                         target.classList.remove('object-cover');
                         target.classList.add('object-contain', 'p-2');
