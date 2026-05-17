@@ -28,10 +28,14 @@ export function trainNaiveBayes(library: any[]): NaiveBayesModel {
   const tagCountsLiked: Record<string, number> = {}
   const tagCountsDisliked: Record<string, number> = {}
 
+  // Calculate dynamic threshold: 15% of average playtime in library
+  const avgPlaytime = library.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / (library.length || 1)
+  const dynamicThreshold = Math.max(1, (avgPlaytime / 60) * 0.15) // Min 1 hour
+
   library.forEach(game => {
     const hours = (game.playtime_forever || 0) / 60
-    // Fuzzified playtime score (0.0 to 1.0)
-    const fuzzyScore = trapezoid(hours, 0, 2, 1000, 1000)
+    // Fuzzified playtime score (0.0 to 1.0) using dynamic threshold
+    const fuzzyScore = trapezoid(hours, 0, dynamicThreshold, 1000, 1000)
     
     const likedWeight = fuzzyScore
     const dislikedWeight = 1 - fuzzyScore
@@ -39,11 +43,14 @@ export function trainNaiveBayes(library: any[]): NaiveBayesModel {
     totalLikedWeight += likedWeight
     totalDislikedWeight += dislikedWeight
 
-    // Use SteamSpy 'tags' object keys
+    // Use top 5 tags only
     const tags = game.tags || {}
-    const tagNames = Object.keys(tags)
+    const topTags = Object.entries(tags)
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .slice(0, 5)
+      .map(([tag]) => tag)
     
-    tagNames.forEach(tag => {
+    topTags.forEach(tag => {
       tagCountsLiked[tag] = (tagCountsLiked[tag] || 0) + likedWeight
       tagCountsDisliked[tag] = (tagCountsDisliked[tag] || 0) + dislikedWeight
     })
@@ -76,13 +83,17 @@ export function trainNaiveBayes(library: any[]): NaiveBayesModel {
 
 export function calculateNaiveBayesPosterior(game: any, model: NaiveBayesModel): number {
   const tags = game.tags || {}
-  const tagNames = Object.keys(tags)
+  // Use top 5 tags only
+  const topTags = Object.entries(tags)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
+    .slice(0, 5)
+    .map(([tag]) => tag)
 
   // Prior probabilities in log space
   let logProbLiked = Math.log(model.priorLiked)
   let logProbDisliked = Math.log(model.priorDisliked)
 
-  tagNames.forEach(tag => {
+  topTags.forEach(tag => {
     logProbLiked += Math.log(model.tagLikelihoodsLiked[tag] || model.defaultLikelihoodLiked)
     logProbDisliked += Math.log(model.tagLikelihoodsDisliked[tag] || model.defaultLikelihoodDisliked)
   })
@@ -129,9 +140,9 @@ export function calculateTimeDecay(game: any, reviewScore: number): number {
     }
   }
 
-  // Time Decay penalty: 0.85 if older than 5 years, unless review_score > 90%
-  if (ageInYears > 5 && reviewScore <= 90) return 0.85
-  return 1.0
+  // Smooth Exponential Decay: ~5% reduction per year
+  const lambda = 0.05
+  return Math.exp(-lambda * ageInYears)
 }
 
 export function calculateFinalScore(game: any, model: NaiveBayesModel): number {
@@ -152,13 +163,22 @@ export interface ScoredCandidate {
   [key: string]: any
 }
 
-function calculateJaccardSimilarity(tagsA: string[], tagsB: string[]): number {
-  if (tagsA.length === 0 && tagsB.length === 0) return 1
-  const setA = new Set(tagsA)
-  const setB = new Set(tagsB)
-  const intersection = new Set([...setA].filter(x => setB.has(x)))
-  const union = new Set([...setA, ...setB])
-  return intersection.size / union.size
+function calculateCosineSimilarity(tagsA: Record<string, number>, tagsB: Record<string, number>): number {
+  const allTags = new Set([...Object.keys(tagsA), ...Object.keys(tagsB)])
+  let dotProduct = 0
+  let normA = 0
+  let normB = 0
+
+  for (const tag of allTags) {
+    const valA = tagsA[tag] || 0
+    const valB = tagsB[tag] || 0
+    dotProduct += valA * valB
+    normA += valA * valA
+    normB += valB * valB
+  }
+
+  if (normA === 0 || normB === 0) return 0
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))
 }
 
 export function runMMROptimization(
@@ -189,10 +209,10 @@ export function runMMROptimization(
       let maxSim = 0
 
       if (selected.length > 0) {
-        const candidateTags = Object.keys(candidate.tags || {})
+        const candidateTags = candidate.tags || {}
         for (const s of selected) {
-          const sTags = Object.keys(s.tags || {})
-          const sim = calculateJaccardSimilarity(candidateTags, sTags)
+          const sTags = s.tags || {}
+          const sim = calculateCosineSimilarity(candidateTags, sTags)
           if (sim > maxSim) maxSim = sim
         }
       }

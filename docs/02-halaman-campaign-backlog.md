@@ -6,13 +6,13 @@ Halaman ini menggunakan kecerdasan komputasional untuk menyusun urutan prioritas
 
 ## 1. Fase Profiling: Naive Bayes Training
 Sistem melatih model klasifikasi berdasarkan library yang sudah dimainkan oleh pengguna.
-*   **Fuzzy Playtime**: Jam main dikonversi menjadi probabilitas "Liked" menggunakan fungsi trapesium.
-*   **Tag Likelihood**: Menghitung probabilitas setiap tag SteamSpy muncul dalam game yang disukai vs tidak disukai.
+*   **Fuzzy Playtime**: Jam main dikonversi menjadi probabilitas "Liked" menggunakan fungsi trapesium dengan ambang batas dinamis (15% dari rata-rata jam main library).
+*   **Tag Likelihood**: Menghitung probabilitas setiap tag SteamSpy muncul dalam game yang disukai vs tidak disukai (dibatasi 5 tag terpopuler per game).
 
 ## 2. Fase Scoring: Posterior Calculation
-Setiap game backlog (playtime < 2 jam) dihitung probabilitas posteriornya.
+Setiap game backlog dihitung probabilitas posteriornya.
 *   **Bayesian Inference**: Mengalikan prior probability dengan likelihood setiap tag yang dimiliki game tersebut.
-*   **Quality & Recency Adjustments**: Skor akhir dimodifikasi oleh persentase review positif dan faktor **Time Decay** untuk game lama.
+*   **Quality & Recency Adjustments**: Skor akhir dimodifikasi oleh persentase review positif dan faktor **Time Decay** (peluruhan eksponensial bertahap setiap tahun).
 
 ## 3. Fase Optimasi: MMR Diversity
 Menggunakan **Maximal Marginal Relevance (MMR)** untuk menampilkan daftar game yang memiliki skor tinggi namun tetap bervariasi secara tema/tag, mencegah daftar yang didominasi oleh satu genre saja.

@@ -15,13 +15,12 @@ export async function getDealRecommendations(
     // Base recommendation score (NB + Review + Time Decay)
     const baseScore = calculateFinalScore(deal, model)
     
-    // Custom Deal Factors: Savings (30%) + Low Price (10%)
+    // Custom Deal Factors: Focus on Savings (Discount %)
     const savings = (parseFloat(deal.savings) || 0) / 100
-    const salePrice = parseFloat(deal.salePrice) || 0
-    const priceScore = salePrice > 0 ? Math.min(1, 20 / salePrice) : 1
     
-    // Final Weighted Score for Deals
-    const finalScore = (baseScore * 0.6) + (savings * 0.3) + (priceScore * 0.1)
+    // Final Weighted Score for Deals: 50% Match, 50% Savings
+    // Removed absolute price limit to prioritize relative value (discount %)
+    const finalScore = (baseScore * 0.5) + (savings * 0.5)
     
     return {
       ...deal,

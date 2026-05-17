@@ -18,13 +18,13 @@ Alih-alih mengambil "Top 100 Global" yang membosankan, sistem melakukan **Crawli
 
 ## 3. Fase Scoring: Naive Bayes Classifier
 Setiap kandidat dari pool game tersebut diskor menggunakan **Naive Bayes Classifier**.
-*   **Tag-Based Likelihood**: Menggunakan SteamSpy Tags untuk menghitung probabilitas posterior $P(\text{Liked} | \text{Tags})$.
-*   **Review & Recency**: Mengintegrasikan skor review (SteamSpy) dan **Time Decay** (penurunan skor untuk game > 5 tahun) ke dalam nilai akhir.
+*   **Tag-Based Likelihood**: Menggunakan top 5 tags paling populer per game untuk menghitung probabilitas posterior $P(\text{Liked} | \text{Tags})$ guna menghindari bias tag ganda.
+*   **Review & Recency**: Mengintegrasikan skor review (SteamSpy) dan **Time Decay** (peluruhan eksponensial yang menurun mulus setiap tahun) ke dalam nilai akhir.
 
 ## 4. Fase Final: MMR Optimization (Maximal Marginal Relevance)
 Menggantikan Simulated Annealing dengan **MMR** untuk menyeleksi 12 game terbaik secara deterministik:
 *   **Relevance vs Diversity**: Menyeimbangkan antara skor prediksi tinggi dan keunikan tags dibanding game yang sudah terpilih.
-*   **Jaccard Similarity**: Menghitung kemiripan antar game untuk mencegah saturasi tag yang sama di hasil akhir.
+*   **Cosine Similarity**: Menghitung kemiripan antar game menggunakan bobot/vote dari tags untuk mencegah saturasi tag yang sama di hasil akhir.
 
 ---
 *Hasil Akhir: Penemuan game yang benar-benar personal, cerdas, dan bervariasi.*
