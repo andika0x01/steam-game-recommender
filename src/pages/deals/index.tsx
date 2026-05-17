@@ -73,7 +73,12 @@ app.get('/', async (c) => {
       if (!isGame || isSoftware) return null
       
       const genreNames = genres.map((g: any) => g.description)
-      return { ...deal, genres: genreNames.length > 0 ? genreNames : ['Indie'] }
+      return { 
+        ...deal, 
+        appid: appId, 
+        name: deal.title, 
+        genres: genreNames.length > 0 ? genreNames : ['Indie'] 
+      }
     })
   )).filter((d): d is any => d !== null)
 
