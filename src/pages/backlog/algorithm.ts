@@ -1,7 +1,7 @@
-import { calculateUserGenreProfile, calculateBayesianPreferenceScore } from './bayesian'
-
-export * from './bayesian'
-export * from './fuzzyLogic'
+import { 
+  calculateUserGenreProfile, 
+  calculateBayesianPreferenceScore 
+} from '../../lib/algorithm'
 
 export async function getBacklogRecommendations(
   userLibrary: any[],

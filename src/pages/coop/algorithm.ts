@@ -1,9 +1,10 @@
-import { calculateUserGenreProfile, calculateBayesianPreferenceScore } from './bayesian'
-import { runSimulatedAnnealing } from './sa'
+import { 
+  calculateBayesianPreferenceScore, 
+  runSimulatedAnnealing,
+  calculateUserGenreProfile
+} from '../../lib/algorithm'
 
-export * from './bayesian'
-export * from './sa'
-export * from './fuzzyLogic'
+export { calculateUserGenreProfile }
 
 export async function getCoopConvergence(
   groupProfiles: any[],

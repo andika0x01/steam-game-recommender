@@ -1,9 +1,8 @@
-import { calculateUserGenreProfile, calculateBayesianPreferenceScore } from './bayesian'
-import { runSimulatedAnnealing } from './sa'
-
-export * from './bayesian'
-export * from './sa'
-export * from './fuzzyLogic'
+import { 
+  calculateUserGenreProfile, 
+  calculateBayesianPreferenceScore, 
+  runSimulatedAnnealing 
+} from '../../lib/algorithm'
 
 export async function getDealRecommendations(
   userLibrary: any[],

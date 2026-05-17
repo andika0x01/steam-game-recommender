@@ -1,9 +1,11 @@
-import { calculateUserGenreProfile, calculateBayesianPreferenceScore, UserGenreProfile } from './bayesian'
-import { runSimulatedAnnealing, CandidateGame } from './sa'
+import { 
+  calculateUserGenreProfile, 
+  calculateBayesianPreferenceScore, 
+  runSimulatedAnnealing,
+  CandidateGame
+} from '../../lib/algorithm'
 
-export * from './fuzzyLogic'
-export * from './bayesian'
-export * from './sa'
+export { calculateUserGenreProfile }
 
 export async function getSmartRecommendations(
   userLibrary: any[],

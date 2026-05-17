@@ -4,39 +4,33 @@ Dokumen ini ditujukan bagi pengembang atau asisten laboratorium yang ingin memer
 
 ---
 
-## 1. Arsitektur Kode (Logic Isolation)
+## 1. Arsitektur Kode (Colocated Logic)
 
-Kami memisahkan total antara antarmuka (UI) dengan logika cerdas (Algorithm).
-*   **Pusat Logika (`src/pages/engine/algorithm/`)**: Berisi otak utama aplikasi (Fuzzy, Bayesian, SA). Halaman lain mengimpor logika dari sini untuk menjaga konsistensi profil user.
-*   **Folder `src/lib/`**: Berisi wrapper API (Steam, SteamSpy, CheapShark) dan manajemen **Cloudflare KV Cache** untuk metadata genre.
-*   **File Halaman (`src/pages/*/index.tsx`)**: Bertindak sebagai konduktor yang mengatur alur data dan merender visualisasi.
+Kami menggunakan pola **Colocated Logic** untuk menyeimbangkan antara keterpakaian ulang kode (reusability) dan kejelasan domain bisnis per halaman.
+
+*   **Pusat Fungsi Shared (`src/lib/algorithm.ts`)**: Berisi primitif matematika dan fungsi umum yang digunakan oleh banyak fitur (misal: `trapezoid` fuzzy, `calculateAffinityScore` Bayesian, dan wrapper SA standar).
+*   **Logika Spesifik Halaman (`src/pages/*/algorithm.ts`)**: Setiap folder halaman memiliki file algoritmanya sendiri. File ini mengimpor fungsi shared dari `lib` dan mengimplementasikan alur logika unik untuk fitur tersebut (misal: `getCoopConvergence` untuk fitur Co-op).
+*   **Antarmuka UI (`src/pages/*/index.tsx`)**: File presentasi yang hanya fokus pada rendering dan interaksi pengguna, mengimpor logika dari file `algorithm.ts` di folder yang sama.
 
 ## 2. Integritas Data & Caching (KV Store)
 
 Sistem menggunakan **Cloudflare KV** sebagai lapisan memori jangka panjang untuk metadata Steam.
 *   **Enrichment**: Karena API Steam `GetOwnedGames` tidak menyertakan genre, sistem melakukan fetch detail secara real-time dan menyimpannya di KV.
-*   **Efisiensi**: Game yang sudah pernah di-enrich oleh satu user akan tersedia secara instan untuk user lainnya, meminimalkan hit ke API Steam Store yang memiliki rate limit ketat.
+*   **Efisiensi**: Metadata genre yang sudah di-cache akan tersedia secara instan untuk semua pengguna, menghindari rate limit API Steam.
 
-## 3. Instruksi Penambahan Algoritma Baru
+## 3. Instruksi Penambahan Fitur Baru
 
-Aplikasi ini didesain secara modular di dalam suite **Deep Personalization**:
+Jika Anda ingin menambahkan halaman rekomendasi baru:
 
-1.  **Langkah 1**: Tambahkan fungsi matematis baru di `src/pages/engine/algorithm/`.
-2.  **Langkah 2**: Integrasikan ke dalam pipeline di halaman tujuan (misal: Engine atau Deals).
-3.  **Langkah 3**: Jika algoritma baru membutuhkan data tambahan, perbarui wrapper di `src/lib/steam.ts`.
+1.  **Langkah 1**: Buat folder baru di `src/pages/nama-fitur/`.
+2.  **Langkah 2**: Buat file `algorithm.ts`. Impor utilitas dari `../../lib/algorithm` dan buat fungsi utama (misal: `getNewRecommendations`).
+3.  **Langkah 3**: Buat file `index.tsx` untuk UI dan panggil fungsi dari `algorithm.ts`.
+4.  **Langkah 4**: Daftarkan rute baru di `src/index.tsx`.
 
-## 4. Pengujian Stabilitas (Deep Personalization)
+## 4. Pengujian Stabilitas
 
-Algoritma dalam sistem ini bersifat deterministik pada tahap Bayesian, namun stokastik pada tahap **Simulated Annealing (SA)**.
-1.  **Validasi Profil**: Pastikan `calculateUserGenreProfile` menghasilkan distribusi probabilitas yang logis sesuai library user.
-2.  **Uji Konvergensi SA**: Jalankan rekomendasi berkali-kali. SA yang optimal akan menghasilkan set yang berbeda secara item namun konsisten secara kualitas (skor Match tetap tinggi).
-3.  **Genre Balance**: Periksa apakah hasil akhir mengandung variasi genre yang sehat (efek dari *Saturation Penalty* di SA).
+1.  **Validasi Profil**: Pastikan `calculateUserGenreProfile` (di `lib/algorithm.ts`) menghasilkan skor yang akurat berdasarkan playtime.
+2.  **Uji Konvergensi**: Periksa apakah logika optimasi di `algorithm.ts` halaman terkait berhasil menyaring kandidat dengan skor tertinggi namun tetap bervariasi.
 
-## 5. Deployment ke Produksi
-
-Sistem ini dioptimasi untuk berjalan di **Cloudflare Workers**.
-```bash
-# Untuk mendeploy perubahan terbaru
-npm run deploy
-```
-Pastikan `wrangler.jsonc` telah dikonfigurasi dengan binding D1 dan KV yang benar.
+---
+*Arsitektur ini memastikan bahwa kode tetap rapi seiring bertambahnya fitur baru.*

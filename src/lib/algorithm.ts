@@ -17,6 +17,8 @@ export interface GenreProfile {
   score: number
 }
 
+export type UserGenreProfile = GenreProfile
+
 export function calculateNormalizedProfile(items: any[], getWeight: (item: any) => number): GenreProfile[] {
   const genreTotalWeights: Record<string, number> = {}
   
@@ -60,6 +62,8 @@ export interface ScoredCandidate {
   score: number
   [key: string]: any
 }
+
+export type CandidateGame = ScoredCandidate
 
 export function runSAOptimization(
   candidates: ScoredCandidate[],
@@ -106,4 +110,32 @@ export function runSAOptimization(
   }
 
   return currentSolution.sort((a, b) => b.score - a.score)
+}
+
+/**
+ * Common Algorithm Wrappers
+ */
+
+export function calculateUserGenreProfile(library: any[]): UserGenreProfile[] {
+  return calculateNormalizedProfile(library, (g) => {
+    const hours = (g.playtime_forever || 0) / 60
+    return 0.2 + (trapezoid(hours, 0, 2, 1000, 1000) * 0.8)
+  })
+}
+
+export function calculateBayesianPreferenceScore(gameGenres: string[], userProfile: UserGenreProfile[]): number {
+  return calculateAffinityScore(gameGenres, userProfile)
+}
+
+export function runSimulatedAnnealing(candidates: CandidateGame[], count: number = 12): CandidateGame[] {
+  return runSAOptimization(candidates, count, (solution) => {
+    const totalAffinity = solution.reduce((sum, g) => sum + g.score, 0)
+    const genreCounts: Record<string, number> = {}
+    solution.flatMap(g => g.genres).forEach(genre => {
+      genreCounts[genre] = (genreCounts[genre] || 0) + 1
+    })
+
+    const uniqueGenreCount = Object.keys(genreCounts).length
+    return totalAffinity + (uniqueGenreCount / 10)
+  })
 }

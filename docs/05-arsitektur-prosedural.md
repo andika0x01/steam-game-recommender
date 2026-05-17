@@ -1,36 +1,45 @@
 # 05 - Panduan Arsitektur Prosedural Modular
 
-Aplikasi ini tidak mengikuti standar arsitektur perangkat lunak komersial pada umumnya. Sebaliknya, ia menggunakan pendekatan **Prosedural Murni per Halaman** yang dirancang khusus untuk transparansi akademik dan integritas algoritma.
+Aplikasi ini menggunakan pendekatan **Colocated Logic** yang dirancang khusus untuk transparansi akademik dan modularitas pengembangan.
 
 ---
 
 ## 1. Konsep Dasar
-Dalam arsitektur ini, setiap fitur cerdas diisolasi ke dalam modul halamannya masing-masing. Hal ini memastikan bahwa logika personalisasi user diproses secara linear dan mudah diaudit.
-*   Setiap halaman (`/engine`, `/backlog`, dll) adalah unit mandiri.
+Dalam arsitektur ini, setiap fitur cerdas diisolasi ke dalam folder halamannya masing-masing. Hal ini memastikan bahwa logika algoritma mudah diaudit dan tidak bercampur dengan fitur lainnya.
+
+*   Setiap folder halaman (`/engine`, `/backlog`, dll) adalah unit mandiri yang berisi UI (`index.tsx`) dan Logika (`algorithm.ts`).
 *   Proses berjalan linear: **Data Enrichment (KV) -> Profiling -> Scoring -> Optimization -> Render**.
 
-## 2. Alasan Akademis
-Pendekatan ini diambil untuk mempermudah penilaian:
-1.  **Transparansi Alur**: Penilai dapat melihat dengan jelas bagaimana data mentah dari API Steam diubah menjadi rekomendasi personal dalam satu file `index.tsx`.
-2.  **Isolasi Logika**: Perubahan pada parameter Simulated Annealing di satu halaman tidak akan merusak stabilitas halaman lainnya.
-3.  **Audit Algoritma**: Memisahkan fungsi matematis (TypeScript murni) dari antarmuka (React/JSX) memungkinkan pengujian logika secara independen.
+## 2. Alasan Pemilihan Arsitektur
+Pendekatan **Colocated Logic** (memasangkan Logic dengan UI di folder yang sama) diambil karena:
+1.  **Kemandirian Fitur**: Perubahan pada parameter algoritma di satu halaman (misal: bobot harga di fitur Deals) tidak akan merusak stabilitas halaman lainnya.
+2.  **Audit Algoritma**: Penilai dapat dengan mudah membandingkan perbedaan strategi rekomendasi antar halaman cukup dengan melihat file `algorithm.ts` di folder terkait.
+3.  **Efisiensi Shared Logic**: Fungsi-fungsi matematika murni yang bersifat universal tetap disimpan di satu tempat (`src/lib/algorithm.ts`) agar tidak terjadi duplikasi kode yang tidak perlu.
 
-## 3. Pembedahan Struktur Folder (Unified Suite)
+## 3. Pembedahan Struktur Folder
 Berikut adalah peta jalan kode sumber setelah overhaul:
 
 ```text
 src/
+├── lib/
+│   └── algorithm.ts     # Otak Pusat: Primitif Fuzzy, Bayesian, & SA standar.
 └── pages/
-    ├── dashboard/       # Persona Dasar & Statistik Library
-    ├── engine/          # [Pusat CI] Smart Recommendations (Fuzzy-Bayesian, SA)
-    │   └── algorithm/   # Otak utama: Profiling, Preference Scoring, & Diversity SA
-    ├── backlog/         # [Personalized] Priority Queue (Bayesian Ranking)
-    ├── coop/            # [Multi-Agent] Group Convergence (Collective Bayesian)
-    └── deals/           # [Deep Value] Deal Hunter (Weighted Bayesian + SA)
+    ├── engine/          # [Discovery] Smart Recommendations
+    │   ├── index.tsx    # View: Grid rekomendasi & filter
+    │   └── algorithm.ts # Logic: Pipeline Fusi Fuzzy-Bayesian & SA
+    ├── backlog/         # [Personalized] Priority Queue
+    │   ├── index.tsx
+    │   └── algorithm.ts # Logic: Bayesian Rating untuk koleksi pribadi
+    ├── coop/            # [Multi-Agent] Group Convergence
+    │   ├── index.tsx
+    │   └── algorithm.ts # Logic: Collective Bayesian Group Analysis
+    └── deals/           # [Deep Value] Deal Hunter
+        ├── index.tsx
+        └── algorithm.ts # Logic: Value Analysis (Weighted Bayesian + SA)
 ```
 
 ## 4. Keunggulan Integritas Data
-Arsitektur ini mengutamakan **Integritas Data** di atas efisiensi pengetikan. Dengan memproses minimal 200-300 kandidat per permintaan dan melakukan enrichment genre secara real-time via Cloudflare KV, sistem menjamin bahwa hasil yang tampil di layar adalah hasil perhitungan matematis yang jujur terhadap library pengguna.
+Arsitektur ini mengutamakan **Integritas Data** di atas abstraksi yang berlebihan. Dengan memisahkan logika ke file `algorithm.ts` yang bersih dari elemen UI, sistem menjamin bahwa hasil yang tampil di layar adalah hasil perhitungan matematis yang jujur terhadap library pengguna.
 
 ---
-*Kesimpulan: Arsitektur ini adalah jembatan antara dunia riset algoritma dengan aplikasi web modern.*
+*Kesimpulan: Arsitektur ini adalah jembatan antara dunia riset algoritma dengan aplikasi web modern yang terorganisir.*
