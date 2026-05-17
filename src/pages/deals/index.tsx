@@ -9,6 +9,39 @@ const app = new Hono<{ Bindings: any }>()
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
+
+  // Currency Conversion: Fetch rate from Wise API or KV
+  let idrRate = 16000 // Fallback
+  try {
+    const cachedRate = await c.env.KV.get('usd_to_idr_rate')
+    if (cachedRate) {
+      idrRate = parseFloat(cachedRate)
+    } else {
+      const rateRes = await fetch('https://api.wise.com/v1/rates?source=USD&target=IDR', {
+        headers: { 'Authorization': `Bearer ${c.env.WISE_API_KEY}` }
+      })
+      if (rateRes.ok) {
+        const rates = await rateRes.json() as any[]
+        if (rates.length > 0 && rates[0].rate) {
+          idrRate = rates[0].rate
+          await c.env.KV.put('usd_to_idr_rate', idrRate.toString(), { expirationTtl: 86400 })
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Wise API error:', e)
+  }
+
+  const formatIDR = (price: string | number) => {
+    const numericPrice = typeof price === 'string' ? parseFloat(price) : price
+    const converted = numericPrice * idrRate
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(converted)
+  }
   
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
   
@@ -105,6 +138,8 @@ app.get('/', async (c) => {
           <div className="inline-flex items-center gap-3 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
             <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Value Intelligence Active</span>
+            <div className="w-[1px] h-3 bg-white/10 mx-1" />
+            <span className="text-[10px] font-mono font-bold text-emerald-500">1 USD = {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(idrRate)}</span>
           </div>
           <h2 className="text-4xl md:text-6xl font-black tracking-tighter uppercase leading-none">Deal <br /><span className="text-white">Hunter</span></h2>
           <p className="text-zinc-400 text-base md:text-lg">Berburu diskon dengan presisi Bayesian. Kami menyaring ratusan penawaran untuk menemukan titik temu antara selera Anda dan efisiensi ekonomi.</p>
@@ -134,8 +169,8 @@ app.get('/', async (c) => {
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 gap-4">
                     {originalDeal && (
                       <div className="text-center">
-                          <p className="text-[18px] font-black text-white leading-tight">${originalDeal.salePrice}</p>
-                          <p className="text-[10px] text-zinc-400 line-through">${originalDeal.normalPrice}</p>
+                          <p className="text-[12px] font-black text-white leading-tight">{formatIDR(originalDeal.salePrice)}</p>
+                          <p className="text-[8px] text-zinc-400 line-through">{formatIDR(originalDeal.normalPrice)}</p>
                       </div>
                     )}
                     <a href={`https://www.cheapshark.com/redirect?dealID=${originalDeal?.dealID}`} target="_blank" className="px-4 py-2 bg-white text-black text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all shadow-xl">Dapatkan</a>
