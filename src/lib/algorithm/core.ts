@@ -91,7 +91,10 @@ export function runSAOptimization(
     const idxToAdd = Math.floor(Math.random() * pool.length)
     const candidateToAdd = pool[idxToAdd]
 
-    if (!nextSolution.some(g => g.appid === candidateToAdd.appid)) {
+    // Ganti hanya jika kandidat baru belum ada di solusi saat ini
+    const isAlreadyInSolution = nextSolution.some(g => g.appid === candidateToAdd.appid)
+    
+    if (!isAlreadyInSolution) {
       nextSolution[idxToRemove] = candidateToAdd
       const nextEnergy = calculateEnergy(nextSolution)
       if (nextEnergy > currentEnergy || Math.random() < Math.exp((nextEnergy - currentEnergy) / temp)) {
