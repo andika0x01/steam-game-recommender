@@ -60,10 +60,20 @@ app.get('/', async (c) => {
     candidateDeals.map(async (deal) => {
       const appId = parseInt(deal.steamAppID)
       const details = await getAppDetails(c.env.KV, appId)
-      if (details?.type !== 'game') return null
       
-      const genres = details?.genres?.map((g: any) => g.description) || ['Indie']
-      return { ...deal, genres }
+      // Absolute Software Filter: Check Type and official Software Genre IDs
+      const type = details?.type
+      const genres = details?.genres || []
+      const genreIds = genres.map((g: any) => parseInt(g.id))
+      
+      // Blacklisted IDs: 51, 53, 55, 57, 58, 60
+      const isSoftware = genreIds.some((id: number) => [51, 53, 55, 57, 58, 60].includes(id))
+      const isGame = type === 'game'
+
+      if (!isGame || isSoftware) return null
+      
+      const genreNames = genres.map((g: any) => g.description)
+      return { ...deal, genres: genreNames.length > 0 ? genreNames : ['Indie'] }
     })
   )).filter((d): d is any => d !== null)
 

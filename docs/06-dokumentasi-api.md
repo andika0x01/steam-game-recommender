@@ -29,7 +29,10 @@ Digunakan untuk mengambil data profil pengguna dan perpustakaan game. Memerlukan
 ### B. GetOwnedGames (v1)
 *   **Endpoint:** `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/`
 *   **Method:** `GET`
-*   **Parameter:** `key`, `steamid`, `include_appinfo=1`, `include_played_free_games=1`
+*   **Parameter:** `key`, `steamid`, `include_appinfo=1`, `include_played_free_games=1`, `include_free_sub=1`, `skip_unvetted_apps=0`, `include_free_license=1`
+*   **Special Parameters (Enhanced Detection):**
+    *   `include_free_sub=1` / `include_free_license=1`: Mengambil game gratis/subs yang belum dimainkan.
+    *   `skip_unvetted_apps=0`: Mengambil game indie kecil/baru yang statusnya masih "learning about this game".
 *   **Response Sample:**
     ```json
     {
@@ -69,6 +72,14 @@ Digunakan untuk mengambil detail game publik (deskripsi, genre, dll). Tidak meme
 *   **Endpoint:** `https://store.steampowered.com/api/appdetails`
 *   **Method:** `GET`
 *   **Parameter:** `appids`
+*   **Filtering Logic (Internal):**
+    Aplikasi menerapkan **ID Blacklist** untuk membuang software non-game:
+    *   `51`: Animation & Modeling
+    *   `53`: Design & Illustration
+    *   `55`: Photo Editing
+    *   `57`: Utilities
+    *   `58`: Video Production
+    *   `60`: Web Publishing
 *   **Response Sample (AppID 400 - Portal):**
     ```json
     {

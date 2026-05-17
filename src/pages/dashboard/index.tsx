@@ -115,6 +115,13 @@ app.get('/', async (c) => {
               <p className="text-3xl font-black tracking-tighter">{totalPlaytimeHours}j</p>
             </div>
             <p className="text-zinc-400 text-sm">Aplikasi unik ditemukan di dalam Vault Steam Anda.</p>
+            {games.length < 10 && (
+              <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                <p className="text-[10px] text-amber-200 leading-relaxed font-mono uppercase tracking-tight">
+                  <span className="font-black text-amber-500">API Alert:</span> Jika jumlah library terasa tidak akurat, pastikan opsi "Always keep my total playtime private" di Steam dlm keadaan MATI. Game gratis yang belum pernah dimainkan juga tidak akan muncul.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

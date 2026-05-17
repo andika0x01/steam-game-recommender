@@ -15,6 +15,14 @@ Seluruh fitur dalam aplikasi ini sekarang menggunakan satu standar inteligensi t
 - **Co-op Nexus (`/coop`)**: Analisis konvergensi multi-agen. Menemukan titik temu minat grup menggunakan **Group Bayesian Inference** untuk merekomendasikan sesi bermain bersama yang paling memuaskan semua pihak.
 - **Deal Hunter (`/deals`)**: Berburu diskon cerdas menggunakan **Deep Value Analysis**. Sistem memadukan selera library Anda (Bayesian) dengan efisiensi ekonomi, diseleksi melalui **Simulated Annealing**.
 
+### Integritas Data & Filter Konten
+
+Aplikasi ini menerapkan standar akurasi tinggi untuk menjaga relevansi rekomendasi:
+- **Absolute Software Filter**: Menggunakan **Steam Genre ID Blacklist** (ID: 51, 53, 55, 57, 58, 60) untuk secara absolut membuang non-game software (Utilities, Design, dll) yang sering memanipulasi label tipe di Steam Store.
+- **Library Enrichment**: Menggunakan parameter API Steam undocumented (`skip_unvetted_apps=0`, `include_free_license=1`) untuk memaksa pengambilan library secara menyeluruh, termasuk game unplayed dan game indie kecil.
+- **Baseline Interest Weight**: Algoritma profiling menyertakan game dengan **0 jam bermain** dengan bobot dasar **0.2**, memastikan niat beli/kepemilikan tetap masuk dalam hitungan preferensi personal.
+- **Multiplayer Enforcement**: Fitur Co-op Nexus secara ketat memvalidasi kategori multiplayer/co-op sebelum melakukan analisis konvergensi.
+
 ## 🛠️ Tech Stack
 
 - **Framework**: [Hono](https://hono.dev/) (Web framework ultra-cepat untuk Edge Computing)

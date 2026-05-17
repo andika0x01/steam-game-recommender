@@ -38,8 +38,20 @@ app.get('/', async (c) => {
   const enrichedCandidates = (await Promise.all(
     discoveryCandidates.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
-      if (details?.type !== 'game') return null
-      return { ...game, genres: details?.genres?.map((g: any) => g.description) || ['Indie'] }
+      
+      // Absolute Software Filter: Check Type and official Software Genre IDs
+      const type = details?.type
+      const genres = details?.genres || []
+      const genreIds = genres.map((g: any) => parseInt(g.id))
+      
+      // Blacklisted IDs: 51 (Animation), 53 (Design), 55 (Photo), 57 (Utilities), 58 (Video), 60 (Web)
+      const isSoftware = genreIds.some((id: number) => [51, 53, 55, 57, 58, 60].includes(id))
+      const isGame = type === 'game'
+
+      if (!isGame || isSoftware) return null
+      
+      const genreNames = genres.map((g: any) => g.description)
+      return { ...game, genres: genreNames.length > 0 ? genreNames : ['Indie'] }
     })
   )).filter((g): g is any => g !== null)
 

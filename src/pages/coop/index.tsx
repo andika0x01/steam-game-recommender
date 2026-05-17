@@ -66,14 +66,21 @@ app.get('/', async (c) => {
   const enrichedSharedGames = (await Promise.all(
     candidatePool.map(async (g) => {
       const details = await getAppDetails(c.env.KV, g.appid)
-      if (details?.type !== 'game') return null
+      
+      // Absolute Software Filter: Check Type and official Software Genre IDs
+      const type = details?.type
+      const genresArr = details?.genres || []
+      const genreIds = genresArr.map((gen: any) => parseInt(gen.id))
+      const isSoftware = genreIds.some((id: number) => [51, 53, 55, 57, 58, 60].includes(id))
+      
+      if (type !== 'game' || isSoftware) return null
 
       // Multiplayer Categories Filter (1: Multi-player, 9: Co-op, 36: Online PvP, 38: Online Co-op)
       const categories = details?.categories?.map((cat: any) => cat.id) || []
       const isMultiplayer = categories.some((id: number) => [1, 9, 36, 38].includes(id))
       if (!isMultiplayer) return null
 
-      const genres = details?.genres?.map((gen: any) => gen.description) || ['Multiplayer']
+      const genres = genresArr.map((gen: any) => gen.description) || ['Multiplayer']
       return { ...g, genres }
     })
   )).filter((g): g is any => g !== null)
