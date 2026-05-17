@@ -18,7 +18,7 @@ app.get('/', async (c) => {
       idrRate = parseFloat(cachedRate)
     } else {
       const rateRes = await fetch('https://api.wise.com/v1/rates?source=USD&target=IDR', {
-        headers: { 'Authorization': `Bearer ${c.env.WISE_API_KEY}` }
+        headers: { 'Authorization': `Bearer ${c.env.WISE_API_TOKEN}` }
       })
       if (rateRes.ok) {
         const rates = await rateRes.json() as any[]
