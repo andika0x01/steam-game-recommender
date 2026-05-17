@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
 import { getOwnedGames, getDiscoveryCandidates, getAppDetails, getSteamSpyDetails } from '../../lib/steam'
-import { calculateUserGenreProfile, getSmartRecommendations } from './algorithm'
+import { trainNaiveBayes, getSmartRecommendations } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -32,8 +32,12 @@ app.get('/', async (c) => {
     })
   )).filter((g): g is any => g !== null).slice(0, 50)
 
-  const userProfile = calculateUserGenreProfile(enrichedLibrary)
-  const top3Genres = userProfile.slice(0, 3).map(p => p.genre)
+  const model = trainNaiveBayes(enrichedLibrary)
+  // Extract top genres from tag likelihoods for display/crawling
+  const top3Genres = Object.entries(model.tagLikelihoodsLiked)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([tag]) => tag)
 
   // 2. Genre Stacking: Fetch ~300 target candidates berdasarkan top 3 genre user
   const rawCandidates = await getDiscoveryCandidates(top3Genres)
