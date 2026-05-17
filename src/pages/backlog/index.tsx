@@ -32,8 +32,11 @@ app.get('/', async (c) => {
     })
   )).filter((g): g is any => g !== null).slice(0, 40)
 
-  // 2. Bayesian Scoring untuk Backlog (Playtime < 2 Jam)
-  const backlogCandidates = games.filter(g => g.playtime_forever < 120).slice(0, 50)
+  // 2. Bayesian Scoring untuk Seluruh Library (Prioritas Hidden Gems)
+  // Ambil hingga 150 game untuk di-rank (prioritaskan yang belum tamat/jarang dimainkan)
+  const backlogCandidates = games
+    .sort((a, b) => a.playtime_forever - b.playtime_forever)
+    .slice(0, 150)
 
   const enrichedBacklog = (await Promise.all(
     backlogCandidates.map(async (game) => {
