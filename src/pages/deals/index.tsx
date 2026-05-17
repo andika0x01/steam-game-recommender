@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
 import { getOwnedGames, getAppDetails } from '../../lib/steam'
-import { calculateUserGenreProfile, calculateBayesianPreferenceScore, runSimulatedAnnealing } from '../engine/algorithm'
+import { getDealRecommendations } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -26,7 +26,6 @@ app.get('/', async (c) => {
     })
   )).filter((g): g is any => g !== null).slice(0, 30)
   
-  const userProfile = calculateUserGenreProfile(enrichedLibrary)
   const ownedAppIds = new Set(games.map(g => g.appid))
   
   // 2. Fetch Candidates: Ambil 3 halaman CheapShark (180 deals) untuk pool yang luas
@@ -58,33 +57,18 @@ app.get('/', async (c) => {
   // 3. Enrichment & Scoring: Proses 50 kandidat terbaik secara mendalam
   const candidateDeals = rawDeals.slice(0, 50)
 
-  const scoredDeals = (await Promise.all(
+  const enrichedDeals = (await Promise.all(
     candidateDeals.map(async (deal) => {
       const appId = parseInt(deal.steamAppID)
       const details = await getAppDetails(c.env.KV, appId)
       if (details?.type !== 'game') return null
       
       const genres = details?.genres?.map((g: any) => g.description) || ['Indie']
-      
-      const bScore = calculateBayesianPreferenceScore(genres, userProfile)
-      const savings = (parseFloat(deal.savings) || 0) / 100
-      const salePrice = parseFloat(deal.salePrice) || 0
-      const priceScore = salePrice > 0 ? Math.min(1, 20 / salePrice) : 1
-      
-      // Multi-Objective Score: Personal Match (60%) + Savings (30%) + Low Price (10%)
-      const finalScore = (bScore * 0.6) + (savings * 0.3) + (priceScore * 0.1)
-      
-      return {
-        ...deal,
-        appid: appId,
-        genres,
-        score: finalScore
-      }
+      return { ...deal, genres }
     })
   )).filter((d): d is any => d !== null)
 
-  // 4. Optimization: Gunakan SA untuk memilih 24 penawaran terbaik & beragam
-  const recommendations = runSimulatedAnnealing(scoredDeals, 24)
+  const recommendations = await getDealRecommendations(enrichedLibrary, enrichedDeals)
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-16">

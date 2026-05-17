@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
 import { getOwnedGames, getPlayerSummaries, resolveVanityURL, getAppDetails } from '../../lib/steam'
-import { calculateUserGenreProfile, calculateBayesianPreferenceScore, runSimulatedAnnealing } from '../engine/algorithm'
+import { calculateUserGenreProfile, getCoopConvergence } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -64,7 +64,7 @@ app.get('/', async (c) => {
   // 3. Konvergensi Bayesian: Cari game yang memuaskan SEMUA profil secara kolektif
   const candidatePool = sharedGames.slice(0, 100)
   
-  const scoredSharedGames = (await Promise.all(
+  const enrichedSharedGames = (await Promise.all(
     candidatePool.map(async (g) => {
       const details = await getAppDetails(c.env.KV, g.appid)
       if (details?.type !== 'game') return null
@@ -75,22 +75,11 @@ app.get('/', async (c) => {
       if (!isMultiplayer) return null
 
       const genres = details?.genres?.map((gen: any) => gen.description) || ['Multiplayer']
-      
-      let totalConvergenceScore = 0
-      groupProfiles.forEach(p => {
-        totalConvergenceScore += calculateBayesianPreferenceScore(genres, p.profileData)
-      })
-      
-      return {
-        ...g,
-        genres,
-        score: totalConvergenceScore / groupProfiles.length
-      }
+      return { ...g, genres }
     })
   )).filter((g): g is any => g !== null)
 
-  // 4. Optimization: Pilih 12 game terbaik & beragam untuk sesi mabar
-  const recommendations = runSimulatedAnnealing(scoredSharedGames, 12)
+  const recommendations = await getCoopConvergence(groupProfiles, enrichedSharedGames)
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-16">

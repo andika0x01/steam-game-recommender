@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
 import { getOwnedGames, getAppDetails } from '../../lib/steam'
-import { calculateUserGenreProfile, calculateBayesianPreferenceScore } from '../engine/algorithm'
+import { getBacklogRecommendations } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -26,22 +26,19 @@ app.get('/', async (c) => {
     })
   )).filter((g): g is any => g !== null).slice(0, 30)
 
-  const userProfile = calculateUserGenreProfile(enrichedPlayed)
-
   // 2. Bayesian Scoring untuk Backlog (Playtime < 2 Jam)
   const backlogCandidates = games.filter(g => g.playtime_forever < 120).slice(0, 50)
 
-  const ratedBacklog = (await Promise.all(
+  const enrichedBacklog = (await Promise.all(
     backlogCandidates.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
       if (details?.type !== 'game') return null
-      const genres = details?.genres?.map((g: any) => g.description) || ['Indie']
-      const score = calculateBayesianPreferenceScore(genres, userProfile)
-      return { ...game, genres, personalMatch: score }
+      return { ...game, genres: details?.genres?.map((g: any) => g.description) || ['Indie'] }
     })
   )).filter((g): g is any => g !== null)
 
-  const sortedBacklog = ratedBacklog.sort((a, b) => b.personalMatch - a.personalMatch)
+  const ratedBacklog = await getBacklogRecommendations(enrichedPlayed, enrichedBacklog)
+  const sortedBacklog = ratedBacklog.sort((a: any, b: any) => b.personalMatch - a.personalMatch)
   const topRecommendation = sortedBacklog[0]
 
   return c.render(
