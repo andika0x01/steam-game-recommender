@@ -1,13 +1,15 @@
 import { 
   trainNaiveBayes,
   calculateFinalScore,
-  runMMROptimization
+  runMMROptimization,
+  runSimulatedAnnealing
 } from '../../lib/algorithm'
 
 export async function getDealRecommendations(
   userLibrary: any[],
   candidateDeals: any[],
-  count: number = 24
+  count: number = 24,
+  budgetUSD?: number
 ) {
   const model = trainNaiveBayes(userLibrary)
 
@@ -28,6 +30,11 @@ export async function getDealRecommendations(
     }
   })
 
-  // Pass tagIdf to MMR for weighted diversity calculation
+  // If budget is provided, use Simulated Annealing (Knapsack)
+  if (budgetUSD && budgetUSD > 0) {
+    return runSimulatedAnnealing(scoredDeals, budgetUSD)
+  }
+
+  // Pass tagIdf to MMR for weighted diversity calculation (Default behavior)
   return runMMROptimization(scoredDeals, count, 0.7, model.tagIdf)
 }

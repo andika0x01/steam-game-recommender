@@ -266,3 +266,137 @@ export function runMMROptimization(
 
   return selected
 }
+
+// 5. Simulated Annealing for Budget Optimization (Knapsack)
+export function runSimulatedAnnealing(
+  candidates: ScoredCandidate[],
+  budget: number,
+  iterations: number = 10000,
+  initialTemp: number = 100,
+  coolingRate: number = 0.99
+): ScoredCandidate[] {
+  if (candidates.length === 0 || budget <= 0) return []
+
+  // Ensure unique appids and filter out items more expensive than budget
+  const uniquePool = Array.from(
+    candidates.reduce((map, item) => {
+      const price = parseFloat(item.salePrice || "0")
+      if (price <= budget && (!map.has(item.appid) || item.score > map.get(item.appid)!.score)) {
+        map.set(item.appid, item)
+      }
+      return map
+    }, new Map<number, ScoredCandidate>()).values()
+  )
+
+  if (uniquePool.length === 0) return []
+
+  let currentSelection: ScoredCandidate[] = []
+  let currentCost = 0
+  let currentScore = 0
+
+  // Initial greedy state: fill with highest score per price (efficiency)
+  const sorted = [...uniquePool].sort((a, b) => {
+    const effA = a.score / (parseFloat(a.salePrice) || 0.01)
+    const effB = b.score / (parseFloat(b.salePrice) || 0.01)
+    return effB - effA
+  })
+
+  for (const item of sorted) {
+    const cost = parseFloat(item.salePrice || "0")
+    if (currentCost + cost <= budget) {
+      currentSelection.push(item)
+      currentCost += cost
+      currentScore += item.score
+    }
+  }
+
+  let bestSelection = [...currentSelection]
+  let bestScore = currentScore
+  let temp = initialTemp
+
+  for (let i = 0; i < iterations; i++) {
+    const action = Math.random() // 0-1
+    let nextSelection = [...currentSelection]
+    let nextCost = currentCost
+    let nextScore = currentScore
+
+    if (action < 0.3 && nextSelection.length > 0) {
+      // 1. Remove Operation
+      const idx = Math.floor(Math.random() * nextSelection.length)
+      const removed = nextSelection.splice(idx, 1)[0]
+      nextCost -= parseFloat(removed.salePrice || "0")
+      nextScore -= removed.score
+    } 
+    else if (action < 0.6) {
+      // 2. Add Operation
+      const currentIds = new Set(nextSelection.map(s => s.appid))
+      const unselected = uniquePool.filter(c => !currentIds.has(c.appid))
+      if (unselected.length > 0) {
+        const added = unselected[Math.floor(Math.random() * unselected.length)]
+        const cost = parseFloat(added.salePrice || "0")
+        
+        nextSelection.push(added)
+        nextCost += cost
+        nextScore += added.score
+
+        // Enforce budget constraint by removing random items if over budget
+        while (nextCost > budget && nextSelection.length > 0) {
+          const removeIdx = Math.floor(Math.random() * nextSelection.length)
+          const removedItem = nextSelection.splice(removeIdx, 1)[0]
+          nextCost -= parseFloat(removedItem.salePrice || "0")
+          nextScore -= removedItem.score
+        }
+      }
+    } 
+    else if (nextSelection.length > 0) {
+      // 3. Swap Operation
+      const idx = Math.floor(Math.random() * nextSelection.length)
+      const removed = nextSelection.splice(idx, 1)[0]
+      nextCost -= parseFloat(removed.salePrice || "0")
+      nextScore -= removed.score
+
+      const currentIds = new Set(nextSelection.map(s => s.appid))
+      const unselected = uniquePool.filter(c => !currentIds.has(c.appid))
+      
+      if (unselected.length > 0) {
+        const added = unselected[Math.floor(Math.random() * unselected.length)]
+        const cost = parseFloat(added.salePrice || "0")
+        
+        nextSelection.push(added)
+        nextCost += cost
+        nextScore += added.score
+
+        // Enforce budget constraint by removing random items if over budget
+        while (nextCost > budget && nextSelection.length > 0) {
+          const removeIdx = Math.floor(Math.random() * nextSelection.length)
+          const removedItem = nextSelection.splice(removeIdx, 1)[0]
+          nextCost -= parseFloat(removedItem.salePrice || "0")
+          nextScore -= removedItem.score
+        }
+      } else {
+        // Revert if no unselected items
+        nextSelection.push(removed)
+        nextCost += parseFloat(removed.salePrice || "0")
+        nextScore += removed.score
+      }
+    }
+
+    // Acceptance Probability (Metropolis Criterion)
+    const delta = nextScore - currentScore
+    if (delta > 0 || Math.random() < Math.exp(delta / temp)) {
+      currentSelection = nextSelection
+      currentCost = nextCost
+      currentScore = nextScore
+
+      if (currentScore > bestScore) {
+        bestScore = currentScore
+        bestSelection = [...currentSelection]
+      }
+    }
+
+    // Cooling
+    temp *= coolingRate
+  }
+
+  return bestSelection
+}
