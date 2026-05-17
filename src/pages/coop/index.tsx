@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
-import { getOwnedGames, getPlayerSummaries, resolveVanityURL, getAppDetails } from '../../lib/steam'
-import { calculateUserGenreProfile, getCoopConvergence } from './algorithm'
+import { getOwnedGames, getPlayerSummaries, resolveVanityURL, getAppDetails, getSteamSpyDetails } from '../../lib/steam'
+import { trainNaiveBayes, getCoopConvergence } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -104,13 +104,20 @@ app.get('/', async (c) => {
 
       const enrichedLibrary = (await Promise.all(
         libraryCandidates.map(async (game) => {
-          const details = await getAppDetails(c.env.KV, game.appid)
+          const [details, spyDetails] = await Promise.all([
+            getAppDetails(c.env.KV, game.appid),
+            getSteamSpyDetails(c.env.KV, game.appid)
+          ])
           if (details?.type !== 'game') return null
-          return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
+          return { 
+            ...game, 
+            genres: details?.genres?.map((g: any) => g.description) || [],
+            tags: spyDetails?.tags || {}
+          }
         })
       )).filter((g): g is any => g !== null).slice(0, 30)
 
-      return { id: fId, profile, games, profileData: calculateUserGenreProfile(enrichedLibrary) }
+      return { id: fId, profile, games, profileData: trainNaiveBayes(enrichedLibrary) }
     })
   )
 
@@ -127,7 +134,10 @@ app.get('/', async (c) => {
   const candidatePool = sharedGames.slice(0, 100)
   const enrichedSharedGames = (await Promise.all(
     candidatePool.map(async (g) => {
-      const details = await getAppDetails(c.env.KV, g.appid)
+      const [details, spyDetails] = await Promise.all([
+        getAppDetails(c.env.KV, g.appid),
+        getSteamSpyDetails(c.env.KV, g.appid)
+      ])
       const type = details?.type
       const genresArr = details?.genres || []
       const genreIds = genresArr.map((gen: any) => parseInt(gen.id))
@@ -140,7 +150,14 @@ app.get('/', async (c) => {
       if (!isMultiplayer) return null
 
       const genres = genresArr.map((gen: any) => gen.description) || ['Multiplayer']
-      return { ...g, genres }
+      return { 
+        ...g, 
+        genres, 
+        tags: spyDetails?.tags || {},
+        positive: spyDetails?.positive || 0,
+        negative: spyDetails?.negative || 0,
+        release_date: details?.release_date || ""
+      }
     })
   )).filter((g): g is any => g !== null)
 

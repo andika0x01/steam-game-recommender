@@ -11,131 +11,203 @@ export function trapezoid(x: number, a: number, b: number, c: number, d: number)
   return 0
 }
 
-// 2. Bayesian & Profiling Primitives
-export interface GenreProfile {
-  genre: string
-  score: number
+// 2. Naive Bayes Classifier
+export interface NaiveBayesModel {
+  priorLiked: number
+  priorDisliked: number
+  tagLikelihoodsLiked: Record<string, number>
+  tagLikelihoodsDisliked: Record<string, number>
+  defaultLikelihoodLiked: number
+  defaultLikelihoodDisliked: number
 }
 
-export type UserGenreProfile = GenreProfile
-
-export function calculateNormalizedProfile(items: any[], getWeight: (item: any) => number): GenreProfile[] {
-  const genreTotalWeights: Record<string, number> = {}
+export function trainNaiveBayes(library: any[]): NaiveBayesModel {
+  let totalLikedWeight = 0
+  let totalDislikedWeight = 0
   
-  items.forEach(item => {
-    const weight = getWeight(item)
-    const genres = item.genres || []
-    genres.forEach((genreObj: any) => {
-      const genreName = typeof genreObj === 'string' ? genreObj : (genreObj.description || genreObj.name)
-      if (genreName) {
-        genreTotalWeights[genreName] = (genreTotalWeights[genreName] || 0) + weight
-      }
+  const tagCountsLiked: Record<string, number> = {}
+  const tagCountsDisliked: Record<string, number> = {}
+
+  library.forEach(game => {
+    const hours = (game.playtime_forever || 0) / 60
+    // Fuzzified playtime score (0.0 to 1.0)
+    const fuzzyScore = trapezoid(hours, 0, 2, 1000, 1000)
+    
+    const likedWeight = fuzzyScore
+    const dislikedWeight = 1 - fuzzyScore
+
+    totalLikedWeight += likedWeight
+    totalDislikedWeight += dislikedWeight
+
+    // Use SteamSpy 'tags' object keys
+    const tags = game.tags || {}
+    const tagNames = Object.keys(tags)
+    
+    tagNames.forEach(tag => {
+      tagCountsLiked[tag] = (tagCountsLiked[tag] || 0) + likedWeight
+      tagCountsDisliked[tag] = (tagCountsDisliked[tag] || 0) + dislikedWeight
     })
   })
 
-  const totalWeightSum = Object.values(genreTotalWeights).reduce((a, b) => a + b, 0) || 1
-  
-  return Object.entries(genreTotalWeights)
-    .map(([genre, weight]) => ({
-      genre,
-      score: weight / totalWeightSum
-    }))
-    .sort((a, b) => b.score - a.score)
-}
+  // Laplace Smoothing
+  const alpha = 1
+  const allTags = new Set([...Object.keys(tagCountsLiked), ...Object.keys(tagCountsDisliked)])
+  const V = allTags.size || 1
 
-export function calculateAffinityScore(itemGenres: string[], profile: GenreProfile[]): number {
-  if (itemGenres.length === 0) return 0.1
+  const tagLikelihoodsLiked: Record<string, number> = {}
+  const tagLikelihoodsDisliked: Record<string, number> = {}
 
-  let aggregateScore = 0
-  itemGenres.forEach(genre => {
-    const profileEntry = profile.find(p => p.genre === genre)
-    aggregateScore += profileEntry ? profileEntry.score : (1 / (profile.length + 10))
+  allTags.forEach(tag => {
+    tagLikelihoodsLiked[tag] = ((tagCountsLiked[tag] || 0) + alpha) / (totalLikedWeight + alpha * V)
+    tagLikelihoodsDisliked[tag] = ((tagCountsDisliked[tag] || 0) + alpha) / (totalDislikedWeight + alpha * V)
   })
 
-  return Math.min(1.0, aggregateScore / itemGenres.length)
+  const totalWeight = totalLikedWeight + totalDislikedWeight || 1
+
+  return {
+    priorLiked: (totalLikedWeight + alpha) / (totalWeight + 2 * alpha),
+    priorDisliked: (totalDislikedWeight + alpha) / (totalWeight + 2 * alpha),
+    tagLikelihoodsLiked,
+    tagLikelihoodsDisliked,
+    defaultLikelihoodLiked: alpha / (totalLikedWeight + alpha * V),
+    defaultLikelihoodDisliked: alpha / (totalDislikedWeight + alpha * V)
+  }
 }
 
-// 3. Optimization Primitives (Simulated Annealing)
+export function calculateNaiveBayesPosterior(game: any, model: NaiveBayesModel): number {
+  const tags = game.tags || {}
+  const tagNames = Object.keys(tags)
+
+  // Prior probabilities in log space
+  let logProbLiked = Math.log(model.priorLiked)
+  let logProbDisliked = Math.log(model.priorDisliked)
+
+  tagNames.forEach(tag => {
+    logProbLiked += Math.log(model.tagLikelihoodsLiked[tag] || model.defaultLikelihoodLiked)
+    logProbDisliked += Math.log(model.tagLikelihoodsDisliked[tag] || model.defaultLikelihoodDisliked)
+  })
+
+  // Convert back from log space using normalization trick to avoid underflow
+  const maxLog = Math.max(logProbLiked, logProbDisliked)
+  const probLiked = Math.exp(logProbLiked - maxLog)
+  const probDisliked = Math.exp(logProbDisliked - maxLog)
+
+  return probLiked / (probLiked + probDisliked)
+}
+
+// 3. Review Score & Time Decay
+export function getReviewScore(game: any): number {
+  // CheapShark: steamRatingPercent
+  if (game.steamRatingPercent) return parseFloat(game.steamRatingPercent)
+  
+  // SteamSpy: positive / (positive + negative) * 100
+  if (typeof game.positive === 'number' && typeof game.negative === 'number') {
+    const total = game.positive + game.negative
+    if (total === 0) return 50
+    return (game.positive / total) * 100
+  }
+  
+  return 50
+}
+
+export function calculateTimeDecay(game: any, reviewScore: number): number {
+  let ageInYears = 0
+  
+  // CheapShark: releaseDate (UNIX timestamp)
+  if (game.releaseDate) {
+    ageInYears = (Date.now() / 1000 - game.releaseDate) / (365 * 24 * 3600)
+  } 
+  // Steam: release_date (string)
+  else if (game.release_date) {
+    // Steam API can return "Aug 21, 2012" or { date: "..." }
+    const dateStr = typeof game.release_date === 'string' ? game.release_date : game.release_date.date
+    if (dateStr) {
+      const date = new Date(dateStr)
+      if (!isNaN(date.getTime())) {
+        ageInYears = (Date.now() - date.getTime()) / (365 * 24 * 3600 * 1000)
+      }
+    }
+  }
+
+  // Time Decay penalty: 0.85 if older than 5 years, unless review_score > 90%
+  if (ageInYears > 5 && reviewScore <= 90) return 0.85
+  return 1.0
+}
+
+export function calculateFinalScore(game: any, model: NaiveBayesModel): number {
+  const posterior = calculateNaiveBayesPosterior(game, model)
+  const reviewScore = getReviewScore(game)
+  const timeDecay = calculateTimeDecay(game, reviewScore)
+  
+  const normalizedReview = reviewScore / 100
+  // Combined score: Weighted average of posterior and review score, adjusted by time decay
+  return (posterior * 0.7 + normalizedReview * 0.3) * timeDecay
+}
+
+// 4. Maximal Marginal Relevance (MMR) for Diversity
 export interface ScoredCandidate {
   appid: number
-  genres: string[]
   score: number
+  tags?: Record<string, number>
   [key: string]: any
 }
 
-export type CandidateGame = ScoredCandidate
+function calculateJaccardSimilarity(tagsA: string[], tagsB: string[]): number {
+  if (tagsA.length === 0 && tagsB.length === 0) return 1
+  const setA = new Set(tagsA)
+  const setB = new Set(tagsB)
+  const intersection = new Set([...setA].filter(x => setB.has(x)))
+  const union = new Set([...setA, ...setB])
+  return intersection.size / union.size
+}
 
-export function runSAOptimization(
+export function runMMROptimization(
   candidates: ScoredCandidate[],
   count: number,
-  calculateEnergy: (solution: ScoredCandidate[]) => number
+  lambda: number = 0.7
 ): ScoredCandidate[] {
   if (candidates.length === 0) return []
 
-  // Ensure uniqueness
+  // Unique appids only, keep best score
   const uniqueMap = new Map<number, ScoredCandidate>()
   candidates.forEach(c => {
     if (!uniqueMap.has(c.appid) || c.score > uniqueMap.get(c.appid)!.score) {
       uniqueMap.set(c.appid, c)
     }
   })
+  
   const pool = Array.from(uniqueMap.values())
-  
-  let currentSolution = [...pool]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, Math.min(count, pool.length))
-  
-  let currentEnergy = calculateEnergy(currentSolution)
-  let temp = 100
-  const coolingRate = 0.96
+  const selected: ScoredCandidate[] = []
+  const remaining = [...pool]
 
-  while (temp > 1) {
-    let nextSolution = [...currentSolution]
-    const idxToRemove = Math.floor(Math.random() * currentSolution.length)
-    const idxToAdd = Math.floor(Math.random() * pool.length)
-    const candidateToAdd = pool[idxToAdd]
+  while (selected.length < count && remaining.length > 0) {
+    let bestIndex = -1
+    let maxMMR = -Infinity
 
-    // Ganti hanya jika kandidat baru belum ada di solusi saat ini
-    const isAlreadyInSolution = nextSolution.some(g => g.appid === candidateToAdd.appid)
-    
-    if (!isAlreadyInSolution) {
-      nextSolution[idxToRemove] = candidateToAdd
-      const nextEnergy = calculateEnergy(nextSolution)
-      if (nextEnergy > currentEnergy || Math.random() < Math.exp((nextEnergy - currentEnergy) / temp)) {
-        currentSolution = nextSolution
-        currentEnergy = nextEnergy
+    for (let i = 0; i < remaining.length; i++) {
+      const candidate = remaining[i]
+      let maxSim = 0
+
+      if (selected.length > 0) {
+        const candidateTags = Object.keys(candidate.tags || {})
+        for (const s of selected) {
+          const sTags = Object.keys(s.tags || {})
+          const sim = calculateJaccardSimilarity(candidateTags, sTags)
+          if (sim > maxSim) maxSim = sim
+        }
+      }
+
+      const mmrScore = (lambda * candidate.score) - ((1 - lambda) * maxSim)
+
+      if (mmrScore > maxMMR) {
+        maxMMR = mmrScore
+        bestIndex = i
       }
     }
-    temp *= coolingRate
+
+    selected.push(remaining[bestIndex])
+    remaining.splice(bestIndex, 1)
   }
 
-  return currentSolution.sort((a, b) => b.score - a.score)
-}
-
-/**
- * Common Algorithm Wrappers
- */
-
-export function calculateUserGenreProfile(library: any[]): UserGenreProfile[] {
-  return calculateNormalizedProfile(library, (g) => {
-    const hours = (g.playtime_forever || 0) / 60
-    return 0.2 + (trapezoid(hours, 0, 2, 1000, 1000) * 0.8)
-  })
-}
-
-export function calculateBayesianPreferenceScore(gameGenres: string[], userProfile: UserGenreProfile[]): number {
-  return calculateAffinityScore(gameGenres, userProfile)
-}
-
-export function runSimulatedAnnealing(candidates: CandidateGame[], count: number = 12): CandidateGame[] {
-  return runSAOptimization(candidates, count, (solution) => {
-    const totalAffinity = solution.reduce((sum, g) => sum + g.score, 0)
-    const genreCounts: Record<string, number> = {}
-    solution.flatMap(g => g.genres).forEach(genre => {
-      genreCounts[genre] = (genreCounts[genre] || 0) + 1
-    })
-
-    const uniqueGenreCount = Object.keys(genreCounts).length
-    return totalAffinity + (uniqueGenreCount / 10)
-  })
+  return selected
 }

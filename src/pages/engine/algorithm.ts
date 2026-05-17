@@ -1,31 +1,29 @@
 import { 
-  calculateUserGenreProfile, 
-  calculateBayesianPreferenceScore, 
-  runSimulatedAnnealing,
-  CandidateGame
+  trainNaiveBayes,
+  calculateFinalScore,
+  runMMROptimization,
+  ScoredCandidate
 } from '../../lib/algorithm'
 
-export { calculateUserGenreProfile }
+export { trainNaiveBayes }
 
 export async function getSmartRecommendations(
   userLibrary: any[],
   candidates: any[],
   count: number = 12
-): Promise<CandidateGame[]> {
-  // 1. Profiling Phase: Identify user's "Genre Fingerprint"
-  const userProfile = calculateUserGenreProfile(userLibrary)
+): Promise<ScoredCandidate[]> {
+  // 1. Profiling Phase: Train Naive Bayes Model
+  const model = trainNaiveBayes(userLibrary)
 
-  // 2. Scoring Phase: Process candidates using the profile
-  const scoredCandidates: CandidateGame[] = candidates.map(game => {
-    const score = calculateBayesianPreferenceScore(game.genres || [], userProfile)
+  // 2. Scoring Phase: Calculate posterior probability + reviews + time decay
+  const scoredCandidates: ScoredCandidate[] = candidates.map(game => {
+    const score = calculateFinalScore(game, model)
     return {
-      appid: game.appid,
-      name: game.name,
-      genres: game.genres || [],
+      ...game,
       score
     }
   })
 
-  // 3. Optimization Phase: Simulated Annealing (Diversity & Balance)
-  return runSimulatedAnnealing(scoredCandidates, count)
+  // 3. Optimization Phase: MMR for Diversity
+  return runMMROptimization(scoredCandidates, count)
 }

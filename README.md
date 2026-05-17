@@ -1,59 +1,27 @@
-# Steam Game Recommender (Deep Personalization Edition) 🎮
+# Steam Game Recommender
 
-Sistem rekomendasi game Steam mutakhir yang mentenagai Tugas Besar mata kuliah *Computational Intelligence*. Aplikasi ini telah dirombak total menggunakan arsitektur **Colocated Logic** yang modular, menggabungkan **Fuzzy Logic**, **Bayesian Inference**, dan **Simulated Annealing (SA)**.
+A high-performance Steam library analyzer and discovery engine built with Hono, Cloudflare Workers, and D1.
 
-## 🚀 Ikhtisar Proyek
+## Core Features
+- **Naive Bayes Recommendation Engine**: Rigorous mathematical scoring using SteamSpy tags and user playtime weighted by Fuzzy Logic.
+- **MMR Diversity Sorting**: Replaced Simulated Annealing with Maximal Marginal Relevance for deterministic and diverse game suggestions.
+- **Backlog Priority**: Smart ranking for owned but unplayed games.
+- **Deal Hunter**: Bayesian-filtered discount discovery via CheapShark API.
+- **Co-op Nexus**: Collective interest convergence for group play sessions.
+- **Tier List**: Manual organization tool for your digital legacy.
 
-Steam Game Recommender adalah **Intelligence-Powered Discovery Hub** yang mempelajari "sidik jari" perilaku bermain Anda. Sistem ini menganalisis library Anda menggunakan pemodelan keterikatan fuzzy untuk menemukan game yang benar-benar personal.
+## Tech Stack
+- **Framework**: [Hono](https://hono.dev/) (Full-stack)
+- **Runtime**: [Cloudflare Workers](https://workers.cloudflare.com/)
+- **Database**: [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite)
+- **Cache**: [Cloudflare KV](https://developers.cloudflare.com/kv/)
+- **Styling**: Vanilla CSS (Modern aesthetic)
 
-### Fitur Utama & Alur Algoritma
+## Getting Started
+1. Clone the repository.
+2. Run `npm install`.
+3. Configure `wrangler.jsonc` with your Steam API Key and D1 database.
+4. Run `npm run dev` for local development.
+5. Deploy using `npm run deploy`.
 
-Aplikasi ini menggunakan standar inteligensi tinggi yang konsisten di seluruh fiturnya:
-
-- **Discovery Engine (`/engine`)**: Menemukan game baru menggunakan fusi **Fuzzy-Bayesian** pada pool kandidat, dioptimalkan oleh **Simulated Annealing** untuk akurasi dan keragaman maksimal.
-- **Campaign Map (`/backlog`)**: Menyusun rute bermain terbaik dari backlog Anda dengan rating afinitas Bayesian.
-- **Co-op Nexus (`/coop`)**: Analisis konvergensi multi-agen untuk menemukan titik temu minat grup menggunakan **Group Bayesian Inference**.
-- **Deal Hunter (`/deals`)**: Berburu diskon cerdas dengan memadukan selera personal (Bayesian) dan efisiensi ekonomi.
-
-## 🛠️ Arsitektur & Struktur Proyek
-
-Proyek ini menggunakan pola **Colocated Logic**, di mana logika algoritma diletakkan sedekat mungkin dengan presentasi (UI) untuk meningkatkan keterbacaan dan pemeliharaan.
-
-```text
-src/
-├── lib/
-│   ├── algorithm.ts    # SHARED: Fungsi inti matematis (Fuzzy, Bayesian, SA)
-│   ├── steam.ts       # Integrasi API Steam & KV Caching
-│   └── auth.ts        # Logika Autentikasi Steam
-└── pages/
-    ├── engine/        # Modul Fitur
-    │   ├── index.tsx      # PRESENTATION: UI Halaman
-    │   └── algorithm.ts   # LOGIC: Implementasi algoritma spesifik halaman
-    ├── backlog/
-    │   ├── index.tsx
-    │   └── algorithm.ts
-    └── ...
-```
-
-### Keunggulan Struktur Ini:
-1. **Modular & Reusable**: Fungsi umum berada di `src/lib/algorithm.ts`, sementara logika spesifik fitur diisolasi di `algorithm.ts` masing-masing folder page.
-2. **Konsisten**: Setiap fitur mengikuti pola folder yang sama (`index.tsx` + `algorithm.ts`).
-3. **Mudah Diaudit**: Pemisahan tegas antara UI dan logika domain algoritma di tingkat file.
-
-## ⚙️ Persiapan & Instalasi
-
-1. **Konfigurasi Variabel**: Edit `.dev.vars` dan masukkan `STEAM_API_KEY`.
-2. **Setup KV**: Pastikan `wrangler.jsonc` memiliki binding `KV`.
-3. **Migrasi Database**: Jalankan `npx wrangler d1 migrations apply steam-recommender --local`.
-4. **Jalankan Server**: `npm run dev`.
-
-## 🚢 Dokumentasi Teknis
-
-Dokumentasi detail mengenai cara kerja sistem:
-
-1. [Panduan Pengembangan](./docs/04-panduan-pengembangan.md) - Cara memperluas sistem.
-2. [Arsitektur Prosedural Modular](./docs/05-arsitektur-prosedural.md) - Filosofi desain struktur kode.
-3. [Dokumentasi API](./docs/06-dokumentasi-api.md) - Referensi endpoint.
-
----
-*Dikembangkan dengan standar integritas data 100% menggunakan API Steam dunia nyata dan Real-time KV Enrichment.*
+License: MIT

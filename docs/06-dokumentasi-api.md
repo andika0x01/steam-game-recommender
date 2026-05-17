@@ -100,25 +100,31 @@ Digunakan untuk mengambil detail game publik (deskripsi, genre, dll). Tidak meme
 ---
 
 ## 3. SteamSpy API
-Digunakan untuk mencari game berdasarkan kategori atau tag tertentu.
+Digunakan untuk mencari game berdasarkan kategori atau tag tertentu serta mendapatkan metrik detail (tags, reviews).
 
-*   **Endpoint:** `https://steamspy.com/api.php`
+### A. Tag Request
+*   **Endpoint:** `https://steamspy.com/api.php?request=tag&tag={tag_name}`
 *   **Method:** `GET`
-*   **Parameter:** `request=tag`, `tag={tag_name}`
+*   **Usage:** Digunakan untuk mencari kandidat game di Discovery Engine.
+
+### B. App Details Request (Enhanced Analytics)
+*   **Endpoint:** `https://steamspy.com/api.php?request=appdetails&appid={appid}`
+*   **Method:** `GET`
 *   **Response Sample:**
     ```json
     {
-      "400": {
-        "appid": 400,
-        "name": "Portal",
-        "developer": "Valve",
-        "publisher": "Valve",
-        "owners": "10,000,000 .. 20,000,000",
-        "average_forever": 612,
-        "price": "999"
+      "appid": 730,
+      "name": "Counter-Strike: Global Offensive",
+      "positive": 7642084,
+      "negative": 1173003,
+      "tags": {
+        "FPS": 91172,
+        "Shooter": 65634,
+        "Multiplayer": 62536
       }
     }
     ```
+*   **Usage:** Digunakan sebagai basis data untuk **Naive Bayes Classifier** dan penghitungan **Review Score**.
 
 ---
 
@@ -136,10 +142,13 @@ Digunakan untuk mencari penawaran harga (deals) game PC (fokus pada Steam).
         "salePrice": "9.79",
         "normalPrice": "69.99",
         "savings": "86.012287",
-        "steamAppID": "3472040"
+        "steamAppID": "3472040",
+        "steamRatingPercent": "74",
+        "releaseDate": 1757030400
       }
     ]
     ```
+*   **Usage:** Menyediakan data `steamRatingPercent` dan `releaseDate` (UNIX) untuk algoritma **Time Decay** di halaman Deal Hunter.
 
 ---
 

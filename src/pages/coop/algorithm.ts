@@ -1,10 +1,10 @@
 import { 
-  calculateBayesianPreferenceScore, 
-  runSimulatedAnnealing,
-  calculateUserGenreProfile
+  calculateFinalScore, 
+  runMMROptimization,
+  trainNaiveBayes
 } from '../../lib/algorithm'
 
-export { calculateUserGenreProfile }
+export { trainNaiveBayes }
 
 export async function getCoopConvergence(
   groupProfiles: any[],
@@ -12,19 +12,18 @@ export async function getCoopConvergence(
   count: number = 12
 ) {
   const scoredSharedGames = sharedGamesPool.map(g => {
-    const genres = g.genres || ['Multiplayer']
-    
     let totalConvergenceScore = 0
+    
+    // Convergence: Average the Final Score across all participants' models
     groupProfiles.forEach(p => {
-      totalConvergenceScore += calculateBayesianPreferenceScore(genres, p.profileData)
+      totalConvergenceScore += calculateFinalScore(g, p.profileData)
     })
     
     return {
       ...g,
-      genres,
       score: totalConvergenceScore / groupProfiles.length
     }
   })
 
-  return runSimulatedAnnealing(scoredSharedGames, count)
+  return runMMROptimization(scoredSharedGames, count)
 }

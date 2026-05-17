@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
-import { getOwnedGames, getAppDetails } from '../../lib/steam'
+import { getOwnedGames, getAppDetails, getSteamSpyDetails } from '../../lib/steam'
 import { getDealRecommendations } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
@@ -19,9 +19,16 @@ app.get('/', async (c) => {
 
   const enrichedLibrary = (await Promise.all(
     libraryCandidates.map(async (game) => {
-      const details = await getAppDetails(c.env.KV, game.appid)
+      const [details, spyDetails] = await Promise.all([
+        getAppDetails(c.env.KV, game.appid),
+        getSteamSpyDetails(c.env.KV, game.appid)
+      ])
       if (details?.type !== 'game') return null
-      return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
+      return { 
+        ...game, 
+        genres: details?.genres?.map((g: any) => g.description) || [],
+        tags: spyDetails?.tags || {}
+      }
     })
   )).filter((g): g is any => g !== null).slice(0, 40)
   
@@ -59,7 +66,10 @@ app.get('/', async (c) => {
   const enrichedDeals = (await Promise.all(
     candidateDeals.map(async (deal) => {
       const appId = parseInt(deal.steamAppID)
-      const details = await getAppDetails(c.env.KV, appId)
+      const [details, spyDetails] = await Promise.all([
+        getAppDetails(c.env.KV, appId),
+        getSteamSpyDetails(c.env.KV, appId)
+      ])
       
       // Absolute Software Filter: Check Type and official Software Genre IDs
       const type = details?.type
@@ -77,7 +87,11 @@ app.get('/', async (c) => {
         ...deal, 
         appid: appId, 
         name: deal.title, 
-        genres: genreNames.length > 0 ? genreNames : ['Indie'] 
+        genres: genreNames.length > 0 ? genreNames : ['Indie'],
+        tags: spyDetails?.tags || {},
+        positive: spyDetails?.positive || 0,
+        negative: spyDetails?.negative || 0,
+        release_date: details?.release_date || ""
       }
     })
   )).filter((d): d is any => d !== null)

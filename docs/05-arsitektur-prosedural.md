@@ -22,24 +22,22 @@ Berikut adalah peta jalan kode sumber setelah overhaul:
 ```text
 src/
 ├── lib/
-│   └── algorithm.ts     # Otak Pusat: Primitif Fuzzy, Bayesian, & SA standar.
+│   └── algorithm.ts     # Otak Pusat: Primitif Fuzzy, Naive Bayes, MMR, & Time Decay.
 └── pages/
     ├── engine/          # [Discovery] Smart Recommendations
     │   ├── index.tsx    # View: Grid rekomendasi & filter
-    │   └── algorithm.ts # Logic: Pipeline Fusi Fuzzy-Bayesian & SA
+    │   └── algorithm.ts # Logic: Pipeline Naive Bayes + MMR
     ├── backlog/         # [Personalized] Priority Queue
     │   ├── index.tsx
     │   └── algorithm.ts # Logic: Bayesian Rating untuk koleksi pribadi
     ├── coop/            # [Multi-Agent] Group Convergence
     │   ├── index.tsx
-    │   └── algorithm.ts # Logic: Collective Bayesian Group Analysis
+    │   └── algorithm.ts # Logic: Multi-Agent Bayesian Convergence + MMR
     └── deals/           # [Deep Value] Deal Hunter
         ├── index.tsx
-        └── algorithm.ts # Logic: Value Analysis (Weighted Bayesian + SA)
+        └── algorithm.ts # Logic: Value Analysis (Naive Bayes + MMR)
 ```
 
 ## 4. Keunggulan Integritas Data
-Arsitektur ini mengutamakan **Integritas Data** di atas abstraksi yang berlebihan. Dengan memisahkan logika ke file `algorithm.ts` yang bersih dari elemen UI, sistem menjamin bahwa hasil yang tampil di layar adalah hasil perhitungan matematis yang jujur terhadap library pengguna.
+Arsitektur ini mengutamakan **Integritas Data** di atas abstraksi yang berlebihan. Dengan memisahkan logika ke file `algorithm.ts` yang bersih dari elemen UI, sistem menjamin bahwa hasil yang tampil di layar adalah hasil perhitungan matematis yang jujur terhadap library pengguna. Penggunaan **MMR (Maximal Marginal Relevance)** memastikan diversitas hasil secara deterministik tanpa ketidakpastian (stochasticity) dari Simulated Annealing.
 
----
-*Kesimpulan: Arsitektur ini adalah jembatan antara dunia riset algoritma dengan aplikasi web modern yang terorganisir.*

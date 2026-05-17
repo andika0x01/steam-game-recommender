@@ -1,7 +1,7 @@
 import { 
-  calculateUserGenreProfile, 
-  calculateBayesianPreferenceScore, 
-  runSimulatedAnnealing 
+  trainNaiveBayes,
+  calculateFinalScore,
+  runMMROptimization
 } from '../../lib/algorithm'
 
 export async function getDealRecommendations(
@@ -9,25 +9,25 @@ export async function getDealRecommendations(
   candidateDeals: any[],
   count: number = 24
 ) {
-  const userProfile = calculateUserGenreProfile(userLibrary)
+  const model = trainNaiveBayes(userLibrary)
 
   const scoredDeals = candidateDeals.map(deal => {
-    const genres = deal.genres || ['Indie']
+    // Base recommendation score (NB + Review + Time Decay)
+    const baseScore = calculateFinalScore(deal, model)
     
-    const bScore = calculateBayesianPreferenceScore(genres, userProfile)
+    // Custom Deal Factors: Savings (30%) + Low Price (10%)
     const savings = (parseFloat(deal.savings) || 0) / 100
     const salePrice = parseFloat(deal.salePrice) || 0
     const priceScore = salePrice > 0 ? Math.min(1, 20 / salePrice) : 1
     
-    // Multi-Objective Score: Personal Match (60%) + Savings (30%) + Low Price (10%)
-    const finalScore = (bScore * 0.6) + (savings * 0.3) + (priceScore * 0.1)
+    // Final Weighted Score for Deals
+    const finalScore = (baseScore * 0.6) + (savings * 0.3) + (priceScore * 0.1)
     
     return {
       ...deal,
-      genres,
       score: finalScore
     }
   })
 
-  return runSimulatedAnnealing(scoredDeals, count)
+  return runMMROptimization(scoredDeals, count)
 }

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import * as React from 'hono/jsx'
-import { getOwnedGames, getDiscoveryCandidates, getAppDetails } from '../../lib/steam'
+import { getOwnedGames, getDiscoveryCandidates, getAppDetails, getSteamSpyDetails } from '../../lib/steam'
 import { calculateUserGenreProfile, getSmartRecommendations } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
@@ -19,9 +19,16 @@ app.get('/', async (c) => {
 
   const enrichedLibrary = (await Promise.all(
     libraryCandidates.map(async (game) => {
-      const details = await getAppDetails(c.env.KV, game.appid)
+      const [details, spyDetails] = await Promise.all([
+        getAppDetails(c.env.KV, game.appid),
+        getSteamSpyDetails(c.env.KV, game.appid)
+      ])
       if (details?.type !== 'game') return null
-      return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
+      return { 
+        ...game, 
+        genres: details?.genres?.map((g: any) => g.description) || [],
+        tags: spyDetails?.tags || {}
+      }
     })
   )).filter((g): g is any => g !== null).slice(0, 50)
 
@@ -37,7 +44,10 @@ app.get('/', async (c) => {
 
   const enrichedCandidates = (await Promise.all(
     discoveryCandidates.map(async (game) => {
-      const details = await getAppDetails(c.env.KV, game.appid)
+      const [details, spyDetails] = await Promise.all([
+        getAppDetails(c.env.KV, game.appid),
+        getSteamSpyDetails(c.env.KV, game.appid)
+      ])
       
       // Absolute Software Filter: Check Type and official Software Genre IDs
       const type = details?.type
@@ -51,7 +61,14 @@ app.get('/', async (c) => {
       if (!isGame || isSoftware) return null
       
       const genreNames = genres.map((g: any) => g.description)
-      return { ...game, genres: genreNames.length > 0 ? genreNames : ['Indie'] }
+      return { 
+        ...game, 
+        genres: genreNames.length > 0 ? genreNames : ['Indie'],
+        tags: spyDetails?.tags || {},
+        positive: spyDetails?.positive || 0,
+        negative: spyDetails?.negative || 0,
+        release_date: details?.release_date || ""
+      }
     })
   )).filter((g): g is any => g !== null)
 

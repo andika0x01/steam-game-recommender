@@ -16,14 +16,15 @@ Alih-alih mengambil "Top 100 Global" yang membosankan, sistem melakukan **Crawli
 *   Mencari 100 game terbaik untuk **Genre C**.
 *   **Hasil**: Pool **300 kandidat** yang sudah terfilter secara minat di level API.
 
-## 3. Fase Scoring: Bayesian Preference
-Setiap kandidat dari pool 300 game tersebut diskor menggunakan probabilitas Bayesian terhadap seluruh profil library Anda:
-$$Score = \frac{\sum P(Genre_j | UserProfile)}{|Genres_{game}|}$$
+## 3. Fase Scoring: Naive Bayes Classifier
+Setiap kandidat dari pool game tersebut diskor menggunakan **Naive Bayes Classifier**.
+*   **Tag-Based Likelihood**: Menggunakan SteamSpy Tags untuk menghitung probabilitas posterior $P(\text{Liked} | \text{Tags})$.
+*   **Review & Recency**: Mengintegrasikan skor review (SteamSpy) dan **Time Decay** (penurunan skor untuk game > 5 tahun) ke dalam nilai akhir.
 
-## 4. Fase Final: Simulated Annealing (Diversity & Saturation Penalty)
-SA menyeleksi 12 game terbaik dengan fungsi energi yang menghukum keseragaman:
-$$E = \text{TotalAffinity} + \lambda \cdot \text{UniqueGenreCount}$$
-Hal ini memastikan hasil akhir tidak berisi 12 game dengan genre yang identik, melainkan kombinasi yang seimbang dari minat Anda.
+## 4. Fase Final: MMR Optimization (Maximal Marginal Relevance)
+Menggantikan Simulated Annealing dengan **MMR** untuk menyeleksi 12 game terbaik secara deterministik:
+*   **Relevance vs Diversity**: Menyeimbangkan antara skor prediksi tinggi dan keunikan tags dibanding game yang sudah terpilih.
+*   **Jaccard Similarity**: Menghitung kemiripan antar game untuk mencegah saturasi tag yang sama di hasil akhir.
 
 ---
 *Hasil Akhir: Penemuan game yang benar-benar personal, cerdas, dan bervariasi.*

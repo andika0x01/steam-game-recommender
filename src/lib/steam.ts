@@ -61,6 +61,27 @@ export async function getAppDetails(kv: KVNamespace, appId: number) {
   return null
 }
 
+export async function getSteamSpyDetails(kv: KVNamespace, appId: number) {
+  const cacheKey = `steamspy_details:${appId}`
+  try {
+    const cached = await kv.get(cacheKey, 'json')
+    if (cached) return cached
+
+    const url = `https://steamspy.com/api.php?request=appdetails&appid=${appId}`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data && data.appid) {
+      // Cache the relevant data permanently
+      await kv.put(cacheKey, JSON.stringify(data))
+      return data
+    }
+  } catch (e) {
+    console.error(`getSteamSpyDetails error for ${appId}:`, e)
+  }
+  return null
+}
+
 export async function getGamesByTag(tag: string): Promise<any[]> {
   const url = `https://steamspy.com/api.php?request=tag&tag=${encodeURIComponent(tag)}`
   try {

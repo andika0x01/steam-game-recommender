@@ -1,6 +1,6 @@
 import { 
-  calculateUserGenreProfile, 
-  calculateBayesianPreferenceScore 
+  trainNaiveBayes, 
+  calculateFinalScore 
 } from '../../lib/algorithm'
 
 export async function getBacklogRecommendations(
@@ -8,11 +8,10 @@ export async function getBacklogRecommendations(
   backlogGames: any[],
   count: number = 50
 ) {
-  const userProfile = calculateUserGenreProfile(userLibrary)
+  const model = trainNaiveBayes(userLibrary)
 
   return backlogGames.map(game => {
-    const genres = game.genres || ['Indie']
-    const score = calculateBayesianPreferenceScore(genres, userProfile)
-    return { ...game, genres, personalMatch: score }
+    const score = calculateFinalScore(game, model)
+    return { ...game, personalMatch: score }
   })
 }
