@@ -27,7 +27,7 @@ export async function getPlayerSummaries(apiKey: string, steamId: string): Promi
 }
 
 export async function getOwnedGames(apiKey: string, steamId: string): Promise<SteamGame[]> {
-  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamId}&include_appinfo=1&include_played_free_games=1&appids_filter=0&format=json`
+  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${apiKey}&steamid=${steamId}&include_appinfo=1&include_played_free_games=1&include_free_sub=1&format=json`
   try {
     const res = await fetch(url)
     if (!res.ok) return []

@@ -14,7 +14,7 @@ app.get('/', async (c) => {
 
   if (!player) return c.redirect('/auth/logout')
 
-  const topGames = games.sort((a, b) => b.playtime_forever - a.playtime_forever).slice(0, 4)
+  const topGames = games.sort((a, b) => b.playtime_forever - a.playtime_forever).slice(0, 12)
   
   // Persona Logic
   const totalPlaytimeMinutes = games.reduce((acc, g) => acc + g.playtime_forever, 0)
