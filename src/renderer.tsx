@@ -26,11 +26,14 @@ export const renderer = jsxRenderer(({ children, title }, c) => {
               if (src.includes('library_600x900.jpg')) {
                 // Step 1: Fallback ke Header (Horizontal)
                 img.src = src.replace('library_600x900.jpg', 'header.jpg');
+                img.style.objectFit = 'contain';
+                img.style.padding = '10px';
               } else if (src.includes('header.jpg')) {
-                // Step 2: Fallback ke Placeholder Resmi Steam (Jika Header juga 404)
-                img.src = 'https://community.cloudflare.steamstatic.com/public/images/applications/community/unknown_app.png';
+                // Step 2: Fallback ke Logo Steam (Jika Header juga 404)
+                img.src = 'https://community.cloudflare.steamstatic.com/public/shared/images/header/logo_steam.svg';
                 img.style.objectFit = 'contain';
                 img.style.background = '#1a1a1a';
+                img.style.padding = '40px';
               }
             }
           }, true);

@@ -317,20 +317,7 @@ app.get('/', async (c) => {
                       src={`https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/library_600x900.jpg`} 
                       className="w-full h-full object-cover grayscale-[0.5] group-hover:grayscale-0 transition-all duration-700" 
                       alt={deal.name}
-                      onLoad={(e) => {
-                        const target = e.target as any;
-                        if (target.naturalWidth < 300 || target.src.includes('unknown_app.png')) {
-                          target.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`;
-                          target.classList.remove('object-cover');
-                          target.classList.add('object-contain', 'p-2');
-                        }
-                      }}
-                      onError={(e) => {
-                        const target = e.target as any;
-                        target.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`;
-                        target.classList.remove('object-cover');
-                        target.classList.add('object-contain', 'p-2');
-                      }}
+
                     />
                     <div className="absolute top-3 left-3 bg-emerald-500 text-black px-2 py-0.5 rounded-md font-mono font-black text-[9px] z-20 shadow-lg uppercase">
                       Selected
@@ -371,20 +358,7 @@ app.get('/', async (c) => {
                       src={`https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/library_600x900.jpg`} 
                       className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" 
                       alt={deal.name}
-                      onLoad={(e) => {
-                        const target = e.target as any;
-                        if (target.naturalWidth < 300 || target.src.includes('unknown_app.png')) {
-                          target.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`;
-                          target.classList.remove('object-cover');
-                          target.classList.add('object-contain', 'p-2');
-                        }
-                      }}
-                      onError={(e) => {
-                        const target = e.target as any;
-                        target.src = `https://cdn.akamai.steamstatic.com/steam/apps/${deal.appid}/header.jpg`;
-                        target.classList.remove('object-cover');
-                        target.classList.add('object-contain', 'p-2');
-                      }}
+
                     />
                     <div className="absolute top-2 right-2 bg-white text-black px-2 py-0.5 rounded-full border border-white/10 shadow-xl z-20">
                       <p className="text-[8px] font-mono font-black">{Math.min(100, Math.round(deal.score * 100))}% Match</p>

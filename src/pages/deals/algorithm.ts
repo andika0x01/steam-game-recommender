@@ -21,8 +21,8 @@ export async function getDealRecommendations(
     // Discount percentage (savings) boosts the base score
     const savings = (parseFloat(deal.savings) || 0) / 100
     
-    // Multiplicative scoring: Discount only boosts games you actually might like
-    const finalScore = baseScore * (1 + savings)
+    // Multiplicative scoring: Discount gives a controlled boost (max 30% boost for 100% discount)
+    const finalScore = baseScore * (1 + (savings * 0.3))
     
     return {
       ...deal,
