@@ -12,19 +12,18 @@ app.get('/', async (c) => {
 
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
   
-  // 1. Data Enrichment: Profiling mendalam
-  const topPlayed = games
-    .filter(g => Number(g.playtime_forever) > 0)
+  // 1. Data Enrichment: Profiling mendalam dari seluruh library
+  const libraryCandidates = games
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 50) // Ambil lebih banyak untuk kompensasi filter non-game
+    .slice(0, 60) // Ambil lebih banyak untuk kompensasi filter non-game
 
   const enrichedPlayed = (await Promise.all(
-    topPlayed.map(async (game) => {
+    libraryCandidates.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
       if (details?.type !== 'game') return null
       return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
     })
-  )).filter((g): g is any => g !== null).slice(0, 30)
+  )).filter((g): g is any => g !== null).slice(0, 40)
 
   // 2. Bayesian Scoring untuk Backlog (Playtime < 2 Jam)
   const backlogCandidates = games.filter(g => g.playtime_forever < 120).slice(0, 50)

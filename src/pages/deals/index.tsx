@@ -12,19 +12,18 @@ app.get('/', async (c) => {
   
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
   
-  // 1. Profiling: Ambil genre asli untuk profil Bayesian
-  const topPlayed = games
-    .filter(g => Number(g.playtime_forever) > 0)
+  // 1. Profiling: Ambil genre asli dari seluruh library
+  const libraryCandidates = games
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 50) // Ambil lebih banyak untuk kompensasi filter non-game
+    .slice(0, 60) // Ambil lebih banyak untuk kompensasi filter non-game
 
   const enrichedLibrary = (await Promise.all(
-    topPlayed.map(async (game) => {
+    libraryCandidates.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
       if (details?.type !== 'game') return null
       return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
     })
-  )).filter((g): g is any => g !== null).slice(0, 30)
+  )).filter((g): g is any => g !== null).slice(0, 40)
   
   const ownedAppIds = new Set(games.map(g => g.appid))
   

@@ -35,18 +35,17 @@ app.get('/', async (c) => {
       const games = await getOwnedGames(c.env.STEAM_API_KEY, fId)
       const profile = await getPlayerSummaries(c.env.STEAM_API_KEY, fId)
       
-      const topPlayed = games
-        .filter(g => Number(g.playtime_forever) > 0)
+      const libraryCandidates = games
         .sort((a, b) => b.playtime_forever - a.playtime_forever)
-        .slice(0, 30) // Ambil lebih banyak untuk kompensasi filter non-game
+        .slice(0, 50) // Ambil lebih banyak untuk cakupan library
 
       const enrichedLibrary = (await Promise.all(
-        topPlayed.map(async (game) => {
+        libraryCandidates.map(async (game) => {
           const details = await getAppDetails(c.env.KV, game.appid)
           if (details?.type !== 'game') return null
           return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
         })
-      )).filter((g): g is any => g !== null).slice(0, 15)
+      )).filter((g): g is any => g !== null).slice(0, 30)
 
       return { id: fId, profile, games, profileData: calculateUserGenreProfile(enrichedLibrary) }
     })

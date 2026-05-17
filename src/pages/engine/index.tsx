@@ -12,19 +12,18 @@ app.get('/', async (c) => {
 
   const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
   
-  // 1. Profiling: Analisis genre mendalam dari library yang sudah dimainkan
-  const playedGames = games
-    .filter(g => Number(g.playtime_forever) > 0)
+  // 1. Profiling: Analisis genre mendalam dari seluruh library
+  const libraryCandidates = games
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 60) // Ambil lebih banyak untuk kompensasi filter non-game
+    .slice(0, 80) // Ambil lebih banyak untuk cakupan library yang lebih luas
 
   const enrichedLibrary = (await Promise.all(
-    playedGames.map(async (game) => {
+    libraryCandidates.map(async (game) => {
       const details = await getAppDetails(c.env.KV, game.appid)
       if (details?.type !== 'game') return null
       return { ...game, genres: details?.genres?.map((g: any) => g.description) || [] }
     })
-  )).filter((g): g is any => g !== null).slice(0, 40)
+  )).filter((g): g is any => g !== null).slice(0, 50)
 
   const userProfile = calculateUserGenreProfile(enrichedLibrary)
   const top3Genres = userProfile.slice(0, 3).map(p => p.genre)
