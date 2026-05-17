@@ -76,18 +76,19 @@ app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
 
-  // Ambil teman yang tersimpan di DB
-  const savedFriends = await c.env.DB.prepare(
-    'SELECT friend_id FROM friends WHERE user_id = ?'
+  // Ambil teman yang tersimpan di DB beserta detailnya
+  const savedFriendsResult = await c.env.DB.prepare(
+    'SELECT f.friend_id, u.name, u.avatar FROM friends f JOIN users u ON f.friend_id = u.id WHERE f.user_id = ?'
   ).bind(steamId).all()
-  const savedFriendIds = savedFriends.results.map((r: any) => r.friend_id)
+  const savedFriends = savedFriendsResult.results || []
+  const savedFriendIds = savedFriends.map((r: any) => r.friend_id)
 
   const friendsQuery = c.req.query('friends') || ''
   const friendIdsResults = await Promise.all(
     friendsQuery.split(',').map(f => resolveInputToSteamId(c.env.STEAM_API_KEY, f))
   )
   
-  // Gabungkan teman dari DB dan Query Param (untuk backward compatibility)
+  // Gabungkan teman dari DB dan Query Param
   const combinedFriendIds = [...new Set([...savedFriendIds, ...friendIdsResults.filter((id): id is string => id !== null && id !== steamId)])]
   const friendIds = [steamId, ...combinedFriendIds]
   
@@ -99,7 +100,7 @@ app.get('/', async (c) => {
       
       const libraryCandidates = games
         .sort((a, b) => b.playtime_forever - a.playtime_forever)
-        .slice(0, 50) // Ambil lebih banyak untuk cakupan library
+        .slice(0, 50)
 
       const enrichedLibrary = (await Promise.all(
         libraryCandidates.map(async (game) => {
@@ -115,21 +116,18 @@ app.get('/', async (c) => {
 
   const friendSummaries = groupProfiles.map(d => d.profile).filter(Boolean).slice(1)
   
-  // 2. Filter game milik bersama (Intersection)
+  // 2. Filter game milik bersama
   let sharedGames = groupProfiles[0].games
   for (let i = 1; i < groupProfiles.length; i++) {
     const fAppIds = new Set(groupProfiles[i].games.map(g => g.appid))
     sharedGames = sharedGames.filter(g => fAppIds.has(g.appid))
   }
 
-  // 3. Konvergensi Bayesian: Cari game yang memuaskan SEMUA profil secara kolektif
+  // 3. Konvergensi Bayesian
   const candidatePool = sharedGames.slice(0, 100)
-  
   const enrichedSharedGames = (await Promise.all(
     candidatePool.map(async (g) => {
       const details = await getAppDetails(c.env.KV, g.appid)
-      
-      // Absolute Software Filter: Check Type and official Software Genre IDs
       const type = details?.type
       const genresArr = details?.genres || []
       const genreIds = genresArr.map((gen: any) => parseInt(gen.id))
@@ -137,7 +135,6 @@ app.get('/', async (c) => {
       
       if (type !== 'game' || isSoftware) return null
 
-      // Multiplayer Categories Filter (1: Multi-player, 9: Co-op, 36: Online PvP, 38: Online Co-op)
       const categories = details?.categories?.map((cat: any) => cat.id) || []
       const isMultiplayer = categories.some((id: number) => [1, 9, 36, 38].includes(id))
       if (!isMultiplayer) return null
@@ -162,27 +159,50 @@ app.get('/', async (c) => {
               <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-[0.85]">Co-op <br /><span className="text-white/20 outline-text">Nexus</span></h2>
               <p className="text-zinc-500 text-xs font-mono uppercase tracking-[0.2em]">Analisis Minat Kolektif Multi-Agen</p>
            </div>
-           <div className="glass p-6 rounded-[2.5rem] border border-white/5 bg-white/[0.01] shadow-2xl">
-              <form method="post" action="/coop" className="flex flex-col gap-4">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 px-1">Deploy Kredensial Agen</p>
+           <div className="glass p-6 rounded-[2.5rem] border border-white/5 bg-white/[0.01] shadow-2xl space-y-8">
+              <div className="space-y-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 px-1">Registrasi Agen Baru</p>
+                <form method="post" action="/coop" className="flex flex-col gap-4">
                   <input 
                     type="text" 
                     name="friends" 
                     placeholder="SteamID atau Tautan Profil..." 
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-white/10 transition-all text-xs font-mono shadow-inner"
                   />
-                </div>
-                <button type="submit" className="w-full py-4 bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all text-[10px] shadow-xl">
-                  Sinkronkan Agen
-                </button>
-              </form>
-              {savedFriendIds.length > 0 && (
-                <form method="post" action="/coop/clear" className="mt-4">
-                  <button type="submit" className="w-full py-2 text-zinc-500 hover:text-rose-500 text-[10px] font-black uppercase tracking-widest transition-colors">
-                    Bersihkan Daftar Agen
+                  <button type="submit" className="w-full py-4 bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all text-[10px] shadow-xl">
+                    Sinkronkan Agen
                   </button>
                 </form>
+              </div>
+
+              {savedFriends.length > 0 && (
+                <div className="space-y-4">
+                   <div className="flex items-center justify-between px-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Agen Terdaftar ({savedFriends.length})</p>
+                      <form method="post" action="/coop/clear">
+                        <button type="submit" className="text-[9px] font-black uppercase tracking-widest text-rose-500/50 hover:text-rose-500 transition-colors">Hapus Semua</button>
+                      </form>
+                   </div>
+                   <div className="space-y-2">
+                      {savedFriends.map((f: any) => (
+                        <div key={f.friend_id} className="flex items-center justify-between bg-white/5 border border-white/5 p-3 rounded-2xl group/item">
+                          <div className="flex items-center gap-3">
+                            <img src={f.avatar} className="w-8 h-8 rounded-xl border border-white/10" />
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-white truncate max-w-[120px]">{f.name}</span>
+                              <span className="text-[8px] font-mono text-zinc-500 uppercase">{f.friend_id.slice(-4)}</span>
+                            </div>
+                          </div>
+                          <form method="post" action="/coop/remove">
+                            <input type="hidden" name="friendId" value={f.friend_id} />
+                            <button type="submit" className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500 transition-all opacity-0 group-hover/item:opacity-100">
+                              <span className="text-lg leading-none">×</span>
+                            </button>
+                          </form>
+                        </div>
+                      ))}
+                   </div>
+                </div>
               )}
            </div>
         </div>
