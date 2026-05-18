@@ -141,7 +141,7 @@ app.get('/', async (c) => {
       .sort((a, b) => b.score - a.score)
       .slice(0, 15)
     
-    sharedGames = mutualAppIds
+    sharedGames = coopGames
   }
 
   return c.render(
@@ -233,7 +233,7 @@ app.get('/', async (c) => {
                     </div>
                   </div>
                   <h3 className="text-4xl md:text-6xl font-black tracking-tighter uppercase text-white leading-[0.9]">
-                    {sharedGames.length} Game <br /><span className="text-white/20 outline-text text-5xl md:text-7xl">Konvergensi</span>
+                    {sharedGames.length} Game <br /><span className="text-white/20 outline-text text-5xl md:text-7xl">Mabar</span>
                   </h3>
                 </div>
              </header>

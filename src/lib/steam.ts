@@ -376,8 +376,8 @@ export class SteamAPI {
 
     return data.query_summary;
   }
-  async getAppStoreDetails(appId: number | string, language: string = 'english'): Promise<SteamStoreAppDetails | null> {
-    const cacheKey = `steam_appdetails_${appId}_${language}`;
+  async getAppStoreDetails(appId: number | string, language: string = 'english', cc?: string): Promise<SteamStoreAppDetails | null> {
+    const cacheKey = `steam_appdetails_${appId}_${language}_${cc || ''}`;
     if (this.kv) {
       const cached = await this.kv.get(cacheKey, 'json');
       if (cached) {
@@ -388,6 +388,9 @@ export class SteamAPI {
     const url = new URL('https://store.steampowered.com/api/appdetails');
     url.searchParams.append('appids', appId.toString());
     url.searchParams.append('l', language);
+    if (cc) {
+      url.searchParams.append('cc', cc);
+    }
 
     const response = await fetch(url.toString(), {
       headers: { 'Accept-Language': 'en-US,en;q=0.9' }

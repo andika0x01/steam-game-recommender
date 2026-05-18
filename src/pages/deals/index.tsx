@@ -27,7 +27,7 @@ app.get('/', async (c) => {
     
     // 2. Fetch AppDetails (cc=id) for localized pricing and metadata
     const candidateIds = saleResults.slice(0, 30).map(r => r.id).filter(Boolean) as number[]
-    const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'id'))
+    const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'english', 'id'))
     const rawDetails = await Promise.all(detailPromises)
 
     // 3. Score Deals against user profile
@@ -104,6 +104,8 @@ app.get('/', async (c) => {
           <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-[0.9]">Deal <br /><span className="text-white/20 outline-text">Hunter</span></h2>
           <p className="text-zinc-400 text-base md:text-lg leading-relaxed">Sistem kami memindai katalog resmi Steam Indonesia untuk menemukan penawaran yang paling sesuai dengan profil bermain Anda.</p>
           
+          <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-white uppercase leading-[0.9] mt-8">Rp{totalCostIDR.toLocaleString('id-ID')}</h1>
+          
           <form method="get" action="/deals" className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative flex-1 max-w-sm">
               <input 
@@ -130,13 +132,13 @@ app.get('/', async (c) => {
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Budget Summary</h3>
               </div>
               <div className="grid grid-cols-2 gap-8 relative">
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Belanja</p>
-                  <p className="text-2xl md:text-3xl font-black text-white leading-none">Rp{totalCostIDR.toLocaleString('id-ID')}</p>
+                  <p className="text-5xl md:text-7xl font-black text-white tracking-tighter leading-none">Rp{totalCostIDR.toLocaleString('id-ID')}</p>
                 </div>
-                <div className="space-y-1 text-right">
+                <div className="space-y-1 col-span-2">
                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sisa Budget</p>
-                  <p className={`text-sm font-mono font-bold ${remainingIDR >= 0 ? 'text-orange-500' : 'text-rose-500'}`}>
+                  <p className={`text-3xl md:text-5xl font-mono font-black ${remainingIDR >= 0 ? 'text-orange-500' : 'text-rose-500'}`}>
                     {remainingIDR >= 0 ? '+' : ''}Rp{remainingIDR.toLocaleString('id-ID')}
                   </p>
                 </div>
