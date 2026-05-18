@@ -40,6 +40,7 @@ const serveAssets = async (c: any, next: any) => {
 }
 
 app.use('/favicon.ico', serveAssets)
+app.use('/noise.svg', serveAssets)
 app.use('/assets/*', serveAssets)
 app.use('/static/*', serveAssets)
 app.use('/src/*', serveAssets)

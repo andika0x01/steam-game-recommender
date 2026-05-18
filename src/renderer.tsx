@@ -1,5 +1,5 @@
 import { reactRenderer, useRequestContext } from '@hono/react-renderer'
-import { Link, ViteClient } from 'vite-ssr-components/react'
+import { Link, Script, ViteClient, ReactRefresh } from 'vite-ssr-components/react'
 import { Nav } from './components/Nav'
 
 declare module 'hono' {
@@ -18,24 +18,13 @@ export const renderer = reactRenderer(({ children, title, c }: { children?: Reac
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title ? `${title} | Steam Recommender` : 'Steam Game Recommender'}</title>
-        <script
-          type="module"
-          dangerouslySetInnerHTML={{
-            __html: `
-import RefreshRuntime from "/@react-refresh"
-RefreshRuntime.injectIntoGlobalHook(window)
-window.$RefreshReg$ = () => {}
-window.$RefreshSig$ = () => (type) => type
-window.__vite_plugin_react_preamble_installed__ = true
-          `
-          }}
-        />
+        <ReactRefresh />
         <ViteClient />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
         <Link href="/src/style.css" rel="stylesheet" />
-        <script type="module" src="/src/client.tsx"></script>
+        <Script src="/src/client.tsx" />
         <script dangerouslySetInnerHTML={{ __html: `
           document.addEventListener('error', function(e) {
             if (e.target.tagName !== 'IMG') return;
@@ -48,7 +37,7 @@ window.__vite_plugin_react_preamble_installed__ = true
       </head>
       <body className="min-h-[100dvh] bg-background text-foreground selection:bg-white/20 pt-20">
         <Nav steamId={steamId} scoringMode={scoringMode} />
-        <div className="fixed inset-0 z-50 pointer-events-none opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
+        <div className="fixed inset-0 z-50 pointer-events-none opacity-[0.03] bg-[url('/noise.svg')]"></div>
         <main id="root">{children}</main>
       </body>
     </html>

@@ -5,5 +5,13 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), cloudflare(), ssrPlugin()]
+  plugins: [react(), tailwindcss(), cloudflare(), ssrPlugin()],
+  build: {
+    rollupOptions: {
+      input: {
+        client: 'src/client.tsx',
+        style: 'src/style.css'
+      }
+    }
+  }
 })
