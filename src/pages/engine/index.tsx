@@ -1,8 +1,5 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import * as React from 'hono/jsx'
-import { getOwnedGames, getDiscoveryCandidates, getAppDetails, getSteamSpyDetails } from '../../lib/steam'
-import { trainNaiveBayes, getSmartRecommendations } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -10,74 +7,7 @@ app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
 
-  const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
-  
-  // 1. Profiling: Analisis genre mendalam dari seluruh library
-  const libraryCandidates = games
-    .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 80) // Ambil lebih banyak untuk cakupan library yang lebih luas
-
-  const enrichedLibrary = (await Promise.all(
-    libraryCandidates.map(async (game) => {
-      const [details, spyDetails] = await Promise.all([
-        getAppDetails(c.env.KV, game.appid),
-        getSteamSpyDetails(c.env.KV, game.appid)
-      ])
-      if (details?.type !== 'game') return null
-      return { 
-        ...game, 
-        genres: details?.genres?.map((g: any) => g.description) || [],
-        tags: spyDetails?.tags || {}
-      }
-    })
-  )).filter((g): g is any => g !== null).slice(0, 50)
-
-  const model = trainNaiveBayes(enrichedLibrary)
-  // Extract top genres from tag likelihoods for display/crawling
-  const top3Genres = Object.entries(model.tagLikelihoodsLiked)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3)
-    .map(([tag]) => tag)
-
-  // 2. Genre Stacking: Fetch ~300 target candidates berdasarkan top 3 genre user
-  const rawCandidates = await getDiscoveryCandidates(top3Genres)
-  const ownedAppIds = new Set(games.map(g => g.appid))
-  
-  // Filter & Ambil 60 kandidat untuk di-enrich (KV Cache akan sangat membantu di sini)
-  const discoveryCandidates = rawCandidates.filter(g => !ownedAppIds.has(g.appid)).slice(0, 60)
-
-  const enrichedCandidates = (await Promise.all(
-    discoveryCandidates.map(async (game) => {
-      const [details, spyDetails] = await Promise.all([
-        getAppDetails(c.env.KV, game.appid),
-        getSteamSpyDetails(c.env.KV, game.appid)
-      ])
-      
-      // Absolute Software Filter: Check Type and official Software Genre IDs
-      const type = details?.type
-      const genres = details?.genres || []
-      const genreIds = genres.map((g: any) => parseInt(g.id))
-      
-      // Blacklisted IDs: 51 (Animation), 53 (Design), 55 (Photo), 57 (Utilities), 58 (Video), 60 (Web)
-      const isSoftware = genreIds.some((id: number) => [51, 53, 55, 57, 58, 60].includes(id))
-      const isGame = type === 'game'
-
-      if (!isGame || isSoftware) return null
-      
-      const genreNames = genres.map((g: any) => g.description)
-      return { 
-        ...game, 
-        genres: genreNames.length > 0 ? genreNames : ['Indie'],
-        tags: spyDetails?.tags || {},
-        positive: spyDetails?.positive || 0,
-        negative: spyDetails?.negative || 0,
-        release_date: details?.release_date || ""
-      }
-    })
-  )).filter((g): g is any => g !== null)
-
-  // 3. Smart Recommendations: Bayesian + SA
-  const recommendations = await getSmartRecommendations(enrichedLibrary, enrichedCandidates, 12)
+  // Do Algorithm Stuff.
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-20">

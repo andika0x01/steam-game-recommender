@@ -1,8 +1,5 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import * as React from 'hono/jsx'
-import { getOwnedGames, getAppDetails, getSteamSpyDetails } from '../../lib/steam'
-import { getBacklogRecommendations } from './algorithm'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -10,55 +7,7 @@ app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
 
-  const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
-  
-  // 1. Data Enrichment: Profiling mendalam dari seluruh library
-  const libraryCandidates = games
-    .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 60) // Ambil lebih banyak untuk kompensasi filter non-game
-
-  const enrichedPlayed = (await Promise.all(
-    libraryCandidates.map(async (game) => {
-      const [details, spyDetails] = await Promise.all([
-        getAppDetails(c.env.KV, game.appid),
-        getSteamSpyDetails(c.env.KV, game.appid)
-      ])
-      if (details?.type !== 'game') return null
-      return { 
-        ...game, 
-        genres: details?.genres?.map((g: any) => g.description) || [],
-        tags: spyDetails?.tags || {}
-      }
-    })
-  )).filter((g): g is any => g !== null).slice(0, 40)
-
-  // 2. Bayesian Scoring untuk Seluruh Library (Prioritas Hidden Gems)
-  // Ambil hingga 150 game untuk di-rank (prioritaskan yang belum tamat/jarang dimainkan)
-  const backlogCandidates = games
-    .sort((a, b) => a.playtime_forever - b.playtime_forever)
-    .slice(0, 150)
-
-  const enrichedBacklog = (await Promise.all(
-    backlogCandidates.map(async (game) => {
-      const [details, spyDetails] = await Promise.all([
-        getAppDetails(c.env.KV, game.appid),
-        getSteamSpyDetails(c.env.KV, game.appid)
-      ])
-      if (details?.type !== 'game') return null
-      return { 
-        ...game, 
-        genres: details?.genres?.map((g: any) => g.description) || ['Indie'],
-        tags: spyDetails?.tags || {},
-        positive: spyDetails?.positive || 0,
-        negative: spyDetails?.negative || 0,
-        release_date: details?.release_date || ""
-      }
-    })
-  )).filter((g): g is any => g !== null)
-
-  const ratedBacklog = await getBacklogRecommendations(enrichedPlayed, enrichedBacklog)
-  const sortedBacklog = ratedBacklog.sort((a: any, b: any) => b.personalMatch - a.personalMatch)
-  const topRecommendation = sortedBacklog[0]
+  // Do Algorithm Stuff.
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-20">
