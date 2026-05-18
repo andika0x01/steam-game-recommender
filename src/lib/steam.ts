@@ -209,6 +209,14 @@ export class SteamAPI {
    * Note: This uses the storefront search results API which returns JSON when json=1 is passed.
    */
   async searchGames(options: SteamSearchOptions = {}): Promise<SteamSearchResult[]> {
+    const cacheKey = `steam_search_${JSON.stringify(options)}`;
+    if (this.kv) {
+      const cached = await this.kv.get(cacheKey, 'json');
+      if (cached) {
+        return cached as SteamSearchResult[];
+      }
+    }
+
     const url = new URL(`${this.storefrontUrl}/search/results`);
     url.searchParams.append('json', '1');
     
@@ -240,13 +248,19 @@ export class SteamAPI {
     const data = (await response.json()) as SteamSearchResponse;
     
     // Process items and extract ID from logo URL
-    return (data.items || []).map(item => {
+    const results = (data.items || []).map(item => {
       const idMatch = item.logo.match(/\/apps\/(\d+)\//);
       return {
         ...item,
         id: idMatch ? parseInt(idMatch[1]) : undefined
       };
     });
+
+    if (this.kv) {
+      await this.kv.put(cacheKey, JSON.stringify(results), { expirationTtl: 86400 });
+    }
+
+    return results;
   }
 
   /**
@@ -333,6 +347,14 @@ export class SteamAPI {
    * Returns review summary for a given app from the Steam Storefront.
    */
   async getAppReviews(appId: number): Promise<SteamAppReviewSummary | null> {
+    const cacheKey = `steam_reviews_${appId}`;
+    if (this.kv) {
+      const cached = await this.kv.get(cacheKey, 'json');
+      if (cached) {
+        return cached as SteamAppReviewSummary;
+      }
+    }
+
     const url = new URL(`${this.storefrontUrl}/appreviews/${appId}`);
     url.searchParams.append('json', '1');
     url.searchParams.append('language', 'all');
@@ -348,9 +370,21 @@ export class SteamAPI {
       return null;
     }
 
+    if (this.kv) {
+      await this.kv.put(cacheKey, JSON.stringify(data.query_summary), { expirationTtl: 86400 });
+    }
+
     return data.query_summary;
   }
   async getAppStoreDetails(appId: number | string, language: string = 'english'): Promise<SteamStoreAppDetails | null> {
+    const cacheKey = `steam_appdetails_${appId}_${language}`;
+    if (this.kv) {
+      const cached = await this.kv.get(cacheKey, 'json');
+      if (cached) {
+        return cached as SteamStoreAppDetails;
+      }
+    }
+
     const url = new URL('https://store.steampowered.com/api/appdetails');
     url.searchParams.append('appids', appId.toString());
     url.searchParams.append('l', language);
@@ -367,7 +401,14 @@ export class SteamAPI {
       return null;
     }
     
-    return data[appId.toString()].data as SteamStoreAppDetails;
+    const result = data[appId.toString()].data as SteamStoreAppDetails;
+
+    if (this.kv) {
+      // 86400 seconds = 24 hours
+      await this.kv.put(cacheKey, JSON.stringify(result), { expirationTtl: 86400 });
+    }
+
+    return result;
   }
 
 }
