@@ -56,22 +56,25 @@ export const TierList = ({ initialGames, initialSavedTiers }: TierListProps) => 
     }
   };
 
+  const handleReset = async () => {
+    if (confirm('Apakah Anda yakin ingin menghapus semua klasifikasi tier list?')) {
+      setSavedTiers([]);
+      await fetch('/tierlist/reset', { method: 'POST' });
+    }
+  };
+
   const assignedIds = new Set(savedTiers.map(t => parseInt(t.game_appid)));
   const unassignedGames = games.filter(g => !assignedIds.has(g.appid));
 
   return (
-    <div 
-      data-hydrate="TierList"
-      data-props={JSON.stringify({ initialGames, initialSavedTiers })}
-      className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-16"
-    >
+    <div className="space-y-12 md:space-y-16">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
         <div className="space-y-4 max-w-3xl">
           <h2 className="text-4xl md:text-6xl font-black tracking-tighter uppercase leading-none">Command <br /><span className="text-white">Tier List</span></h2>
           <p className="text-zinc-400 text-base md:text-lg">Seret dan lepas aset untuk mengklasifikasikan warisan digital Anda. Perubahan disimpan secara otomatis.</p>
         </div>
         <button 
-          onClick={() => window.location.reload()}
+          onClick={handleReset}
           className="px-6 py-3 bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-white/10 transition-all"
         >
           Reset Sesi UI

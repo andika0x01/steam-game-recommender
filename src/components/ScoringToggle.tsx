@@ -11,11 +11,7 @@ export const ScoringToggle = ({ scoringMode: initialScoringMode }: { scoringMode
   };
 
   return (
-    <div 
-      data-hydrate="ScoringToggle" 
-      data-props={JSON.stringify({ scoringMode: initialScoringMode })}
-      className="flex items-center gap-3 w-fit"
-    >
+    <div className="flex items-center gap-3 w-fit">
       <span className={`text-[10px] font-black uppercase tracking-widest ${scoringMode === 'fuzzy' ? 'text-orange-500' : 'text-zinc-500'}`}>Fuzzy</span>
       <button 
         id="scoring-toggle"

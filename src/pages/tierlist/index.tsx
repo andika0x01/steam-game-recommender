@@ -24,7 +24,13 @@ app.get('/', async (c) => {
   const initialGames = topGames.map(g => ({ appid: g.appid, name: g.name || 'Unknown' }))
 
   return c.render(
-    <TierList initialGames={initialGames} initialSavedTiers={savedTiers} />,
+    <div 
+      data-hydrate="TierList"
+      data-props={JSON.stringify({ initialGames, initialSavedTiers: savedTiers })}
+      className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20"
+    >
+      <TierList initialGames={initialGames} initialSavedTiers={savedTiers} />
+    </div>,
     { title: 'Tier List Nexus' } as any
   )
 })
@@ -51,6 +57,17 @@ app.post('/remove', async (c) => {
   try {
     await c.env.DB.prepare('DELETE FROM tier_lists WHERE user_id = ? AND game_appid = ?')
       .bind(steamId, parseInt(appid))
+      .run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }) }
+})
+
+app.post('/reset', async (c) => {
+  const steamId = getCookie(c, 'steam_id')
+  if (!steamId) return c.json({ success: false })
+  try {
+    await c.env.DB.prepare('DELETE FROM tier_lists WHERE user_id = ?')
+      .bind(steamId)
       .run()
     return c.json({ success: true })
   } catch (e) { return c.json({ success: false }) }

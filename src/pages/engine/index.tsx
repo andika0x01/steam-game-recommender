@@ -81,7 +81,9 @@ app.get('/', async (c) => {
                 {scoringMode === 'bayesian' ? 'Deep Bayesian Intelligence Active' : 'Fuzzy Logic Preference Active'}
               </span>
             </div>
-            <ScoringToggle scoringMode={scoringMode} />
+            <div data-hydrate="ScoringToggle" data-props={JSON.stringify({ scoringMode })}>
+              <ScoringToggle scoringMode={scoringMode} />
+            </div>
           </div>
           <h2 className="text-5xl md:text-8xl font-black tracking-tighter uppercase leading-[0.85]">Personal <br /><span className="text-white/20 outline-text">Discovery</span></h2>
           <p className="text-zinc-400 text-lg md:text-xl font-light leading-relaxed max-w-2xl">
