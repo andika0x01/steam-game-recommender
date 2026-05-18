@@ -1,4 +1,6 @@
-export const Nav = ({ steamId }: { steamId?: string }) => {
+import React from 'react'
+
+export const Nav = ({ steamId, scoringMode }: { steamId?: string; scoringMode?: 'bayesian' | 'fuzzy' }) => {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
       {/* Rectangular Glass Backdrop */}
@@ -12,7 +14,7 @@ export const Nav = ({ steamId }: { steamId?: string }) => {
         </a>
 
         {/* Desktop & Mobile Toggle Logic */}
-        <div className="flex items-center pointer-events-auto">
+        <div className="flex items-center gap-4 pointer-events-auto">
           {/* Toggle Button for Mobile (Checkbox Hack for SSR Stability) */}
           <input type="checkbox" id="nav-toggle" className="peer hidden" />
           <label 
@@ -46,7 +48,7 @@ export const Nav = ({ steamId }: { steamId?: string }) => {
                 <NavLink href="/coop" label="Co-op" isLarge />
                 <NavLink href="/deals" label="Deals" isLarge />
                 <NavLink href="/tierlist" label="Tiers" isLarge />
-                <a href="/auth/logout" className="px-10 md:px-5 py-5 md:py-2.5 border border-white/10 text-zinc-400 text-sm md:text-xs font-black uppercase tracking-[0.2em] rounded-2xl md:rounded-xl hover:bg-white/5 transition-all">
+                <a href="/auth/logout" className="px-4 py-2 font-black uppercase tracking-[0.2em] text-red-500 hover:text-red-400 transition-colors text-2xl md:text-xs">
                   Logout
                 </a>
               </>

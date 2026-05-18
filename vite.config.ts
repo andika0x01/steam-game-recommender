@@ -2,7 +2,8 @@ import { cloudflare } from '@cloudflare/vite-plugin'
 import { defineConfig } from 'vite'
 import ssrPlugin from 'vite-ssr-components/plugin'
 import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [tailwindcss(), cloudflare(), ssrPlugin()]
+  plugins: [react(), tailwindcss(), cloudflare(), ssrPlugin()]
 })

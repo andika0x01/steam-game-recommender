@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import * as React from 'hono/jsx'
-import { getPlayerSummaries, getOwnedGames } from '../../lib/steam'
+import React from 'react'
+import { SteamAPI } from '../../lib/steam'
+import { GameCard } from '../../components/GameCard'
 
 const app = new Hono<{ Bindings: any }>()
 
@@ -9,8 +10,10 @@ app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
 
-  const player = await getPlayerSummaries(c.env.STEAM_API_KEY, steamId)
-  const games = await getOwnedGames(c.env.STEAM_API_KEY, steamId)
+  const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
+  const players = await steamAPI.getPlayerSummaries([steamId])
+  const player = players.length > 0 ? players[0] : null
+  const games = await steamAPI.getOwnedGames(steamId)
 
   if (!player) return c.redirect('/auth/logout')
 
@@ -26,16 +29,16 @@ app.get('/', async (c) => {
   
   if (games.length > 100 && avgPlaytime < 300) {
     archetype = "The Collector"
-    badgeColor = "bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+    badgeColor = "bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
   } else if (avgPlaytime > 3000) {
     archetype = "The Completionist"
-    badgeColor = "bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]"
+    badgeColor = "bg-orange-600 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
   } else if (games.length < 20 && totalPlaytimeMinutes > 10000) {
     archetype = "The Specialist"
-    badgeColor = "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+    badgeColor = "bg-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
   } else if (games.length > 50) {
     archetype = "The Explorer"
-    badgeColor = "bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.3)]"
+    badgeColor = "bg-orange-700 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
   }
 
   return c.render(
@@ -43,7 +46,7 @@ app.get('/', async (c) => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-8 md:gap-12 border-b border-white/5 pb-12">
         <div className="flex items-center gap-6 md:gap-8">
           <div className="relative group shrink-0">
-            <div className="absolute -inset-2 bg-gradient-to-tr from-white/20 to-transparent rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+            <div className="absolute -inset-2 bg-gradient-to-tr from-orange-500/20 to-transparent rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
             <img 
               src={player.avatarfull} 
               alt={player.personaname} 
@@ -58,7 +61,7 @@ app.get('/', async (c) => {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${player.personastate > 0 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-zinc-600'}`} />
+              <span className={`w-2 h-2 rounded-full shrink-0 ${player.personastate > 0 ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]' : 'bg-zinc-600'}`} />
               <p className="text-zinc-400 font-mono text-[10px] md:text-xs uppercase tracking-widest truncate">
                 {player.personastate > 0 ? 'Online' : 'Offline'} • {steamId}
               </p>
@@ -94,64 +97,36 @@ app.get('/', async (c) => {
               ))}
             </ol>
           </div>
-
-          <div className="pt-4 border-t border-white/5">
-            <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest leading-relaxed">
-              Catatan: Item dari Steam Family Sharing yang tidak dimiliki oleh akun ini dibatasi oleh protokol API Valve.
-            </p>
-          </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-4 glass p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] flex flex-col justify-between group">
+        <div className="md:col-span-4 glass p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] flex flex-col justify-between group border-white/5 hover:border-orange-500/20 transition-colors">
           <div className="space-y-2">
             <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Total Library</p>
-            <p className="text-6xl md:text-8xl font-black tracking-tighter group-hover:scale-110 transition-transform origin-left">{games.length}</p>
+            <p className="text-6xl md:text-8xl font-black tracking-tighter group-hover:scale-110 transition-transform origin-left text-white group-hover:text-orange-500">{games.length}</p>
           </div>
           <div className="space-y-4">
             <div className="pt-4 border-t border-white/5">
               <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Investasi Waktu</p>
-              <p className="text-3xl font-black tracking-tighter">{totalPlaytimeHours}j</p>
+              <p className="text-3xl font-black tracking-tighter text-white">{totalPlaytimeHours}j</p>
             </div>
-            <p className="text-zinc-400 text-sm">Aplikasi unik ditemukan di dalam Vault Steam Anda.</p>
-            {games.length < 10 && (
-              <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-                <p className="text-[10px] text-amber-200 leading-relaxed font-mono uppercase tracking-tight">
-                  <span className="font-black text-amber-500">API Alert:</span> Jika jumlah library terasa tidak akurat, pastikan opsi "Always keep my total playtime private" di Steam dlm keadaan MATI. Game gratis yang belum pernah dimainkan juga tidak akan muncul.
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
-        <div className="md:col-span-8 glass p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] space-y-8">
+        <div className="md:col-span-8 glass p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] space-y-8 border-white/5">
           <div className="flex items-center justify-between">
             <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Mastery Spectrum</p>
             <span className="text-[10px] font-mono text-zinc-400 uppercase">Paling sering dimainkan</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {topGames.map(game => (
-              <div key={game.appid} className="group space-y-3 transition-all duration-500 hover:-translate-y-1">
-                <div className="aspect-[3/4] bg-zinc-900 rounded-xl md:rounded-2xl overflow-hidden relative transition-all duration-500">
-                   <img 
-                    src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} 
-                    alt={game.name}
-                    className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
-                   />
-                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 gap-4">
-                      <p className="text-[10px] font-mono uppercase text-white">{(game.playtime_forever / 60).toFixed(1)}j Dimainkan</p>
-                      <a 
-                        href={`https://store.steampowered.com/app/${game.appid}`}
-                        target="_blank"
-                        className="px-6 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all shadow-xl"
-                      >
-                        Lihat Game
-                      </a>
-                   </div>
-                </div>
-                <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-tighter truncate text-zinc-400 group-hover:text-white transition-colors">{game.name}</p>
-              </div>
+              <GameCard 
+                key={game.appid}
+                appId={game.appid}
+                name={game.name || 'Unknown'}
+                actionLabel="Mainkan"
+              />
             ))}
           </div>
         </div>

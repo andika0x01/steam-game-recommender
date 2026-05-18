@@ -15,8 +15,8 @@ app.get('/callback', async (c) => {
   const steamId = await verifySteamAuth(c.req.url)
   if (steamId) {
     try {
-      const player = await getPlayerSummaries(c.env.STEAM_API_KEY, steamId)
-      if (player) {
+      const player = await getPlayerSummaries(c.env.STEAM_API_KEY, steamId) as any
+      if (player && !Array.isArray(player)) {
         await c.env.DB.prepare(
           'INSERT OR REPLACE INTO users (id, name, avatar, last_login) VALUES (?, ?, ?, CURRENT_TIMESTAMP)'
         ).bind(steamId, player.personaname, player.avatarfull).run()

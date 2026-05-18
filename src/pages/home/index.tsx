@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import * as React from 'hono/jsx'
+import React from 'react'
 
 const app = new Hono<{ Bindings: any }>()
 

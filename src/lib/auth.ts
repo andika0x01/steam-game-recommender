@@ -33,7 +33,6 @@ export async function verifySteamAuth(url: string) {
   const claimedId = searchParams.get('openid.claimed_id')
   if (!claimedId) return null
 
-  // Claimed ID looks like https://steamcommunity.com/openid/id/76561198000000000
   const steamId = claimedId.split('/').pop()
   return steamId || null
 }

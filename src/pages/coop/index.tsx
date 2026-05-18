@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import * as React from 'hono/jsx'
-import { getOwnedGames, getPlayerSummaries, resolveVanityURL, getAppDetails, getSteamSpyDetails } from '../../lib/steam'
-import { trainNaiveBayes, getCoopConvergence } from './algorithm'
+import { SteamAPI, resolveVanityURL, getPlayerSummaries, getOwnedGames } from '../../lib/steam'
+import { FuzzyBayesianScorer } from '../../lib/fuzzy-bayesian'
+import { PureFuzzyScorer } from '../../lib/pure-fuzzy'
+import { GameCard } from '../../components/GameCard'
+import { ScoringToggle } from '../../components/ScoringToggle'
 
-const app = new Hono<{ Bindings: any }>()
+const app = new Hono<{ Bindings: any, Variables: any }>()
 
 const resolveInputToSteamId = async (apiKey: string, input: string) => {
   input = input.trim()
@@ -30,21 +32,18 @@ app.post('/', async (c) => {
   for (const input of inputs) {
     const fId = await resolveInputToSteamId(c.env.STEAM_API_KEY, input)
     if (fId && fId !== steamId) {
-      const player = await getPlayerSummaries(c.env.STEAM_API_KEY, fId)
+      const player = await getPlayerSummaries(c.env.STEAM_API_KEY, fId) as any
       if (player) {
-        // Upsert to users first
         await c.env.DB.prepare(
           'INSERT OR REPLACE INTO users (id, name, avatar) VALUES (?, ?, ?)'
         ).bind(fId, player.personaname, player.avatarfull).run()
         
-        // Then insert to friends
         await c.env.DB.prepare(
           'INSERT OR IGNORE INTO friends (user_id, friend_id) VALUES (?, ?)'
         ).bind(steamId, fId).run()
       }
     }
   }
-
   return c.redirect('/coop')
 })
 
@@ -53,42 +52,97 @@ app.post('/remove', async (c) => {
   const body = await c.req.parseBody()
   const friendId = body['friendId'] as string
   if (!steamId || !friendId) return c.redirect('/coop')
-  
-  await c.env.DB.prepare('DELETE FROM friends WHERE user_id = ? AND friend_id = ?')
-    .bind(steamId, friendId)
-    .run()
-    
+  await c.env.DB.prepare('DELETE FROM friends WHERE user_id = ? AND friend_id = ?').bind(steamId, friendId).run()
   return c.redirect('/coop')
 })
 
 app.post('/clear', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/coop')
-  
-  await c.env.DB.prepare('DELETE FROM friends WHERE user_id = ?')
-    .bind(steamId)
-    .run()
-    
+  await c.env.DB.prepare('DELETE FROM friends WHERE user_id = ?').bind(steamId).run()
   return c.redirect('/coop')
 })
 
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
+  const scoringMode = c.var.scoringMode || 'fuzzy'
   if (!steamId) return c.redirect('/')
 
-  // Ambil teman yang tersimpan di DB beserta detailnya
+  const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
+  
   const savedFriendsResult = await c.env.DB.prepare(
     'SELECT f.friend_id, u.name, u.avatar FROM friends f JOIN users u ON f.friend_id = u.id WHERE f.user_id = ?'
   ).bind(steamId).all()
   const savedFriends = savedFriendsResult.results || []
-  const savedFriendIds = savedFriends.map((r: any) => r.friend_id)
-
-  const friendsQuery = c.req.query('friends') || ''
-  const friendIdsResults = await Promise.all(
-    friendsQuery.split(',').map(f => resolveInputToSteamId(c.env.STEAM_API_KEY, f))
-  )
   
-  // Do Algorithm Stuff.
+  const allAgents = [steamId, ...savedFriends.map((f: any) => f.friend_id)]
+  const agentProfiles = await steamAPI.getPlayerSummaries(allAgents)
+
+  let sharedGames: any[] = []
+  let recommendations: any[] = []
+
+  if (allAgents.length > 1) {
+    // Fetch owned games for all agents
+    const ownedGamesPromises = allAgents.map(id => steamAPI.getOwnedGames(id))
+    const ownedGamesLists = await Promise.all(ownedGamesPromises)
+
+    // Find mutually owned games
+    const gamesCount: Record<number, { count: number, game: any }> = {}
+    ownedGamesLists.forEach(list => {
+      list.forEach(game => {
+        if (!gamesCount[game.appid]) {
+          gamesCount[game.appid] = { count: 0, game }
+        }
+        gamesCount[game.appid].count++
+      })
+    })
+
+    const mutualAppIds = Object.keys(gamesCount)
+      .filter(id => gamesCount[parseInt(id)].count === allAgents.length)
+      .map(id => parseInt(id))
+
+    // Filter for Multiplayer/Co-op (requires App Details)
+    // Limit to 30 mutual games for performance
+    const candidateIds = mutualAppIds.slice(0, 30)
+    const detailsPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id))
+    const details = await Promise.all(detailsPromises)
+
+    const coopGames = details.filter((d: any) => {
+      if (!d || !d.categories) return false
+      const categories = d.categories.map((c: any) => c.id)
+      return categories.includes(1) || categories.includes(9) || categories.includes(38) // Multiplayer, Co-op, Online Co-op
+    })
+
+    // Score for each agent
+    const reviewsRecord: Record<number, number> = {} // Simpified, using average review score for all
+    
+    recommendations = await Promise.all(coopGames.map(async (game: any) => {
+      if (!game) return null
+      
+      // Calculate average score across all agents
+      let totalScore = 0
+      for (let i = 0; i < allAgents.length; i++) {
+        const scorer = scoringMode === 'bayesian' 
+          ? new FuzzyBayesianScorer(ownedGamesLists[i], reviewsRecord)
+          : new PureFuzzyScorer(ownedGamesLists[i], reviewsRecord)
+        totalScore += scorer.getGameScore(game.steam_appid)
+      }
+
+      return {
+        appid: game.steam_appid,
+        name: game.name,
+        score: totalScore / allAgents.length,
+        tags: (game.genres || []).map((g: any) => g.description)
+      }
+    }))
+
+    recommendations = recommendations
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 15)
+    
+    sharedGames = mutualAppIds
+  }
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-16">
@@ -96,9 +150,12 @@ app.get('/', async (c) => {
       <aside className="w-full lg:w-96 flex flex-col gap-10 shrink-0">
         <div className="space-y-6">
            <div className="space-y-3">
-              <div className="inline-flex items-center gap-3 px-3 py-1 bg-white/5 border border-white/10 rounded-full">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Convergence Engine Ready</span>
+              <div className="flex flex-col gap-4">
+                <div className="inline-flex items-center gap-3 px-3 py-1 bg-white/5 border border-white/10 rounded-full w-fit">
+                  <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Convergence Engine Ready</span>
+                </div>
+                <ScoringToggle scoringMode={scoringMode} />
               </div>
               <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-[0.85]">Co-op <br /><span className="text-white/20 outline-text">Nexus</span></h2>
               <p className="text-zinc-500 text-xs font-mono uppercase tracking-[0.2em]">Analisis Minat Kolektif Multi-Agen</p>
@@ -111,9 +168,9 @@ app.get('/', async (c) => {
                     type="text" 
                     name="friends" 
                     placeholder="SteamID atau Tautan Profil..." 
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-white/10 transition-all text-xs font-mono shadow-inner"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all text-xs font-mono shadow-inner"
                   />
-                  <button type="submit" className="w-full py-4 bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all text-[10px] shadow-xl">
+                  <button type="submit" className="w-full py-4 bg-orange-500 text-black font-black uppercase tracking-[0.2em] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all text-[10px] shadow-xl">
                     Sinkronkan Agen
                   </button>
                 </form>
@@ -152,23 +209,23 @@ app.get('/', async (c) => {
         </div>
       </aside>
       <div className="flex-1 min-w-0">
-        {friendIds.length > 1 ? (
+        {agentProfiles.length > 1 ? (
           <div className="space-y-16">
              <header className="flex flex-col md:flex-row md:items-end justify-between gap-10 border-b border-white/5 pb-10">
                 <div className="space-y-6">
                   <div className="flex items-center gap-6 flex-wrap">
-                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-emerald-500 bg-emerald-500/5 px-4 py-1.5 rounded-full border border-emerald-500/10 shadow-lg animate-glow">Nexus Terjalin</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-orange-500 bg-orange-500/5 px-4 py-1.5 rounded-full border border-orange-500/10 shadow-lg animate-glow">Nexus Terjalin</p>
                     <div className="flex -space-x-4">
-                      {groupProfiles.map((d, i) => d.profile && (
-                        <div key={d.id} className="relative group/avatar" style={{ zIndex: groupProfiles.length - i }}>
-                          {d.id !== steamId && (
+                      {agentProfiles.map((p, i) => (
+                        <div key={p.steamid} className="relative group/avatar" style={{ zIndex: agentProfiles.length - i }}>
+                          {p.steamid !== steamId && (
                             <form method="post" action="/coop/remove" className="absolute -top-2 -right-2 z-30 opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-                              <input type="hidden" name="friendId" value={d.id} />
+                              <input type="hidden" name="friendId" value={p.steamid} />
                               <button type="submit" className="bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] border-2 border-[#09090b] font-bold hover:scale-110 active:scale-90 transition-all">×</button>
                             </form>
                           )}
                           <img 
-                            src={d.profile.avatarfull} 
+                            src={p.avatarfull} 
                             className="w-12 h-12 rounded-2xl border-4 border-[#09090b] ring-1 ring-white/10 shadow-2xl hover:translate-y-[-4px] transition-transform duration-500" 
                           />
                         </div>
@@ -182,28 +239,24 @@ app.get('/', async (c) => {
              </header>
 
             <div className="space-y-10">
-               <p className="text-[11px] font-black tracking-[0.5em] uppercase text-zinc-500 px-2">Rekomendasi Sesi Bermain Grup (SA Optimized)</p>
+               <p className="text-[11px] font-black tracking-[0.5em] uppercase text-zinc-500 px-2">Rekomendasi Sesi Bermain Grup (Sorted by Relevance)</p>
                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 md:gap-8 pt-4">
                 {recommendations.map((game, idx) => (
-                  <div key={game.appid} className="group space-y-4 animate-in fade-in zoom-in-95 duration-700 hover:-translate-y-2" style={{ animationDelay: `${idx * 30}ms` }}>
-                    <div className="aspect-[3/4] bg-zinc-900 rounded-[2rem] overflow-hidden relative transition-all duration-500 border border-white/5 group-hover:border-white/20 shadow-2xl">
-                      <img src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/library_600x900.jpg`} alt={game.name} className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110" />
-                      <div className="absolute top-4 left-4 glass px-2 py-0.5 rounded-full font-mono text-[9px] font-black text-white z-20">
-                        {(game.score * 100).toFixed(0)}% Group Match
-                      </div>
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-center p-6">
-                          <a href={`https://store.steampowered.com/app/${game.appid}`} target="_blank" className="px-6 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full shadow-xl">Lihat</a>
-                      </div>
-                    </div>
-                    <p className="text-[10px] font-black uppercase tracking-tighter truncate text-zinc-500 group-hover:text-white transition-colors duration-500">{game.name}</p>
-                  </div>
+                  <GameCard 
+                    key={game.appid}
+                    appId={game.appid}
+                    name={game.name}
+                    score={game.score}
+                    tags={game.tags}
+                    actionLabel="Mabar"
+                  />
                 ))}
               </div>
             </div>
           </div>
         ) : (
           <div className="h-full min-h-[600px] flex items-center justify-center">
-            <div className="glass p-16 md:p-24 rounded-[4rem] text-center space-y-10 max-w-xl border-dashed relative overflow-hidden group">
+            <div className="glass p-16 md:p-24 rounded-[4rem] text-center space-y-10 max-w-xl border-dashed relative overflow-hidden group border-white/10">
               <div className="relative z-10 space-y-5">
                 <h3 className="text-3xl font-black tracking-tight text-white uppercase leading-none">Standby <br />Operasional</h3>
                 <p className="text-zinc-500 font-light text-base md:text-lg leading-relaxed">Sinkronkan minimal satu teman untuk memulai analisis konvergensi minat bermain.</p>

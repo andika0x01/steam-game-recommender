@@ -1,0 +1,403 @@
+export interface SteamPlayer {
+  steamid: string;
+  communityvisibilitystate: number;
+  profilestate: number;
+  personaname: string;
+  profileurl: string;
+  avatar: string;
+  avatarmedium: string;
+  avatarfull: string;
+  lastlogoff: number;
+  personastate: number;
+  realname?: string;
+  primaryclanid?: string;
+  timecreated?: number;
+  personastateflags?: number;
+  loccountrycode?: string;
+  locstatecode?: string;
+  loccityid?: number;
+}
+
+export interface SteamGame {
+  appid: number;
+  name?: string;
+  playtime_2weeks?: number;
+  playtime_forever: number;
+  img_icon_url?: string;
+  img_logo_url?: string;
+  has_community_visible_stats?: boolean;
+  playtime_windows_forever: number;
+  playtime_mac_forever: number;
+  playtime_linux_forever: number;
+  rtime_last_played?: number;
+}
+
+export interface SteamFriend {
+  steamid: string;
+  relationship: string;
+  friend_since: number;
+}
+
+export interface SteamGetFriendListResponse {
+  friendslist: {
+    friends: SteamFriend[];
+  };
+}
+
+export interface SteamGetPlayerSummariesResponse {
+  response: {
+    players: SteamPlayer[];
+  };
+}
+
+export interface SteamGetOwnedGamesResponse {
+  response: {
+    game_count: number;
+    games?: SteamGame[];
+  };
+}
+
+export interface SteamRecentlyPlayedGamesResponse {
+  response: {
+    total_count: number;
+    games?: SteamGame[];
+  };
+}
+
+export interface SteamGetCurrentPlayersResponse {
+  response: {
+    player_count: number;
+    result: number;
+  };
+}
+
+export interface SteamAppReviewSummary {
+  num_reviews: number;
+  review_score: number;
+  review_score_desc: string;
+  total_positive: number;
+  total_negative: number;
+  total_reviews: number;
+}
+
+export interface SteamAppReviewsResponse {
+  success: number;
+  query_summary: SteamAppReviewSummary;
+}
+
+export interface SteamStoreAppDetails {
+  type: string;
+  name: string;
+  steam_appid: number;
+  required_age: number;
+  is_free: boolean;
+  detailed_description: string;
+  about_the_game: string;
+  short_description: string;
+  supported_languages: string;
+  header_image: string;
+  website: string;
+  pc_requirements: {
+    minimum: string;
+    recommended: string;
+  };
+  developers: string[];
+  publishers: string[];
+  price_overview?: {
+    currency: string;
+    initial: number;
+    final: number;
+    discount_percent: number;
+    initial_formatted: string;
+    final_formatted: string;
+  };
+  platforms: {
+    windows: boolean;
+    mac: boolean;
+    linux: boolean;
+  };
+  categories: Array<{ id: number; description: string }>;
+  genres: Array<{ id: string; description: string }>;
+  screenshots: Array<{ id: number; path_thumbnail: string; path_full: string }>;
+  release_date: {
+    coming_soon: boolean;
+    date: string;
+  };
+}
+
+export interface SteamStoreAppDetailsResponse {
+  [appid: string]: {
+    success: boolean;
+    data: SteamStoreAppDetails;
+  };
+}
+
+export interface SteamSearchResult {
+  name: string;
+  logo: string;
+  id?: number; // Extracted from logo URL if possible
+}
+
+export interface SteamSearchResponse {
+  total_count?: number;
+  items: SteamSearchResult[];
+}
+
+export interface SteamSearchOptions {
+  term?: string;
+  tags?: number[];
+  genre?: string;
+  category1?: number; // 998 for Games
+  os?: 'win' | 'mac' | 'linux';
+  sort_by?: 'Released_DESC' | 'Price_ASC' | 'Price_DESC' | 'Reviews_DESC' | 'Name_ASC';
+  specials?: boolean;
+  maxprice?: number | 'free';
+  cc?: string;
+  l?: string;
+}
+
+export class SteamAPI {
+  private apiKey: string;
+  private kv?: KVNamespace;
+  private baseUrl = 'https://api.steampowered.com';
+  private storeUrl = 'https://store.steampowered.com/api';
+  private storefrontUrl = 'https://store.steampowered.com';
+
+  constructor(apiKey: string, kv?: KVNamespace) {
+    this.apiKey = apiKey;
+    this.kv = kv;
+  }
+
+  /**
+   * Returns basic profile information for a list of 64-bit Steam IDs.
+   */
+  async getPlayerSummaries(steamIds: string[]): Promise<SteamPlayer[]> {
+    const url = new URL(`${this.baseUrl}/ISteamUser/GetPlayerSummaries/v0002/`);
+    url.searchParams.append('key', this.apiKey);
+    url.searchParams.append('steamids', steamIds.join(','));
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Steam API error: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as SteamGetPlayerSummariesResponse;
+    return data.response.players;
+  }
+
+  /**
+   * Returns the friend list of any Steam user, provided their profile visibility is set to "Public".
+   */
+  async getFriendList(steamId: string, relationship: 'friend' | 'all' = 'friend'): Promise<SteamFriend[]> {
+    const url = new URL(`${this.baseUrl}/ISteamUser/GetFriendList/v0001/`);
+    url.searchParams.append('key', this.apiKey);
+    url.searchParams.append('steamid', steamId);
+    url.searchParams.append('relationship', relationship);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      if (response.status === 401) return []; // Profile is private
+      throw new Error(`Steam API error: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as SteamGetFriendListResponse;
+    return data.friendslist.friends || [];
+  }
+
+  /**
+   * Searches for games on the Steam Store using various filters and sorting options.
+   * Note: This uses the storefront search results API which returns JSON when json=1 is passed.
+   */
+  async searchGames(options: SteamSearchOptions = {}): Promise<SteamSearchResult[]> {
+    const url = new URL(`${this.storefrontUrl}/search/results`);
+    url.searchParams.append('json', '1');
+    
+    if (options.term) url.searchParams.append('term', options.term);
+    if (options.tags && options.tags.length > 0) url.searchParams.append('tags', options.tags.join(','));
+    if (options.genre) url.searchParams.append('genre', options.genre);
+    
+    // Default to category1=998 (Games) to exclude Software, DLC, etc.
+    const category = options.category1 || 998;
+    url.searchParams.append('category1', category.toString());
+    
+    if (options.os) url.searchParams.append('os', options.os);
+    if (options.sort_by) url.searchParams.append('sort_by', options.sort_by);
+    if (options.specials) url.searchParams.append('specials', '1');
+    if (options.maxprice) url.searchParams.append('maxprice', options.maxprice.toString());
+    if (options.cc) url.searchParams.append('cc', options.cc);
+    if (options.l) url.searchParams.append('l', options.l);
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Steam Search API error: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as SteamSearchResponse;
+    
+    // Process items and extract ID from logo URL
+    return (data.items || []).map(item => {
+      const idMatch = item.logo.match(/\/apps\/(\d+)\//);
+      return {
+        ...item,
+        id: idMatch ? parseInt(idMatch[1]) : undefined
+      };
+    });
+  }
+
+  /**
+   * Internal helper to filter out non-game items (Software, Servers, SDKs, etc.)
+   */
+  private filterNonGames(games: SteamGame[]): SteamGame[] {
+    const softwareKeywords = [
+      'software', 'utility', 'utilities', 'tool', 'sdk', 'dedicated server', 
+      'benchmark', 'modeling', 'animation', 'production', 'publishing', 'editing',
+      'wallpaper engine', 'soundpad', 'rpg maker', 'game maker', 'test tool', 'beta'
+    ];
+    
+    return games.filter(game => {
+      if (!game.name) return true;
+      const lowerName = game.name.toLowerCase();
+      return !softwareKeywords.some(keyword => lowerName.includes(keyword));
+    });
+  }
+
+  /**
+   * Returns a list of games a player owns along with playtime information.
+   */
+  async getOwnedGames(steamId: string, includeAppInfo = true, includeFreeGames = true): Promise<SteamGame[]> {
+    const url = new URL(`${this.baseUrl}/IPlayerService/GetOwnedGames/v0001/`);
+    url.searchParams.append('key', this.apiKey);
+    url.searchParams.append('steamid', steamId);
+    url.searchParams.append('format', 'json');
+    if (includeAppInfo) {
+      url.searchParams.append('include_appinfo', '1');
+    }
+    if (includeFreeGames) {
+      url.searchParams.append('include_played_free_games', '1');
+    }
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Steam API error: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as SteamGetOwnedGamesResponse;
+    const games = data.response.games || [];
+    return this.filterNonGames(games);
+  }
+
+  /**
+   * Returns a list of games a player has played in the last two weeks.
+   */
+  async getRecentlyPlayedGames(steamId: string, count?: number): Promise<SteamGame[]> {
+    const url = new URL(`${this.baseUrl}/IPlayerService/GetRecentlyPlayedGames/v0001/`);
+    url.searchParams.append('key', this.apiKey);
+    url.searchParams.append('steamid', steamId);
+    url.searchParams.append('format', 'json');
+    if (count) {
+      url.searchParams.append('count', count.toString());
+    }
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Steam API error: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as SteamRecentlyPlayedGamesResponse;
+    const games = data.response.games || [];
+    return this.filterNonGames(games);
+  }
+
+  /**
+   * Returns the number of current players for a given app.
+   */
+  async getCurrentPlayers(appId: number): Promise<number> {
+    const url = new URL(`${this.baseUrl}/ISteamUserStats/GetNumberOfCurrentPlayers/v1/`);
+    url.searchParams.append('appid', appId.toString());
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Steam API error: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as SteamGetCurrentPlayersResponse;
+    return data.response.player_count || 0;
+  }
+
+  /**
+   * Returns review summary for a given app from the Steam Storefront.
+   */
+  async getAppReviews(appId: number): Promise<SteamAppReviewSummary | null> {
+    const url = new URL(`${this.storefrontUrl}/appreviews/${appId}`);
+    url.searchParams.append('json', '1');
+    url.searchParams.append('language', 'all');
+    url.searchParams.append('purchase_type', 'all');
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`Steam App Reviews API error: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as SteamAppReviewsResponse;
+    if (data.success !== 1) {
+      return null;
+    }
+
+    return data.query_summary;
+  }
+  async getAppStoreDetails(appId: number | string, language: string = 'english'): Promise<SteamStoreAppDetails | null> {
+    const url = new URL('https://store.steampowered.com/api/appdetails');
+    url.searchParams.append('appids', appId.toString());
+    url.searchParams.append('l', language);
+
+    const response = await fetch(url.toString(), {
+      headers: { 'Accept-Language': 'en-US,en;q=0.9' }
+    });
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json() as any;
+    
+    if (!data[appId.toString()] || !data[appId.toString()].success) {
+      return null;
+    }
+    
+    return data[appId.toString()].data as SteamStoreAppDetails;
+  }
+
+}
+
+// Standalone functions for backward compatibility and simpler usage in pages
+
+export async function resolveVanityURL(apiKey: string, vanityId: string): Promise<string | null> {
+  const url = new URL('https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/');
+  url.searchParams.append('key', apiKey);
+  url.searchParams.append('vanityurl', vanityId);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) return null;
+  const data = (await response.json()) as any;
+  return data.response.success === 1 ? data.response.steamid : null;
+}
+
+export async function getOwnedGames(apiKey: string, steamId: string): Promise<SteamGame[]> {
+  const api = new SteamAPI(apiKey);
+  return await api.getOwnedGames(steamId);
+}
+
+export async function getPlayerSummaries(apiKey: string, steamIds: string | string[]): Promise<SteamPlayer | SteamPlayer[] | null> {
+  const api = new SteamAPI(apiKey);
+  const ids = Array.isArray(steamIds) ? steamIds : [steamIds];
+  const players = await api.getPlayerSummaries(ids);
+  return Array.isArray(steamIds) ? players : (players[0] || null);
+}
+
+export async function getAppDetails(appId: number): Promise<SteamStoreAppDetails | null> {
+  const api = new SteamAPI(''); // No key needed for store API
+  return await api.getAppStoreDetails(appId);
+}

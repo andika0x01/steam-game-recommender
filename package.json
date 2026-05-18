@@ -6,9 +6,12 @@
     "build": "vite build",
     "preview": "npm run build && vite preview",
     "deploy": "npm run build && wrangler deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
+    "@hono/react-renderer": "^1.0.1",
     "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.3.0",
     "autoprefixer": "^10.5.0",
@@ -17,13 +20,20 @@
     "hono": "^4.12.18",
     "lucide-react": "^1.16.0",
     "postcss": "^8.5.14",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.2.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "^6.0.3",
     "vite": "^6.3.5",
     "vite-ssr-components": "^0.6.1",
+    "vitest": "^4.1.6",
     "wrangler": "^4.17.0"
   }
 }
