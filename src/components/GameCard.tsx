@@ -47,9 +47,9 @@ export const GameCard = ({
           </div>
         )}
 
-        {/* Improved Price & Discount Display (Top Left) */}
+        {/* Improved Price & Discount Display (Bottom Left) */}
         {(price || hasDiscount) && (
-          <div className="absolute top-4 left-4 z-20">
+          <div className="absolute bottom-4 left-4 z-20">
             <div className="flex items-stretch overflow-hidden rounded-xl shadow-2xl border border-white/5 bg-zinc-950/80 backdrop-blur-md w-fit">
               {hasDiscount && (
                 <div className="bg-orange-600 px-3 flex items-center justify-center border-r border-white/10">

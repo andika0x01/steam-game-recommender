@@ -18,6 +18,18 @@ export const renderer = reactRenderer(({ children, title, c }: { children?: Reac
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{title ? `${title} | Steam Recommender` : 'Steam Game Recommender'}</title>
+        <script
+          type="module"
+          dangerouslySetInnerHTML={{
+            __html: `
+import RefreshRuntime from "/@react-refresh"
+RefreshRuntime.injectIntoGlobalHook(window)
+window.$RefreshReg$ = () => {}
+window.$RefreshSig$ = () => (type) => type
+window.__vite_plugin_react_preamble_installed__ = true
+          `
+          }}
+        />
         <ViteClient />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

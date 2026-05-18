@@ -95,11 +95,11 @@ app.get('/', async (c) => {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-12">
         <div className="space-y-6 max-w-2xl">
           <div className="flex flex-col gap-4">
+            <ScoringToggle scoringMode={scoringMode} />
             <div className="inline-flex items-center gap-3 px-3 py-1 bg-white/5 border border-white/10 rounded-full w-fit">
               <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Pure Steam Value Engine Active</span>
             </div>
-            <ScoringToggle scoringMode={scoringMode} />
           </div>
           <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-[0.9]">Deal <br /><span className="text-white/20 outline-text">Hunter</span></h2>
           <p className="text-zinc-400 text-base md:text-lg leading-relaxed">Sistem kami memindai katalog resmi Steam Indonesia untuk menemukan penawaran yang paling sesuai dengan profil bermain Anda.</p>
