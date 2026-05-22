@@ -7,7 +7,7 @@ import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-non-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
 import { getIdrRate } from '../../lib/currency'
 import { InfiniteGrid } from '../../components/InfiniteGrid'
-import { buildUserProfile, calculateSimilarity, calculateWeightedSimilarity } from '../../lib/simple-recommendation'
+import { buildUserProfile, calculateWeightedSimilarity } from '../../lib/simple-recommendation'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 

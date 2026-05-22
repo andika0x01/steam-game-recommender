@@ -12,20 +12,6 @@ export interface RecommendationResult {
 
 /**
  * Menghitung Overlap Coefficient antara dua set tag.
- * Lebih adil untuk game dengan jumlah tag sedikit.
- */
-export function calculateSimilarity(tags1: string[], tags2: string[]): number {
-  if (tags1.length === 0 || tags2.length === 0) return 0;
-  
-  const set1 = new Set(tags1.map(t => t.toLowerCase()));
-  const set2 = new Set(tags2.map(t => t.toLowerCase()));
-  
-  const intersection = new Set([...set1].filter(x => set2.has(x)));
-  
-  // Overlap Coefficient: |A ∩ B| / min(|A|, |B|)
-  return intersection.size / Math.min(set1.size, set2.size);
-}
-
 /**
  * Menghitung Weighted Overlap Coefficient berdasarkan bobot tag dari profil pengguna.
  * 
