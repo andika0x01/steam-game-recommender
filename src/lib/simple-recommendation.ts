@@ -123,8 +123,8 @@ export async function getSimpleRecommendations(
   const fetchPromises = sortedTags.map(async ([tag, weight]) => {
     const proportion = weight / totalTagWeight;
     const count = Math.max(8, Math.ceil((amount * 3) * proportion)); // Perkecil count
-    // Offset melompat lebih jauh per halaman
-    const start = (page - 1) * 50; 
+    // Offset lebih rapat agar tidak kehabisan hasil dari pencarian "term"
+    const start = (page - 1) * 15; 
     return api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start }).then(res => res.slice(0, count));
   });
 

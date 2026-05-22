@@ -45,11 +45,13 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
   const loadMore = async () => {
     setLoading(true)
     try {
-      const nextPage = page + 1
+      const nextPage = items.length === 0 ? 1 : page + 1
       const response = await fetch(`${endpoint}?page=${nextPage}`)
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+      
       const newItems = await response.json() as any[]
       
-      if (newItems.length === 0) {
+      if (!Array.isArray(newItems) || newItems.length === 0) {
         setPageHasMore(false)
       } else {
         const existingIds = new Set(items.map(i => i.appid || i.appId))
