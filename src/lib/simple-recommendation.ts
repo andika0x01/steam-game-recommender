@@ -12,7 +12,6 @@ export interface RecommendationResult {
 
 /**
  * Menghitung Jaccard Similarity antara dua set tag.
- * Rumus: (Irisan Set) / (Gabungan Set)
  */
 export function calculateSimilarity(tags1: string[], tags2: string[]): number {
   if (tags1.length === 0 || tags2.length === 0) return 0;
@@ -29,11 +28,7 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
 /**
  * Mesin Rekomendasi Utama
  * 
- * Fungsi ini mengorkestrasi seluruh proses rekomendasi:
- * 1. Menganalisis library pengguna untuk membangun profil tag favorit dan publisher favorit.
- * 2. Mengambil kandidat game dari Steam Store secara proporsional.
- * 3. Menilai setiap kandidat menggunakan logika fuzzy non-owned (termasuk kecocokan publisher).
- * 4. Mengurutkan dan mengembalikan hasil terbaik.
+ * Pembaruan: Mengimplementasikan agregasi Publisher Score (PS) kontinu.
  */
 export async function getSimpleRecommendations(
   api: SteamAPI,
@@ -45,23 +40,29 @@ export async function getSimpleRecommendations(
   const ownScorer = new FuzzyOwnGamesScorer(ownedGames);
   const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
+  // 1. Build Profile (Tags & Publisher Score)
   const topPlayed = ownedGames
     .filter(g => g.playtime_forever > 0)
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 20);
+    .slice(0, 30);
 
   const detailPromises = topPlayed.map(g => api.getAppStoreDetails(g.appid));
   const details = await Promise.all(detailPromises);
 
   const tagWeights: Record<string, number> = {};
-  const publisherWeights: Record<string, number> = {};
+  
+  /**
+   * Agregasi Publisher Score (PS):
+   * Map menyimpan { totalWeightedScore, totalPlaytime } per publisher.
+   */
+  const publisherStats: Record<string, { weightedScore: number, playtime: number }> = {};
+  let totalLibraryPlaytime = 0;
   let totalTagWeight = 0;
-  let totalPublisherWeight = 0;
 
   details.forEach((detail, idx) => {
     if (!detail) return;
-    const gameId = topPlayed[idx].appid;
-    const score = ownScorer.getGameScore(gameId);
+    const game = topPlayed[idx];
+    const score = ownScorer.getGameScore(game.appid);
     
     const tags = [
       ...(detail.genres || []).map(g => g.description),
@@ -75,14 +76,33 @@ export async function getSimpleRecommendations(
 
     if (detail.publishers) {
       detail.publishers.forEach(pub => {
-        publisherWeights[pub] = (publisherWeights[pub] || 0) + score;
-        totalPublisherWeight += score;
+        if (!publisherStats[pub]) publisherStats[pub] = { weightedScore: 0, playtime: 0 };
+        // Rumus: Sigma (Score * Playtime)
+        publisherStats[pub].weightedScore += (score * game.playtime_forever);
+        publisherStats[pub].playtime += game.playtime_forever;
       });
     }
+    totalLibraryPlaytime += game.playtime_forever;
+  });
+
+  /**
+   * Finalisasi Publisher Score (PS) per Publisher.
+   * PS = weightedSum / totalLibraryPlaytime
+   */
+  const publisherScores: Record<string, number> = {};
+  Object.entries(publisherStats).forEach(([pub, stats]) => {
+    publisherScores[pub] = totalLibraryPlaytime > 0 ? stats.weightedScore / totalLibraryPlaytime : 0;
+  });
+
+  // Normalisasi PS ke skala 0.0 - 1.0 (berdasarkan nilai tertinggi di library)
+  const maxPS = Math.max(...Object.values(publisherScores), 0.001);
+  Object.keys(publisherScores).forEach(pub => {
+    publisherScores[pub] = Math.min(1, publisherScores[pub] / maxPS);
   });
 
   if (totalTagWeight === 0) return [];
 
+  // 2. Fetch Candidates
   const sortedTags = Object.entries(tagWeights)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5); 
@@ -118,18 +138,20 @@ export async function getSimpleRecommendations(
       ...(detail.categories || []).map(c => c.description)
     ];
 
-    // Hitung seberapa cocok publisher game ini dengan preferensi user
-    let publisherMatchScore = 0;
-    if (detail.publishers && totalPublisherWeight > 0) {
-      const matchSum = detail.publishers.reduce((sum, pub) => sum + (publisherWeights[pub] || 0), 0);
-      publisherMatchScore = Math.min(1, matchSum / (totalPublisherWeight / 5)); // Normalize, assume top 5 pubs are major
+    /**
+     * Menghitung PS untuk kandidat:
+     * Jika game punya beberapa publisher, ambil nilai tertinggi.
+     */
+    let candidatePS = 0;
+    if (detail.publishers) {
+      candidatePS = detail.publishers.reduce((max, pub) => Math.max(max, publisherScores[pub] || 0), 0);
     }
 
     const positivity = reviews.total_positive / (reviews.total_reviews || 1);
     const similarity = calculateSimilarity(candidateTags, userProfileTags);
     const volume = reviews.total_reviews;
 
-    const finalScore = nonOwnScorer.getGameScore(positivity, similarity, volume, publisherMatchScore);
+    const finalScore = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);
 
     results.push({
       appId: detail.steam_appid,

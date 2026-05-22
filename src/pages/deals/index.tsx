@@ -47,6 +47,15 @@ app.get('/', async (c) => {
       .map((d: any) => {
         const score = scorer.getGameScore(d!.steam_appid) || 0.5
         const price = d!.price_overview!.final / 100
+
+        /**
+         * Penanganan Game Gratis (Price = 0)
+         * Untuk menghindari Division by Zero, kita berikan nilai harga minimal (1)
+         * atau density yang sangat tinggi agar SA memprioritaskan game berkualitas yang gratis.
+         */
+        const safePrice = price > 0 ? price : 1;
+        const density = score / safePrice;
+
         return {
           appid: d!.steam_appid,
           name: d!.name,
@@ -54,11 +63,12 @@ app.get('/', async (c) => {
           normalPrice: d!.price_overview!.initial / 100,
           savings: d!.price_overview!.discount_percent.toString(),
           score: score,
-          density: score / (price || 1),
+          density: density,
           formattedPrice: d!.price_overview!.final_formatted,
           formattedInitial: d!.price_overview!.initial_formatted,
           tags: (d!.genres || []).map((g: any) => g.description).concat((d!.categories || []).map((c: any) => c.description))
         }
+
       })
   } catch (e) {
     console.error('Steam Search error:', e)
