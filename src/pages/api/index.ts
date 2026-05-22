@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { SteamAPI } from '../../lib/steam'
 import { getSimpleRecommendations } from '../../lib/simple-recommendation'
+import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
@@ -30,6 +31,7 @@ app.get('/deals', async (c) => {
 
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
+  const scorer = new FuzzyOwnGamesScorer(userGames)
 
   // Gunakan 'start' offset pada pencarian Steam untuk mendapatkan data baru
   const start = (page - 1) * amount
@@ -38,10 +40,6 @@ app.get('/deals', async (c) => {
   
   const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'english', 'id'))
   const rawDetails = await Promise.all(detailPromises)
-
-  // We can reuse FuzzyOwnGamesScorer if we had the class accessible, 
-  // for simplicity in API we just return raw data or basic scores.
-  // Actually, let's just return the formatted deal objects.
   
   const deals = rawDetails
     .filter((d: any) => d && d.price_overview)
@@ -51,7 +49,9 @@ app.get('/deals', async (c) => {
       price: d!.price_overview!.final_formatted,
       originalPrice: d!.price_overview!.initial_formatted,
       discount: d!.price_overview!.discount_percent.toString(),
-      tags: (d!.genres || []).map((g: any) => g.description)
+      score: scorer.getGameScore(d!.steam_appid) || 0.5,
+      tags: (d!.genres || []).map((g: any) => g.description),
+      hideScore: false
     }))
 
   return c.json(deals)
