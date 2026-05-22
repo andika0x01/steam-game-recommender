@@ -44,8 +44,19 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
       if (newItems.length === 0) {
         setPageHasMore(false)
       } else {
-        setItems(prev => [...prev, ...newItems])
-        setPage(nextPage)
+        // Deduplikasi client-side: hanya tambah game yang ID-nya belum ada
+        const existingIds = new Set(items.map(i => i.appid || i.appId))
+        const uniqueNewItems = newItems.filter(i => !existingIds.has(i.appid || i.appId))
+        
+        if (uniqueNewItems.length > 0) {
+          setItems(prev => [...prev, ...uniqueNewItems])
+          setPage(nextPage)
+        } else if (page < 5) { 
+          // Jika Steam memberikan data yang sama, coba fetch halaman berikutnya lagi (max 5 percobaan)
+          setPage(nextPage)
+        } else {
+          setPageHasMore(false)
+        }
       }
     } catch (e) {
       console.error('Failed to load more items:', e)

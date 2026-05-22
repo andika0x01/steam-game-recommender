@@ -106,11 +106,11 @@ export async function getSimpleRecommendations(
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5); 
 
-  const candidatesPerTag = amount * 3; 
+  const candidatesPerTag = amount * 5; 
   const fetchPromises = sortedTags.map(async ([tag, weight]) => {
     const proportion = weight / totalTagWeight;
-    const count = Math.max(5, Math.ceil(candidatesPerTag * proportion));
-    const start = (page - 1) * count;
+    const count = Math.max(8, Math.ceil(candidatesPerTag * proportion));
+    const start = (page - 1) * count * 2;
     return api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start }).then(res => res.slice(0, count));
   });
 
