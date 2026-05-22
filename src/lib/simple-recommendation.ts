@@ -45,7 +45,7 @@ export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[], s
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
     .slice(0, 15); // Kurangi dari 30 ke 15 untuk menghemat subrequest
 
-  const details = await api.getAppStoreDetailsBatch(topPlayed.map(g => g.appid));
+  const details = await api.getAppStoreDetailsBatch(topPlayed.map(g => g.appid), 'english', 'id');
 
   const tagWeights: Record<string, number> = {};
   const publisherStats: Record<string, { weightedScore: number, playtime: number }> = {};
@@ -122,26 +122,30 @@ export async function getSimpleRecommendations(
 
   const searchResults: SteamSearchResult[] = [];
   for (const [tag, weight] of sortedTags) {
-    const proportion = weight / totalTagWeight;
-    const count = Math.max(8, Math.ceil((amount * 3) * proportion)); // Perkecil count
-    // Offset lebih rapat agar tidak kehabisan hasil dari pencarian "term"
-    const start = (page - 1) * 15; 
+    // Offset lompat per 50 item as per Steam's default pagination
+    const start = (page - 1) * 50; 
     try {
-      const res = await api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start });
-      searchResults.push(...res.slice(0, count));
+      // Hilangkan batasan 'count' statis, ambil seluruh 50 hasil per tag agar kolam probabilitas > 200 kandidat.
+      // Hal ini mencegah "Popularity Bias Empty Array" di mana user kebetulan sudah punya semua top 10 game genre tersebut!
+      const res = await api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start, cc: 'id' });
+      searchResults.push(...res);
     } catch (e) {
       console.warn(`Search failed for tag ${tag}:`, e);
     }
   }
 
+  // Acak secara deterministik atau biarkan steam ranking, lalu filter unik
   const uniqueIds = [...new Set(searchResults.map(r => r.id).filter((id): id is number => id !== undefined))];
 
   const ownedIds = new Set(ownedGames.map(g => g.appid));
-  const newIds = uniqueIds.filter(id => !ownedIds.has(id)).slice(0, 20); // Batasi maks 20 kandidat (sebelumnya 60)
+  const newIds = uniqueIds.filter(id => !ownedIds.has(id)).slice(0, 20); // Maksimalkan dapat 20 kandidat bersih
 
-  const candidateDetails = await api.getAppStoreDetailsBatch(newIds);
-  const candidateReviewsPromises = newIds.map(id => api.getAppReviews(id));
-  const candidateReviews = await Promise.all(candidateReviewsPromises);
+  const candidateDetails = await api.getAppStoreDetailsBatch(newIds, 'english', 'id');
+  
+  const candidateReviews = [];
+  for (const id of newIds) {
+    candidateReviews.push(await api.getAppReviews(id));
+  }
 
   const results: RecommendationResult[] = [];
 

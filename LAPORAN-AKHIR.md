@@ -92,10 +92,12 @@ Untuk performa maksimal dan efisiensi API Steam dalam batasan 50-subrequest Clou
 -   **Search Cache (7 Hari)**: Menjaga stabilitas daftar rekomendasi mingguan.
 -   **Details & Review Cache (Permanen)**: Informasi metadata game disimpan permanen untuk kecepatan akses instan.
 
-### 3.4. Stabilitas Produksi (Edge Computing)
-Untuk menangani limitasi CPU dan timeout pada Cloudflare Workers:
--   **Graceful Rendering**: Rute kritis seperti `/engine` menggunakan blok error handling yang mencegah halaman blank. Jika perhitungan algoritma di sisi server terlalu berat, sistem akan merender UI placeholder dan memindahkan beban komputasi ke API asinkron.
--   **Safety Thresholds**: Membatasi jumlah kandidat yang diproses secara real-time (maks 20 kandidat per batch) untuk menjaga latensi tetap rendah.
+### 3.4. Stabilitas Produksi (Edge Computing) / Fix Troubleshooting Rate-Limit
+Untuk menangani limitasi IP Datacenter, CPU, dan timeout pada Cloudflare Workers:
+-   **Sequential Request Handling**: Modifikasi dari `Promise.all()` menjadi pola tunggu berurutan untuk pengambilan hasil pencarian API Store Steam nhằm mencegah limitasi pertahanan (Cloudflare 429 *Too Many Requests*) terhadap server.
+-   **No-Collusion Popularity Bias**: Pencarian algoritma menggunakan offset yang lebih besar dan komprehensif, menghilangkan proses *slice* dini yang berisiko membuat kandidat jadi kosong apabila pengguna sudah memiliki semua rekomendasi top 10 (bias popularitas elit).
+-   **Triage Invalidation Cache KV**: Memisahkan Cache KV dan memberikan pengecekan yang lebih ketat agar meretur nilai kosong (bila memang diblokir Steam API) tidak meracuni dan me-lock memori KV selama periode 7 Hari berturut-turut.
+-   **Graceful Fallbacks**: Rute `/engine` maupun perhitungan review kini telah diinjeksikan mekanisme cadangan (skor `0.5` bila di-reject) ketimbang *panic shutdown*, mencegah kasus UI Blank State.
 
 ## 4. Kesimpulan
 Dengan menggabungkan Logika Fuzzy untuk penilaian subjektif dan algoritma heuristik untuk optimasi data, Steam Game Recommender mampu mentransformasi data mentah Steam menjadi pengalaman penemuan game yang benar-benar personal dan akurat.
