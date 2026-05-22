@@ -22,7 +22,14 @@ app.get('/', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const games = await steamAPI.getOwnedGames(steamId)
 
-  const recommendations = await getSimpleRecommendations(steamAPI, games, 12)
+  let recommendations = []
+  try {
+    // Beri batas waktu atau tangani error agar halaman tidak blank jika algoritma berat
+    recommendations = await getSimpleRecommendations(steamAPI, games, 12, 1, steamId)
+  } catch (e) {
+    console.error('Engine error:', e)
+    // Biarkan kosong, InfiniteGrid akan mencoba fetch via API nanti
+  }
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-20">
@@ -43,15 +50,18 @@ app.get('/', async (c) => {
         </div>
       </div>
 
-      {recommendations.length > 0 ? (
-        <div data-hydrate="InfiniteGrid" data-props={JSON.stringify({ initialItems: recommendations, endpoint: '/api/recommendations', type: 'game' })}>
+      <div data-hydrate="InfiniteGrid" data-props={JSON.stringify({ initialItems: recommendations, endpoint: '/api/recommendations', type: 'game' })}>
+        {recommendations.length > 0 ? (
           <InfiniteGrid initialItems={recommendations} endpoint="/api/recommendations" type="game" />
-        </div>
-      ) : (
-        <div className="glass p-16 md:p-32 rounded-[4rem] text-center space-y-8 border-dashed border-white/10">
-          <p className="text-zinc-500 font-light text-base md:text-lg max-w-md mx-auto">Menganalisa library dan melakukan crawling kandidat yang presisi...</p>
-        </div>
-      )}
+        ) : (
+          <div className="glass p-16 md:p-32 rounded-[4rem] text-center space-y-8 border-dashed border-white/10">
+            <p className="text-zinc-500 font-light text-base md:text-lg max-w-md mx-auto">Menganalisa library dan melakukan crawling kandidat yang presisi...</p>
+            <div className="flex justify-center">
+               <div className="w-8 h-8 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+            </div>
+          </div>
+        )}
+      </div>
     </div>,
     { title: 'Discovery Engine' } as any
   )

@@ -22,6 +22,13 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
   const loaderRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Jika komponen di-mount tanpa data awal, langsung load data pertama
+    if (items.length === 0 && hasMore && !loading) {
+      loadMore()
+    }
+  }, [items])
+
+  useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasMore && !loading) {
         loadMore()
