@@ -17,6 +17,13 @@ Sistem menggunakan fungsi keanggotaan trapezoidal untuk mengubah variabel input 
 \mu_A(x; a, b, c, d) = \begin{cases} 0, & x \le a \text{ atau } x \ge d \\ \frac{x-a}{b-a}, & a < x < b \\ 1, & b \le x \le c \\ \frac{d-x}{d-c}, & c < x < d \end{cases}
 ```
 
+### 2.1.1. Justifikasi Pemilihan Fungsi Trapezoidal ($TrapMF$)
+Pemilihan bentuk trapezoid dibandingkan dengan segitiga atau Gaussian didasarkan pada beberapa alasan teknis yang krusial bagi sistem pakar:
+1.  **Representasi Core/Plateau**: Fungsi trapezoidal memungkinkan adanya rentang nilai (interval) yang memiliki derajat keanggotaan penuh ($\mu = 1.0$). Hal ini jauh lebih realistis untuk memodelkan konsep manusia; contohnya, persentase review positif antara 85% hingga 95% dapat dianggap "Sangat Bagus" secara merata, bukan hanya pada satu titik spesifik saja.
+2.  **Stabilitas Sistem**: Puncak yang datar (*plateau*) memberikan stabilitas pada hasil scoring. Fluktuasi kecil pada input (misalnya kenaikan playtime beberapa menit) di dalam rentang core tidak akan mengubah derajat aktivasi aturan secara drastis, sehingga mencegah hasil rekomendasi yang "jittery" atau berubah-ubah secara instan.
+3.  **Generalisasi & Fleksibilitas**: Fungsi trapezoidal adalah generalisasi dari fungsi segitiga (di mana koordinat $b = c$). Ini memberikan kontrol lebih kepada pengembang untuk mengatur ambang batas kepastian pakar sebelum nilai keanggotaan mulai menurun.
+4.  **Efisiensi Komputasi**: Dibandingkan dengan fungsi Gaussian atau Bell-shaped yang menggunakan eksponensial, $TrapMF$ hanya menggunakan operasi aritmatika linear sederhana. Hal ini sangat penting untuk menjaga *latensi* tetap rendah pada platform *edge computing* seperti Cloudflare Workers.
+
 #### Variabel Input:
 -   **Owned Games**: $Playtime$ (Playtime Forever), $Activity$ (2 Weeks Playtime), $Recency$ (Days since last played).
 -   **Non-Owned Games**: $Positivity$ (Review Ratio), $Similarity$ (Tag Match), $Volume$ (Review Count), $PublisherMatch$ (Publisher Match).
