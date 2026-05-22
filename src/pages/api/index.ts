@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { SteamAPI } from '../../lib/steam'
-import { getSimpleRecommendations, buildUserProfile, calculateSimilarity } from '../../lib/simple-recommendation'
+import { getSimpleRecommendations, buildUserProfile, calculateWeightedSimilarity } from '../../lib/simple-recommendation'
 import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-non-own-games-scorer'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
@@ -41,7 +41,7 @@ app.get('/recommendation-deals', async (c) => {
      * Menggunakan FuzzyNonOwnGamesScorer untuk game di store.
      * Kita perlu profil selera user (tags & publisher scores).
      */
-    const { publisherScores, userProfileTags } = await buildUserProfile(steamAPI, userGames, steamId);
+    const { publisherScores, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
     const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
     const start = (page - 1) * amount
@@ -53,9 +53,9 @@ app.get('/recommendation-deals', async (c) => {
     const candidateReviews = await Promise.all(candidateReviewsPromises)
     
     const deals = rawDetails
-      .filter((d: any) => d && d.price_overview)
-      .map((d: any, idx: number) => {
-        const reviews = candidateReviews[idx];
+      .map((d: any, idx: number) => ({ d, reviews: candidateReviews[idx] }))
+      .filter(({ d }: any) => d && d.price_overview)
+      .map(({ d, reviews }: any) => {
         const candidateTags = [
           ...(d.genres || []).map((g: any) => g.description),
           ...(d.categories || []).map((c: any) => c.description)
@@ -67,7 +67,7 @@ app.get('/recommendation-deals', async (c) => {
         }
 
         const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
-        const similarity = calculateSimilarity(candidateTags, userProfileTags);
+        const similarity = calculateWeightedSimilarity(candidateTags, tagWeights);
         const volume = reviews ? reviews.total_reviews : 0;
         
         const score = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);

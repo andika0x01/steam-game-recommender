@@ -28,6 +28,12 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
 
 /**
  * Menghitung Weighted Overlap Coefficient berdasarkan bobot tag dari profil pengguna.
+ * 
+ * Catatan Normalisasi:
+ * maxPossibleWeight dihitung dari top-N tag weights di seluruh profil user berdasarkan ukuran candidate set,
+ * bukan dari batas atas candidate tersebut. Ini adalah intentional trade-off untuk memastikan
+ * candidate yang hanya memiliki sedikit tag dominan (misal semua cocok namun termasuk tag yang berbobot kecil)
+ * tetap tidak bisa mengalahkan candidate yang memuat tag-tag dengan bobot tertinggi dari profil user.
  */
 export function calculateWeightedSimilarity(candidateTags: string[], userTagWeights: Record<string, number>): number {
   if (candidateTags.length === 0 || Object.keys(userTagWeights).length === 0) return 0;
@@ -196,7 +202,7 @@ export async function getSimpleRecommendations(
     }
 
     const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
-    const similarity = calculateSimilarity(candidateTags, userProfileTags);
+    const similarity = calculateWeightedSimilarity(candidateTags, tagWeights);
     const volume = reviews ? reviews.total_reviews : 0;
 
     const finalScore = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);

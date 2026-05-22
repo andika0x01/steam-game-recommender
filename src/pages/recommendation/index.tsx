@@ -31,7 +31,7 @@ app.get('/', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
 
-  const { publisherScores, userProfileTags, tagWeights } = await buildUserProfile(steamAPI, userGames);
+  const { publisherScores, userProfileTags, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
   const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
   let scoredDeals: any[] = []
