@@ -42,6 +42,23 @@ Variabel masukan yang bersifat tegas (*crisp*) dikabutkan menggunakan fungsi kea
 - **Toleransi Plateau**: Bagian puncak datar $(b \le x \le c)$ mentolerir rentang derau (noise) alami dari tabiat bermain tanpa menyebabkan distorsi skor yang tidak stabil.
 - **Komputasi Orde-1**: Model polinomial konstan/linear ini sangat ringan dieksekusi secara masif di ranah *Edge Computing* (Cloudflare Workers).
 
+### 2.2.1. Rule Base & Filosofi Keputusan (Fuzzy Rules)
+
+Untuk menjamin kualitas dan rasionalitas rekomendasi, pembobotan fuzzy dievaluasi melalui pendekatan berbasis keahlian domain (expert-based rules) terkait perilaku gamer. 
+
+**Logika untuk Owned Games (Library Profiling):**
+Sistem mengsyaratkan bahwa game benar-benar disukai jika memenuhi kombinasi yang saling mendukung, bukan secara individual:
+- **SANGAT TINGGI**: Dimainkan sangat banyak dan baru-baru ini dimainkan, ATAU sering dimainkan sekaligus sangat aktif akhir-akhir ini.
+- **TINGGI**: Dimainkan sangat banyak namun sudah agak lama, ATAU rutin dimainkan serta berstatus masih aktif saat ini.
+- **SEDANG**: Game cukup banyak dimainkan pada masa lalu yang lumayan dekat, ATAU sering dimainkan tapi sudah berstatus lama.
+- **RENDAH & SANGAT RENDAH**: Game hanya diuji coba (dicoba), sangat lama ditinggal, atau masuk ke dalam library tanpa pernah dimainkan (tidak dimainkan). 
+
+**Logika untuk Non-Owned Games (Candidate Inference):**
+Rekomendasi potensial diproyeksikan dengan menjaga keseimbangan antara relevansi minat profil dan sinyal kualitas komunitas pengguna luas:
+- **Volume Ulasan Sebagai Penentu Keyakinan (Trust Signal):** Berbeda dengan mengandalkan publisher score utama, algoritma yang ditingkatkan kini menitikberatkan pada Volume Review sebagai variabel penstabil yang muncul di setiap level fuzzy. Review "Mixed" tetap akan memberi hukuman berat dan baru bisa diseimbangkan jika Tag Similarity "Sangat Cocok" dan didukung Volume ulasan yang terbukti "Banyak".
+- **Publisher Favorit Beralih Menjadi Booster (Tiebreaker):** Game yang secara tag hanya "Cocok" dan review "Bagus" kini diproyeksikan sebatas `TINGGI`, dan bukan lagi `SANGAT TINGGI`. Publisher besar hanya dapat mempertahankan gelar `SANGAT TINGGI` bersamaan jika game tersebut punya review sangat memuaskan dengan volume skala masif.
+- **Strict Penalty untuk Tag Meleset:** Review sempurna (Overwhelmingly Positive) tetap tidak akan merekomendasikan sebuah game jika parameter Similarity tidak relevan (Tidak Cocok). Hal ini mengurangi noise dan menegaskan tingkat personalisasi ekstrem bahwa prioritas nomor 1 selalu terletak pada selera tag historis setiap indvidu.
+
 ---
 
 ### 2.3. Ekstraksi Fitur: Profiling Kepemilikan (Owned Games)

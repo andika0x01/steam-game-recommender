@@ -71,11 +71,34 @@ export class FuzzyOwnGamesScorer {
       SANGAT_TINGGI: 0,
     };
 
-    activation.SANGAT_TINGGI = Math.max(Math.min(playtime.sangat_banyak, recency.baru_main), Math.min(playtime.sering, activity.sangat_aktif));
-    activation.TINGGI = Math.max(Math.min(playtime.sering, activity.aktif), Math.min(playtime.cukup, activity.sangat_aktif));
-    activation.SEDANG = Math.max(playtime.cukup, activity.sesekali);
-    activation.RENDAH = Math.max(Math.min(playtime.dicoba, recency.lama), activity.tidak_aktif);
-    activation.SANGAT_RENDAH = Math.max(playtime.tidak_dimainkan, recency.ditinggal);
+    activation.SANGAT_TINGGI = Math.max(
+      Math.min(playtime.sangat_banyak, recency.baru_main),
+      Math.min(playtime.sering, activity.sangat_aktif, recency.baru_main)
+    );
+    
+    activation.TINGGI = Math.max(
+      Math.min(playtime.sangat_banyak, recency.agak_lama),
+      Math.min(playtime.sering, activity.aktif),
+      Math.min(playtime.sering, recency.baru_main)
+    );
+    
+    activation.SEDANG = Math.max(
+      Math.min(playtime.cukup, recency.agak_lama),
+      Math.min(playtime.cukup, activity.sesekali),
+      Math.min(playtime.sering, recency.lama)
+    );
+    
+    activation.RENDAH = Math.max(
+      Math.min(playtime.dicoba, recency.lama),
+      Math.min(playtime.cukup, recency.sangat_lama),
+      Math.min(playtime.dicoba, activity.tidak_aktif)
+    );
+    
+    activation.SANGAT_RENDAH = Math.max(
+      playtime.tidak_dimainkan,
+      Math.min(recency.ditinggal, playtime.dicoba),
+      Math.min(recency.ditinggal, activity.tidak_aktif)
+    );
 
     const weights = {
       SANGAT_RENDAH: 0.1,

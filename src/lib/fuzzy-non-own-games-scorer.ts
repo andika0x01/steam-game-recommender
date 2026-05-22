@@ -50,35 +50,36 @@ export class FuzzyNonOwnGamesScorer {
     };
 
     activation.SANGAT_TINGGI = Math.max(
-      Math.min(similarity.sangat_cocok, review.sangat_bagus),
-      Math.min(similarity.sangat_cocok, review.bagus, publisher.high),
-      Math.min(similarity.cocok, review.sangat_bagus, publisher.high),
-      Math.min(similarity.cocok, review.bagus, publisher.high) // Ditambahkan agar test favPub lulus (0.8, 0.7, 0.9)
+      Math.min(similarity.sangat_cocok, review.sangat_bagus, volume.banyak),
+      Math.min(similarity.sangat_cocok, review.sangat_bagus, volume.sedang),
+      Math.min(similarity.cocok, review.sangat_bagus, volume.banyak, publisher.high)
     );
+
     activation.TINGGI = Math.max(
-      Math.min(similarity.cocok, review.bagus, Math.max(publisher.medium, publisher.high)),
-      Math.min(similarity.lumayan, review.sangat_bagus),
-      Math.min(similarity.sangat_cocok, review.mixed),
-      Math.min(publisher.high, similarity.cocok),
-      Math.min(publisher.high, review.bagus)
+      Math.min(similarity.sangat_cocok, review.bagus, volume.sedang),
+      Math.min(similarity.cocok, review.sangat_bagus, volume.sedang),
+      Math.min(similarity.cocok, review.bagus, volume.banyak),
+      Math.min(similarity.cocok, review.bagus, publisher.high)
     );
+
     activation.SEDANG = Math.max(
-      Math.min(similarity.lumayan, review.bagus),
-      Math.min(similarity.cocok, review.mixed),
-      Math.min(publisher.medium, similarity.lumayan),
-      Math.min(publisher.medium, review.mixed),
-      Math.min(review.mixed, volume.sedang)
+      Math.min(similarity.cocok, review.bagus, volume.sedang),
+      Math.min(similarity.cocok, review.bagus, volume.sedikit),
+      Math.min(similarity.lumayan, review.sangat_bagus, volume.sedang),
+      Math.min(similarity.sangat_cocok, review.mixed, volume.banyak)
     );
+
     activation.RENDAH = Math.max(
-      Math.min(similarity.tidak_cocok, review.bagus),
-      Math.min(similarity.lumayan, review.buruk),
-      Math.min(publisher.low, review.mixed),
-      Math.min(publisher.low, similarity.lumayan),
-      Math.min(review.sangat_bagus, similarity.tidak_cocok)
+      Math.min(similarity.lumayan, review.bagus, volume.sedikit),
+      Math.min(similarity.tidak_cocok, review.sangat_bagus),
+      Math.min(similarity.cocok, review.mixed),
+      Math.min(similarity.lumayan, review.mixed, volume.sedang)
     );
+
     activation.SANGAT_RENDAH = Math.max(
       Math.min(review.buruk, similarity.tidak_cocok),
-      Math.min(review.buruk, publisher.low)
+      Math.min(review.buruk, volume.banyak),
+      similarity.tidak_cocok
     );
 
     const weights = {
