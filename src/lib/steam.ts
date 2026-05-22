@@ -254,8 +254,8 @@ export class SteamAPI {
     });
 
     if (this.kv) {
-      // Cache pencarian hanya bertahan 1 jam agar daftar game tetap segar
-      await this.kv.put(cacheKey, JSON.stringify(results), { expirationTtl: 3600 });
+      // Cache pencarian bertahan 7 hari agar stabil tapi tetap bisa update mingguan
+      await this.kv.put(cacheKey, JSON.stringify(results), { expirationTtl: 604800 });
     }
 
     return results;
@@ -354,7 +354,8 @@ export class SteamAPI {
     }
 
     if (this.kv) {
-      await this.kv.put(cacheKey, JSON.stringify(data.query_summary), { expirationTtl: 86400 });
+      // Cache review permanen (tanpa TTL) karena volume besar jarang berubah drastis proporsinya
+      await this.kv.put(cacheKey, JSON.stringify(data.query_summary));
     }
 
     return data.query_summary;
@@ -390,7 +391,8 @@ export class SteamAPI {
     const result = data[appId.toString()].data as SteamStoreAppDetails;
 
     if (this.kv) {
-      await this.kv.put(cacheKey, JSON.stringify(result), { expirationTtl: 86400 });
+      // Cache detail game permanen untuk efisiensi API
+      await this.kv.put(cacheKey, JSON.stringify(result));
     }
 
     return result;

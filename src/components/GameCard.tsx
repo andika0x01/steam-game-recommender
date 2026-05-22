@@ -42,8 +42,8 @@ export const GameCard = ({
         
         {/* Score Badge (Top Right) */}
         {score !== undefined && !hideScore && (
-          <div className="absolute top-4 right-4 glass px-3 py-1.5 rounded-full z-20 border-orange-500/20 shadow-lg">
-            <p className="text-[10px] font-mono font-black text-orange-500">{(score * 100).toFixed(0)}% Match</p>
+          <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full z-20 border border-white/20 bg-zinc-950/90 backdrop-blur-md shadow-2xl">
+            <p className="text-[10px] font-mono font-black text-white">{(score * 100).toFixed(0)}% Match</p>
           </div>
         )}
 

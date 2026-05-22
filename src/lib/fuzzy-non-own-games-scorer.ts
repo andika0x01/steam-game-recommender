@@ -52,11 +52,26 @@ export class FuzzyNonOwnGamesScorer {
       SANGAT_TINGGI: 0,
     };
 
-    activation.SANGAT_TINGGI = Math.max(Math.min(similarity.sangat_cocok, review.sangat_bagus), Math.min(similarity.sangat_cocok, publisher.high));
-    activation.TINGGI = Math.max(Math.min(similarity.cocok, review.bagus), Math.min(publisher.high, similarity.lumayan));
-    activation.SEDANG = Math.max(similarity.lumayan, Math.min(publisher.medium, review.mixed));
-    activation.RENDAH = Math.max(Math.min(similarity.tidak_cocok, review.mixed), Math.min(publisher.low, review.buruk));
-    activation.SANGAT_RENDAH = Math.max(Math.min(similarity.tidak_cocok, review.buruk), Math.min(review.buruk, volume.banyak));
+    activation.SANGAT_TINGGI = Math.max(
+      Math.min(similarity.sangat_cocok, review.sangat_bagus),
+      Math.min(similarity.sangat_cocok, publisher.high)
+    );
+    activation.TINGGI = Math.max(
+      Math.min(similarity.cocok, review.bagus),
+      Math.min(publisher.high, similarity.lumayan)
+    );
+    activation.SEDANG = Math.max(
+      similarity.lumayan,
+      Math.min(publisher.medium, review.mixed)
+    );
+    activation.RENDAH = Math.max(
+      Math.min(similarity.tidak_cocok, review.mixed),
+      Math.min(publisher.low, review.buruk)
+    );
+    activation.SANGAT_RENDAH = Math.max(
+      Math.min(similarity.tidak_cocok, review.buruk),
+      Math.min(review.buruk, volume.banyak)
+    );
 
     const weights = {
       SANGAT_RENDAH: 0.1,
@@ -80,10 +95,10 @@ export class FuzzyNonOwnGamesScorer {
 
     /**
      * Linear Tie-Breaker:
-     * Mencampurkan 10% nilai input mentah (Similarity & Positivity)
-     * untuk membedakan game-game dalam kategori fuzzy yang sama.
+     * Mencampurkan 10% nilai input mentah untuk memberikan variasi presisi.
+     * Termasuk publisherScore agar brand loyalty memberikan perbedaan skor nyata.
      */
-    const rawBias = (tagSimilarity * 0.05) + (reviewPositivity * 0.05);
+    const rawBias = (tagSimilarity * 0.04) + (reviewPositivity * 0.03) + (publisherScore * 0.03);
     return Math.min(1, fuzzyScore * 0.9 + rawBias);
   }
 }

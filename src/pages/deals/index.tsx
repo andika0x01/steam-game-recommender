@@ -67,6 +67,11 @@ app.get('/', async (c) => {
         const volume = reviews ? reviews.total_reviews : 0;
 
         const score = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);
+        
+        /**
+         * Penanganan Game Gratis (Price = 0)
+         * Gunakan minimal Rp1 untuk menghindari Division by Zero.
+         */
         const safePrice = price > 0 ? price : 1;
         const density = score / safePrice;
 
@@ -90,12 +95,31 @@ app.get('/', async (c) => {
   let basketItems: any[] = []
   let totalCostIDR = 0
   if (budgetIDR > 0 && scoredDeals.length > 0) {
-    let currentBasket = scoredDeals.filter(() => Math.random() > 0.8)
+    /**
+     * Solusi Awal: Ambil set acak yang PASTI di bawah budget.
+     * Jika tidak ada yang di bawah budget, basket kosong.
+     */
+    let currentBasket: any[] = []
+    const sortedByPrice = [...scoredDeals].sort((a, b) => a.salePrice - b.salePrice)
+    let tempCost = 0
+    for (const deal of sortedByPrice) {
+      if (tempCost + deal.salePrice <= budgetIDR) {
+        currentBasket.push(deal)
+        tempCost += deal.salePrice
+      } else {
+        break
+      }
+    }
+
     const getCost = (items: any[]) => items.reduce((sum, item) => sum + item.salePrice, 0)
     
+    /**
+     * getEnergy: Prioritaskan solusi dalam budget.
+     * Solusi overbudget diberi nilai negatif sangat besar.
+     */
     const getEnergy = (items: any[]) => {
       const cost = getCost(items)
-      if (cost > budgetIDR) return -1
+      if (cost > budgetIDR || cost === 0) return -9999999
       
       const totalDensity = items.reduce((sum, item) => sum + item.density, 0)
       const budgetUtilization = cost / budgetIDR
@@ -104,24 +128,34 @@ app.get('/', async (c) => {
     }
 
     let temp = 3000.0 
-    const coolingRate = 0.997 
+    const coolingRate = 0.998 
 
     while (temp > 1) {
       let neighbor = [...currentBasket]
       const action = Math.random()
       
       if (action < 0.4 && neighbor.length < scoredDeals.length) {
+        // Tambah item: Pastikan hanya tambah jika masih muat budget
         const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
         if (available.length > 0) {
-          neighbor.push(available[Math.floor(Math.random() * available.length)])
+          const randomItem = available[Math.floor(Math.random() * available.length)]
+          if (getCost(neighbor) + randomItem.salePrice <= budgetIDR) {
+             neighbor.push(randomItem)
+          }
         }
-      } else if (action < 0.7 && neighbor.length > 1) {
+      } else if (action < 0.6 && neighbor.length > 0) {
+        // Hapus item
         neighbor.splice(Math.floor(Math.random() * neighbor.length), 1)
-      } else {
+      } else if (neighbor.length > 0) {
+        // Ganti item: Pastikan penggantinya tidak bikin overbudget
         const idx = Math.floor(Math.random() * neighbor.length)
         const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
         if (available.length > 0) {
-          neighbor[idx] = available[Math.floor(Math.random() * available.length)]
+          const newItem = available[Math.floor(Math.random() * available.length)]
+          const costWithoutOld = getCost(neighbor) - neighbor[idx].salePrice
+          if (costWithoutOld + newItem.salePrice <= budgetIDR) {
+            neighbor[idx] = newItem
+          }
         }
       }
       
