@@ -12,7 +12,7 @@ import { buildUserProfile, calculateSimilarity } from '../../lib/simple-recommen
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
 /**
- * Halaman Deal Hunter
+ * Halaman Recommendation
  * 
  * Mengoptimalkan anggaran pengguna untuk mendapatkan kombinasi game terbaik
  * yang sedang diskon di Steam Store. Menggunakan algoritma Simulated Annealing
@@ -199,7 +199,7 @@ app.get('/', async (c) => {
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Pure Steam Value Engine Active</span>
             </div>
           </div>
-          <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-[0.9]">Deal <br /><span className="text-white/20 outline-text">Hunter</span></h2>
+          <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-[0.9]">Recom<br /><span className="text-white/20 outline-text">mendation</span></h2>
           <p className="text-zinc-400 text-base md:text-lg leading-relaxed">Sistem kami memindai katalog resmi Steam Indonesia untuk menemukan penawaran yang paling sesuai dengan profil bermain Anda.</p>
           
           <div className="space-y-1">
@@ -207,7 +207,7 @@ app.get('/', async (c) => {
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white uppercase leading-[0.9]">1 USD = Rp{idrRate.toLocaleString('id-ID')}</h1>
           </div>
           
-          <form method="get" action="/deals" className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-8">
+          <form method="get" action="/recommendation" className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-8">
             <div className="relative flex-1 max-w-sm">
               <input 
                 type="number" 
@@ -300,8 +300,8 @@ app.get('/', async (c) => {
           <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-white/10" />
         </div>
         {discoveryItems.length > 0 ? (
-          <div data-hydrate="InfiniteGrid" data-props={JSON.stringify({ initialItems: discoveryItems, endpoint: '/api/deals', type: 'deal' })}>
-            <InfiniteGrid initialItems={discoveryItems} endpoint="/api/deals" type="deal" />
+          <div data-hydrate="InfiniteGrid" data-props={JSON.stringify({ initialItems: discoveryItems, endpoint: '/api/recommendation-deals', type: 'deal' })}>
+            <InfiniteGrid initialItems={discoveryItems} endpoint="/api/recommendation-deals" type="deal" />
           </div>
         ) : (
           <div className="glass p-20 rounded-[3rem] text-center border border-dashed border-white/10">
@@ -310,7 +310,7 @@ app.get('/', async (c) => {
         )}
       </div>
     </div>,
-    { title: 'Deal Hunter' } as any
+    { title: 'Recommendation' } as any
   )
 })
 

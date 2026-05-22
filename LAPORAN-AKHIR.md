@@ -74,13 +74,13 @@ FinalScore = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_
 
 ## 3. Fitur Utama & Optimasi
 
-### 3.1. Discovery Engine & Infinite Scrolling
+### 3.1. Recommendation & Infinite Scrolling
 Mesin pencari yang mendukung eksplorasi tanpa batas. Untuk menjamin kualitas dan variasi:
 -   **Aggressive Offset**: Setiap halaman baru menggunakan parameter `start` yang melompat signifikan (50+ game) untuk menghindari pengulangan hasil populer yang sama.
 -   **Client-side Auto-Fetch**: Jika render sisi server gagal atau kosong karena limitasi sistem, komponen InfiniteGrid akan mendeteksi dan melakukan pengambilan data pertama secara otomatis di sisi browser.
 -   **Deduplikasi Client-side**: Memastikan ID game yang sudah tampil tidak akan muncul kembali di layar.
 
-### 3.2. Deal Hunter (Budget Optimization)
+### 3.2. Recommendation Deals (Budget Optimization)
 Menggunakan **Simulated Annealing (SA)** untuk memaksimalkan kepuasan dalam batas budget.
 -   **Density Function**: $Density = \frac{Score}{\max(Price, 1)}$. Memprioritaskan game berkualitas tinggi dengan harga terendah.
 -   **Utility Maximization**: SA secara agresif mencari kombinasi yang memaksimalkan utilitas budget $(\frac{TotalCost}{Budget})^2$ agar sisa saldo pengguna seminimal mungkin.
@@ -97,7 +97,16 @@ Untuk menangani limitasi IP Datacenter, CPU, dan timeout pada Cloudflare Workers
 -   **Sequential Request Handling**: Modifikasi dari `Promise.all()` menjadi pola tunggu berurutan untuk pengambilan hasil pencarian API Store Steam nhằm mencegah limitasi pertahanan (Cloudflare 429 *Too Many Requests*) terhadap server.
 -   **No-Collusion Popularity Bias**: Pencarian algoritma menggunakan offset yang lebih besar dan komprehensif, menghilangkan proses *slice* dini yang berisiko membuat kandidat jadi kosong apabila pengguna sudah memiliki semua rekomendasi top 10 (bias popularitas elit).
 -   **Triage Invalidation Cache KV**: Memisahkan Cache KV dan memberikan pengecekan yang lebih ketat agar meretur nilai kosong (bila memang diblokir Steam API) tidak meracuni dan me-lock memori KV selama periode 7 Hari berturut-turut.
--   **Graceful Fallbacks**: Rute `/engine` maupun perhitungan review kini telah diinjeksikan mekanisme cadangan (skor `0.5` bila di-reject) ketimbang *panic shutdown*, mencegah kasus UI Blank State.
+-   **Graceful Fallbacks**: Rute `/recommendation` maupun perhitungan review kini telah diinjeksikan mekanisme cadangan (skor `0.5` bila di-reject) ketimbang *panic shutdown*, mencegah kasus UI Blank State.
 
-## 4. Kesimpulan
+### 3.5. Analyzer (Library Deep-Dive)
+Halaman sentral untuk meninjau secara gamblang preferensi pengguna hasil dari kalkulasi Fuzzy Scorer. Selain mendistribusikan skor kecocokan game di masa lalu, Analyzer juga memvisualisasikan:
+-   **Top 12 Preferred Tags**: Diekstrak dari riwayat jam terbang menggunakan fungsi algoritma sentral `buildUserProfile`. Tag disajikan berdampingan dan memberikan insight mendalam tentang *genre* yang paling mendominasi.
+-   **Top 8 Affinity Publishers**: Menyajikan relasi antara loyalitas (*playtime*) dan penilaian pengguna atas game yang dirilis tiap perusahaan, lengkap dengan grafik progres bar.
+
+## 4. Struktur Database & Refactoring Redundansi
+Seiring dengan evolusi proyek, sistem melalui *streamlining* fitur. Halaman yang dinilai duplikatif atau redundan (seperti `Engine`, `Co-op`, dan `Tierlist`) telah dihapus secara permanen dari *repository* agar fokus pengembangan tertuju pada optimasi kualitas `Analyzer` dan `Recommendation`.
+Efisiensi arsitektur ini juga merambah hingga skema database SQLite (D1) melalui migrasi relasional: menghapus kolom `engine_params` tak terpakai dan merename `deals_params` menjadi `recommendation_params`.
+
+## 5. Kesimpulan
 Dengan menggabungkan Logika Fuzzy untuk penilaian subjektif dan algoritma heuristik untuk optimasi data, Steam Game Recommender mampu mentransformasi data mentah Steam menjadi pengalaman penemuan game yang benar-benar personal dan akurat.

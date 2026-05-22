@@ -6,11 +6,8 @@ import { renderer } from './renderer'
 import homeApp from './pages/home'
 import authApp from './pages/auth'
 import dashboardApp from './pages/dashboard'
-import engineApp from './pages/engine'
-import backlogApp from './pages/backlog'
-import coopApp from './pages/coop'
-import tierlistApp from './pages/tierlist'
-import dealsApp from './pages/deals'
+import analyzerApp from './pages/analyzer'
+import recommendationApp from './pages/recommendation'
 import apiApp from './pages/api'
 
 type Bindings = {
@@ -65,11 +62,8 @@ app.use(renderer)
 app.route('/', homeApp)
 app.route('/auth', authApp)
 app.route('/dashboard', dashboardApp)
-app.route('/engine', engineApp)
-app.route('/backlog', backlogApp)
-app.route('/coop', coopApp)
-app.route('/tierlist', tierlistApp)
-app.route('/deals', dealsApp)
+app.route('/analyzer', analyzerApp)
+app.route('/recommendation', recommendationApp)
 app.route('/api', apiApp)
 
 export default app

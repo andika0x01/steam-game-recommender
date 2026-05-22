@@ -25,7 +25,7 @@ app.get('/recommendations', async (c) => {
   }
 })
 
-app.get('/deals', async (c) => {
+app.get('/recommendation-deals', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.json({ error: 'Unauthorized' }, 401)
 
@@ -89,8 +89,8 @@ app.get('/deals', async (c) => {
 
     return c.json(deals)
   } catch (error) {
-    console.error('Error in /api/deals:', error)
-    return c.json({ error: 'Failed to fetch deals' }, 500)
+    console.error('Error in /api/recommendation-deals:', error)
+    return c.json({ error: 'Failed to fetch recommendations' }, 500)
   }
 })
 

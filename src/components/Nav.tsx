@@ -43,11 +43,8 @@ export const Nav = ({ steamId, scoringMode }: { steamId?: string; scoringMode?: 
             ) : (
               <>
                 <NavLink href="/dashboard" label="Dashboard" isLarge />
-                <NavLink href="/engine" label="Engine" isLarge />
-                <NavLink href="/backlog" label="Backlog" isLarge />
-                <NavLink href="/coop" label="Co-op" isLarge />
-                <NavLink href="/deals" label="Deals" isLarge />
-                <NavLink href="/tierlist" label="Tiers" isLarge />
+                <NavLink href="/recommendation" label="Recommendation" isLarge />
+                <NavLink href="/analyzer" label="Analyzer" isLarge />
                 <a href="/auth/logout" className="px-4 py-2 font-black uppercase tracking-[0.2em] text-red-500 hover:text-red-400 transition-colors text-2xl md:text-xs">
                   Logout
                 </a>
