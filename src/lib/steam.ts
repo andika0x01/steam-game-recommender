@@ -233,17 +233,24 @@ export class SteamAPI {
     if (options.l) url.searchParams.append('l', options.l);
     if (options.start !== undefined) url.searchParams.append('start', options.start.toString());
 
-    const response = await fetch(url.toString(), {
+      const response = await fetch(url.toString(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     });
     
     if (!response.ok) {
-      throw new Error(`Steam Search API error: ${response.statusText}`);
+      console.warn(`Steam Search API error: ${response.status} ${response.statusText} for ${url}`);
+      return [];
     }
 
-    const data = (await response.json()) as SteamSearchResponse;
+    let data: SteamSearchResponse;
+    try {
+      data = (await response.json()) as SteamSearchResponse;
+    } catch (e) {
+      console.warn(`Steam Search API parsing error for ${url}:`, e);
+      return [];
+    }
     
     const results = (data.items || []).map(item => {
       const idMatch = item.logo.match(/\/apps\/(\d+)\//);
@@ -345,10 +352,18 @@ export class SteamAPI {
 
     const response = await fetch(url.toString());
     if (!response.ok) {
-      throw new Error(`Steam App Reviews API error: ${response.statusText}`);
+      console.warn(`Steam App Reviews API error: ${response.status} ${response.statusText} for app ${appId}`);
+      return null;
     }
 
-    const data = (await response.json()) as SteamAppReviewsResponse;
+    let data: SteamAppReviewsResponse;
+    try {
+      data = (await response.json()) as SteamAppReviewsResponse;
+    } catch (e) {
+      console.warn(`Steam App Reviews API parsing error for app ${appId}:`, e);
+      return null;
+    }
+    
     if (data.success !== 1) {
       return null;
     }
