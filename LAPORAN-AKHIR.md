@@ -91,15 +91,23 @@ Dihitung menggunakan rumus agregasi: $PS = \frac{\sum (Score \times Playtime)}{\
 
 ---
 
-### 2.2. Defuzzifikasi (Weighted Average)
-Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor preferensi):
+### 2.2. Defuzzifikasi & Linear Tie-Breaker
+Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor preferensi). Untuk menghindari penumpukan skor pada angka bulat (misalnya semua game masuk kategori 50%), sistem menggunakan teknik **Linear Tie-Breaker**.
+
+#### Rumus Defuzzifikasi Berbobot:
 
 ```math
-Score = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_{activation, i}}
+Score_{fuzzy} = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_{activation, i}}
 ```
 
-Dimana $w$ adalah bobot konstanta yang merepresentasikan tingkat kepuasan:
--   **Sangat Rendah (0.1)**, **Rendah (0.3)**, **Sedang (0.5)**, **Tinggi (0.7)**, **Sangat Tinggi (0.9)**.
+#### Rumus Linear Tie-Breaker (Skor Akhir):
+Sistem mencampurkan 10% bobot dari nilai input mentah (*raw bias*) untuk memberikan variasi granularitas pada hasil akhir.
+
+```math
+Score_{final} = (Score_{fuzzy} \times 0.9) + (RawBias \times 0.1)
+```
+
+Dimana $RawBias$ adalah rata-rata dari input normalisasi (seperti *playtime* atau *tag similarity*). Hal ini memastikan bahwa dua game yang berada dalam kategori fuzzy yang sama tetap memiliki skor unik berdasarkan keunggulan nilai absolutnya.
 
 ---
 
@@ -123,8 +131,10 @@ Density = \frac{FuzzyScore}{\max(Price, 1)}
 
 SA mencari solusi yang memaksimalkan utilitas budget $(\frac{TotalCost}{Budget})^2$.
 
-### 3.5. Infinite Scrolling (Pemuatan Data Berkelanjutan)
-Data dimuat secara asinkron melalui API internal. Sistem menggunakan parameter `start` pada query Steam untuk memastikan setiap halaman baru memberikan hasil yang unik dan berbeda.
+### 3.5. Infinite Scrolling & Aggressive Pagination
+Data dimuat secara asinkron melalui API internal. Untuk memastikan pengguna tidak melihat game yang sama berulang kali, sistem menggunakan strategi **Aggressive Offset**:
+1.  **Paging Offset**: Menggunakan parameter `start` pada query Steam yang melompat lebih jauh di setiap halaman (misal: halaman 2 mengambil mulai dari urutan 50+).
+2.  **Deduplikasi Client-side**: Memastikan ID game yang sudah ada di layar tidak akan ditambahkan lagi jika muncul di hasil pencarian berikutnya.
 
 ## 4. Kesimpulan
-Sistem ini berhasil mengonversi data Steam yang sangat luas menjadi rekomendasi personal melalui pemodelan spektrum minat manusia menggunakan Logika Fuzzy. Penggunaan skala logaritmik, normalisasi relatif, dan optimasi heuristik memastikan hasil yang presisi dan efisien.
+Sistem ini berhasil mengonversi data Steam yang sangat luas menjadi rekomendasi personal melalui pemodelan spektrum minat manusia menggunakan Logika Fuzzy. Penggunaan Linear Tie-Breaker, normalisasi relatif, dan optimasi heuristik memastikan hasil yang presisi, bervariasi, dan efisien.
