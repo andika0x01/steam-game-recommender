@@ -3,9 +3,11 @@ import { getCookie } from 'hono/cookie'
 import React from 'react'
 import { SteamAPI } from '../../lib/steam'
 import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
+import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-non-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
 import { getIdrRate } from '../../lib/currency'
 import { InfiniteGrid } from '../../components/InfiniteGrid'
+import { buildUserProfile, calculateSimilarity } from '../../lib/simple-recommendation'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
@@ -29,6 +31,9 @@ app.get('/', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
 
+  const { publisherScores, userProfileTags } = await buildUserProfile(steamAPI, userGames);
+  const nonOwnScorer = new FuzzyNonOwnGamesScorer();
+
   let scoredDeals: any[] = []
   try {
     const basePoolSize = 30
@@ -39,20 +44,29 @@ app.get('/', async (c) => {
     
     const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'english', 'id'))
     const rawDetails = await Promise.all(detailPromises)
-
-    const scorer = new FuzzyOwnGamesScorer(userGames)
+    const reviewPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
+    const rawReviews = await Promise.all(reviewPromises)
 
     scoredDeals = rawDetails
       .filter((d: any) => d && d.price_overview)
-      .map((d: any) => {
-        const score = scorer.getGameScore(d!.steam_appid) || 0.5
+      .map((d: any, idx: number) => {
+        const reviews = rawReviews[idx];
         const price = d!.price_overview!.final / 100
+        const candidateTags = [
+          ...(d.genres || []).map((g: any) => g.description),
+          ...(d.categories || []).map((c: any) => c.description)
+        ];
 
-        /**
-         * Penanganan Game Gratis (Price = 0)
-         * Untuk menghindari Division by Zero, kita berikan nilai harga minimal (1)
-         * atau density yang sangat tinggi agar SA memprioritaskan game berkualitas yang gratis.
-         */
+        let candidatePS = 0;
+        if (d.publishers) {
+          candidatePS = d.publishers.reduce((max: number, pub: string) => Math.max(max, publisherScores[pub] || 0), 0);
+        }
+
+        const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
+        const similarity = calculateSimilarity(candidateTags, userProfileTags);
+        const volume = reviews ? reviews.total_reviews : 0;
+
+        const score = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);
         const safePrice = price > 0 ? price : 1;
         const density = score / safePrice;
 
@@ -66,9 +80,8 @@ app.get('/', async (c) => {
           density: density,
           formattedPrice: d!.price_overview!.final_formatted,
           formattedInitial: d!.price_overview!.initial_formatted,
-          tags: (d!.genres || []).map((g: any) => g.description).concat((d!.categories || []).map((c: any) => c.description))
+          tags: candidateTags
         }
-
       })
   } catch (e) {
     console.error('Steam Search error:', e)

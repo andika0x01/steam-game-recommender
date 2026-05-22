@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { SteamAPI } from '../../lib/steam'
-import { getSimpleRecommendations } from '../../lib/simple-recommendation'
-import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
+import { getSimpleRecommendations, buildUserProfile, calculateSimilarity } from '../../lib/simple-recommendation'
+import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-non-own-games-scorer'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
@@ -16,7 +16,6 @@ app.get('/recommendations', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const games = await steamAPI.getOwnedGames(steamId)
 
-  // Gunakan parameter 'page' untuk mengambil set rekomendasi berikutnya
   const recommendations = await getSimpleRecommendations(steamAPI, games, amount, page)
 
   return c.json(recommendations)
@@ -31,28 +30,52 @@ app.get('/deals', async (c) => {
 
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
-  const scorer = new FuzzyOwnGamesScorer(userGames)
+  
+  /**
+   * Menggunakan FuzzyNonOwnGamesScorer untuk game di store.
+   * Kita perlu profil selera user (tags & publisher scores).
+   */
+  const { publisherScores, userProfileTags } = await buildUserProfile(steamAPI, userGames);
+  const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
-  // Gunakan 'start' offset pada pencarian Steam untuk mendapatkan data baru
   const start = (page - 1) * amount
   const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id', start })
   const candidateIds = saleResults.slice(0, amount).map(r => r.id).filter(Boolean) as number[]
   
   const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'english', 'id'))
   const rawDetails = await Promise.all(detailPromises)
+  const candidateReviewsPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
+  const candidateReviews = await Promise.all(candidateReviewsPromises)
   
   const deals = rawDetails
     .filter((d: any) => d && d.price_overview)
-    .map((d: any) => ({
-      appid: d!.steam_appid,
-      name: d!.name,
-      price: d!.price_overview!.final_formatted,
-      originalPrice: d!.price_overview!.initial_formatted,
-      discount: d!.price_overview!.discount_percent.toString(),
-      score: scorer.getGameScore(d!.steam_appid) || 0.5,
-      tags: (d!.genres || []).map((g: any) => g.description),
-      hideScore: false
-    }))
+    .map((d: any, idx: number) => {
+      const reviews = candidateReviews[idx];
+      const candidateTags = [
+        ...(d.genres || []).map((g: any) => g.description),
+        ...(d.categories || []).map((c: any) => c.description)
+      ];
+
+      let candidatePS = 0;
+      if (d.publishers) {
+        candidatePS = d.publishers.reduce((max: number, pub: string) => Math.max(max, publisherScores[pub] || 0), 0);
+      }
+
+      const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
+      const similarity = calculateSimilarity(candidateTags, userProfileTags);
+      const volume = reviews ? reviews.total_reviews : 0;
+
+      return {
+        appid: d!.steam_appid,
+        name: d!.name,
+        price: d!.price_overview!.final_formatted,
+        originalPrice: d!.price_overview!.initial_formatted,
+        discount: d!.price_overview!.discount_percent.toString(),
+        score: nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS),
+        tags: candidateTags,
+        hideScore: false
+      }
+    })
 
   return c.json(deals)
 })

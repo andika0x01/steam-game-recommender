@@ -26,22 +26,12 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
 }
 
 /**
- * Mesin Rekomendasi Utama
- * 
- * Pembaruan: Mengimplementasikan agregasi Publisher Score (PS) kontinu.
+ * Membangun profil selera pengguna (Tags & Publisher Scores)
+ * berdasarkan game yang dimiliki di library.
  */
-export async function getSimpleRecommendations(
-  api: SteamAPI,
-  ownedGames: SteamGame[],
-  amount: number = 12,
-  page: number = 1
-): Promise<RecommendationResult[]> {
-  if (ownedGames.length === 0) return [];
-
+export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[]) {
   const ownScorer = new FuzzyOwnGamesScorer(ownedGames);
-  const nonOwnScorer = new FuzzyNonOwnGamesScorer();
-
-  // 1. Build Profile (Tags & Publisher Score)
+  
   const topPlayed = ownedGames
     .filter(g => g.playtime_forever > 0)
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
@@ -51,11 +41,6 @@ export async function getSimpleRecommendations(
   const details = await Promise.all(detailPromises);
 
   const tagWeights: Record<string, number> = {};
-  
-  /**
-   * Agregasi Publisher Score (PS):
-   * Map menyimpan { totalWeightedScore, totalPlaytime } per publisher.
-   */
   const publisherStats: Record<string, { weightedScore: number, playtime: number }> = {};
   let totalLibraryPlaytime = 0;
   let totalTagWeight = 0;
@@ -78,7 +63,6 @@ export async function getSimpleRecommendations(
     if (detail.publishers) {
       detail.publishers.forEach(pub => {
         if (!publisherStats[pub]) publisherStats[pub] = { weightedScore: 0, playtime: 0 };
-        // Rumus: Sigma (Score * Playtime)
         publisherStats[pub].weightedScore += (score * game.playtime_forever);
         publisherStats[pub].playtime += game.playtime_forever;
       });
@@ -86,20 +70,34 @@ export async function getSimpleRecommendations(
     totalLibraryPlaytime += game.playtime_forever;
   });
 
-  /**
-   * Finalisasi Publisher Score (PS) per Publisher.
-   * PS = weightedSum / totalLibraryPlaytime
-   */
   const publisherScores: Record<string, number> = {};
   Object.entries(publisherStats).forEach(([pub, stats]) => {
     publisherScores[pub] = totalLibraryPlaytime > 0 ? stats.weightedScore / totalLibraryPlaytime : 0;
   });
 
-  // Normalisasi PS ke skala 0.0 - 1.0 (berdasarkan nilai tertinggi di library)
   const maxPS = Math.max(...Object.values(publisherScores), 0.001);
   Object.keys(publisherScores).forEach(pub => {
     publisherScores[pub] = Math.min(1, publisherScores[pub] / maxPS);
   });
+
+  return { tagWeights, totalTagWeight, publisherScores, userProfileTags: Object.keys(tagWeights) };
+}
+
+/**
+ * Mesin Rekomendasi Utama
+ * 
+ * Pembaruan: Menggunakan profil selera terpusat untuk konsistensi.
+ */
+export async function getSimpleRecommendations(
+  api: SteamAPI,
+  ownedGames: SteamGame[],
+  amount: number = 12,
+  page: number = 1
+): Promise<RecommendationResult[]> {
+  if (ownedGames.length === 0) return [];
+
+  const { tagWeights, totalTagWeight, publisherScores, userProfileTags } = await buildUserProfile(api, ownedGames);
+  const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
   if (totalTagWeight === 0) return [];
 
@@ -112,7 +110,6 @@ export async function getSimpleRecommendations(
   const fetchPromises = sortedTags.map(async ([tag, weight]) => {
     const proportion = weight / totalTagWeight;
     const count = Math.max(5, Math.ceil(candidatesPerTag * proportion));
-    // Gunakan 'start' offset berdasarkan halaman untuk mendapatkan data baru
     const start = (page - 1) * count;
     return api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start }).then(res => res.slice(0, count));
   });
@@ -128,7 +125,6 @@ export async function getSimpleRecommendations(
   const candidateReviewsPromises = newIds.map(id => api.getAppReviews(id));
   const candidateReviews = await Promise.all(candidateReviewsPromises);
 
-  const userProfileTags = Object.keys(tagWeights);
   const results: RecommendationResult[] = [];
 
   candidateDetails.forEach((detail, idx) => {
@@ -141,10 +137,6 @@ export async function getSimpleRecommendations(
       ...(detail.categories || []).map(c => c.description)
     ];
 
-    /**
-     * Menghitung PS untuk kandidat:
-     * Jika game punya beberapa publisher, ambil nilai tertinggi.
-     */
     let candidatePS = 0;
     if (detail.publishers) {
       candidatePS = detail.publishers.reduce((max, pub) => Math.max(max, publisherScores[pub] || 0), 0);
