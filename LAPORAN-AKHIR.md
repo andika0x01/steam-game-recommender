@@ -4,28 +4,79 @@
 Steam Game Recommender adalah platform berbasis web yang menggunakan **Logika Fuzzy (Fuzzy Logic)** dan algoritma optimasi untuk memberikan rekomendasi game yang sangat personal. Sistem ini membedah library pengguna, menganalisis perilaku bermain, dan memprediksi tingkat ketertarikan terhadap game baru di Steam Store.
 
 ## 2. Arsitektur Algoritma Rekomendasi
-Sistem ini mengadopsi arsitektur **Dual-Scorer Fuzzy Logic**, memisahkan evaluasi utilitas masa lalu (historis library) dengan pemodelan preferensi masa depan.
+Sistem ini mengadopsi arsitektur **Dual-Scorer Fuzzy Logic**. Intinya, sistem tidak langsung merekomendasikan game hanya karena genre-nya mirip. Algoritma terlebih dahulu mempelajari game yang benar-benar bermakna di library pengguna, mengubahnya menjadi profil minat berbobot, lalu memakai profil tersebut untuk menilai kandidat game baru dari Steam Store.
 
-![Flowchart Arsitektur Sistem](flowchart.svg)
+Dua scorer dipakai karena dua masalahnya berbeda:
+- `FuzzyOwnGamesScorer` menjawab pertanyaan: "Seberapa besar game yang sudah dimiliki ini mencerminkan minat pengguna?"
+- `FuzzyNonOwnGamesScorer` menjawab pertanyaan: "Seberapa layak game yang belum dimiliki ini direkomendasikan berdasarkan profil pengguna dan kualitas publiknya?"
+
+```mermaid
+flowchart TD
+    A[Steam ID Pengguna] --> B[Ambil Owned Games dari Steam API]
+    B --> C[Filter game yang pernah dimainkan]
+    C --> D[Ambil 15 game dengan playtime terbesar]
+
+    D --> E[FuzzyOwnGamesScorer]
+    E --> E1[Fuzzifikasi: playtime, recency, activity]
+    E1 --> E2[Evaluasi rule owned games]
+    E2 --> E3[Defuzzifikasi skor owned 0-1]
+
+    E3 --> F[Ambil genre, kategori, dan publisher dari Steam Store]
+    F --> G[Sanitasi tag teknis Steam]
+    G --> H[Bangun Weighted Interest Fingerprint]
+    F --> I[Hitung Publisher Affinity]
+
+    H --> J[Pilih top weighted tags]
+    J --> K[Search kandidat game di Steam Store]
+    K --> L[Deduplikasi dan hapus game yang sudah dimiliki]
+    L --> M[Ambil detail kandidat dan review Steam]
+
+    M --> N[Hitung fitur kandidat]
+    H --> N
+    I --> N
+    N --> N1[review_positivity]
+    N --> N2[tag_similarity]
+    N --> N3[review_volume]
+    N --> N4[publisher_score]
+
+    N1 --> O[FuzzyNonOwnGamesScorer]
+    N2 --> O
+    N3 --> O
+    N4 --> O
+    O --> O1[Fuzzifikasi kandidat]
+    O1 --> O2[Evaluasi rule rekomendasi]
+    O2 --> O3[Defuzzifikasi final score 0-1]
+
+    O3 --> P[Ranking rekomendasi]
+    P --> Q[Market Discovery / Infinite Scrolling]
+    P --> R[Recommendation Deals]
+    R --> S[Simulated Annealing Knapsack]
+    S --> T[Kombinasi game terbaik sesuai budget]
+```
 
 ### 2.1. Orkestrasi Pipa Rekomendasi
-Transformasi dari data statis menjadi rekomendasi bertingkat dilakukan melalui langkah-langkah berikut:
+Transformasi dari data Steam menjadi rekomendasi dilakukan dalam lima tahap berikut:
 
-1. **Library Profiling & Scoring**:
-   Sistem mengevaluasi seluruh game dalam *library* pengguna dengan `FuzzyOwnGamesScorer`. Setiap game dikonversi menjadi skor utilitas (0 hingga 1.0) berbasis interaksi nyata (playtime, recency, activity).
-2. **Fingerprint & Weighted Tag Generation**:
-   Sistem membentuk "sidik jari minat" (*interest fingerprint*) dengan mengakumulasi tag/genre dari game-game historis. Bobot setiap tag $w_{tag}$ dikomputasi berbasis akumulasi skor fuzzy game pemicunya. 
-3. **Proportional Genre Fetching**:
-   Pencarian ke Steam Search API dipartisi berdasarkan persentase bobot tag yang dominan dalam profil, memastikan kandidat yang diraih merepresentasikan distribusi selera aktual.
-4. **Candidate Inference**:
-   Riset tiap kandidat independen menggunakan `FuzzyNonOwnGamesScorer`, membandingkan skor kesamaan profil (*similarity*), penerimaan publik (*volume & positivity*), serta probabilitas loyalitas penerbit.
-5. **Final Ranking & Optimization**:
-   Menyajikan *Infinite Scrolling* berbasis densitas kelayakan (score/price) serta menyelesaikan masalah optimasi anggaran (*Knapsack Problem*) untuk mode Recommendation Deals.
+1. **Profiling Library Pengguna**:
+   Sistem mengambil game yang dimiliki pengguna, lalu memprioritaskan game yang pernah dimainkan. Untuk efisiensi API, profil utama dibangun dari 15 game dengan `playtime_forever` terbesar. Setiap game tersebut dinilai dengan `FuzzyOwnGamesScorer` agar game yang sering dimainkan, masih relevan, dan aktif akhir-akhir ini memberi pengaruh lebih besar daripada game yang hanya pernah dicoba.
+2. **Pembentukan Weighted Interest Fingerprint**:
+   Detail Steam Store dari game historis dipakai untuk mengambil genre dan kategori. Setiap tag memperoleh bobot dari skor fuzzy game pemicunya. Jika sebuah tag muncul pada beberapa game yang skornya tinggi, bobot tag tersebut ikut naik. Tag teknis Steam seperti *Steam Achievements*, *Steam Cloud*, *Remote Play*, *Trading Cards*, dukungan controller, *LAN PvP*, dan *LAN Co-op* disaring karena bukan sinyal genre/minat.
+3. **Pengambilan Kandidat dari Steam Store**:
+   Sistem memilih tag profil teratas, lalu mencari game di Steam berdasarkan tag tersebut dengan urutan review tertinggi. Kandidat yang sudah dimiliki pengguna dihapus, kandidat duplikat digabung, dan detail kandidat diambil kembali dari Steam untuk memperoleh metadata yang lebih lengkap.
+4. **Inferensi Kandidat Baru**:
+   Tiap kandidat dinilai oleh `FuzzyNonOwnGamesScorer` menggunakan empat input: `review_positivity`, `tag_similarity`, `review_volume`, dan `publisher_score`. Skor akhir bukan rata-rata sederhana; skor berasal dari rule fuzzy yang menyeimbangkan kecocokan selera personal, kualitas review, keyakinan statistik dari jumlah review, dan affinity terhadap publisher.
+5. **Ranking dan Optimasi Deals**:
+   Kandidat diurutkan berdasarkan skor fuzzy akhir. Pada mode Recommendation Deals, kandidat yang sedang diskon diproses lagi sebagai masalah optimasi anggaran: sistem memilih kombinasi game dengan nilai rekomendasi terbaik tanpa melewati budget pengguna.
 
 ---
 
 ### 2.2. Sistem Inferensi Logika Fuzzy
-Variabel masukan yang bersifat tegas (*crisp*) dikabutkan menggunakan fungsi keanggotaan trapezoidal ($TrapMF$).
+Setiap variabel input awalnya berupa angka tegas (*crisp*), misalnya `playtime_forever = 1200 menit` atau `review_positivity = 0.84`. Angka tersebut sulit langsung dipakai sebagai keputusan karena batas antar-kategori tidak selalu tajam. Karena itu, sistem mengubah angka menjadi derajat keanggotaan fuzzy menggunakan fungsi trapezoidal ($TrapMF$).
+
+Contoh interpretasi:
+- `playtime_norm = 0.80` dapat memiliki keanggotaan tinggi pada kategori `sangat_banyak`.
+- `review_positivity = 0.65` dapat mulai masuk kategori `bagus`, tetapi belum sepenuhnya kuat.
+- `tag_similarity = 0.30` dapat dianggap `lumayan`, bukan langsung gagal total.
 
 #### Persamaan Keanggotaan Trapezoidal:
 
@@ -41,23 +92,40 @@ Variabel masukan yang bersifat tegas (*crisp*) dikabutkan menggunakan fungsi kea
 #### Alasan Desain:
 - **Toleransi Plateau**: Bagian puncak datar $(b \le x \le c)$ mentolerir rentang derau (noise) alami dari tabiat bermain tanpa menyebabkan distorsi skor yang tidak stabil.
 - **Komputasi Orde-1**: Model polinomial konstan/linear ini sangat ringan dieksekusi secara masif di ranah *Edge Computing* (Cloudflare Workers).
+- **Transisi Gradual**: Nilai di sekitar batas kategori tidak berubah secara ekstrem. Game dengan review 79% dan 81% tidak diperlakukan sebagai dua kelas yang sepenuhnya berbeda.
 
-### 2.2.1. Rule Base & Filosofi Keputusan (Fuzzy Rules)
+#### Tahapan Inferensi
+Untuk setiap scorer, proses fuzzy berjalan dengan pola yang sama:
+
+1. **Fuzzifikasi**: input numerik diubah menjadi derajat keanggotaan pada beberapa label linguistik.
+2. **Evaluasi Rule**: setiap rule memakai operator AND berbasis minimum. Jika sebuah rule membutuhkan `similarity = cocok` dan `review = bagus`, maka kekuatan rule adalah nilai terkecil dari dua keanggotaan tersebut.
+3. **Agregasi Output**: beberapa rule bisa menghasilkan output yang sama, misalnya `TINGGI`. Sistem mengambil aktivasi terbesar untuk tiap output.
+4. **Defuzzifikasi**: aktivasi output dikonversi menjadi skor numerik 0 sampai 1 memakai weighted average.
+
+### 2.2.1. Rule Base & Filosofi Keputusan
 
 Untuk menjamin kualitas dan rasionalitas rekomendasi, pembobotan fuzzy dievaluasi melalui pendekatan berbasis keahlian domain (expert-based rules) terkait perilaku gamer. 
 
 **Logika untuk Owned Games (Library Profiling):**
-Sistem mengsyaratkan bahwa game benar-benar disukai jika memenuhi kombinasi yang saling mendukung, bukan secara individual:
-- **SANGAT TINGGI**: Dimainkan sangat banyak dan baru-baru ini dimainkan, ATAU sering dimainkan sekaligus sangat aktif akhir-akhir ini.
-- **TINGGI**: Dimainkan sangat banyak namun sudah agak lama, ATAU rutin dimainkan serta berstatus masih aktif saat ini.
-- **SEDANG**: Game cukup banyak dimainkan pada masa lalu yang lumayan dekat, ATAU sering dimainkan tapi sudah berstatus lama.
-- **RENDAH & SANGAT RENDAH**: Game hanya diuji coba (dicoba), sangat lama ditinggal, atau masuk ke dalam library tanpa pernah dimainkan (tidak dimainkan). 
+Sistem tidak menganggap semua game di library sebagai sinyal minat yang sama kuat. Game yang dibeli tetapi tidak pernah dimainkan seharusnya tidak memengaruhi profil sebesar game yang benar-benar dimainkan. Karena itu, scorer melihat tiga sinyal:
+- `playtime`: total durasi main relatif terhadap game paling sering dimainkan pengguna.
+- `recency`: jumlah hari sejak terakhir dimainkan.
+- `activity`: durasi main dalam dua minggu terakhir relatif terhadap aktivitas tertinggi.
+
+Filosofi rule-nya:
+- **SANGAT TINGGI**: game sangat banyak dimainkan dan baru dimainkan, atau sering dimainkan dengan aktivitas dua minggu terakhir yang sangat kuat.
+- **TINGGI**: game punya playtime besar dan masih cukup relevan, atau sering dimainkan serta masih aktif.
+- **SEDANG**: game cukup dimainkan, tetapi sinyal recency/activity tidak cukup kuat untuk dianggap minat utama.
+- **RENDAH**: game hanya dicoba, sudah lama tidak dimainkan, atau tidak punya aktivitas baru.
+- **SANGAT RENDAH**: game tidak dimainkan, ditinggalkan sangat lama, atau tidak aktif sehingga tidak layak menjadi sumber utama profil.
 
 **Logika untuk Non-Owned Games (Candidate Inference):**
-Rekomendasi potensial diproyeksikan dengan menjaga keseimbangan antara relevansi minat profil dan sinyal kualitas komunitas pengguna luas:
-- **Volume Ulasan Sebagai Penentu Keyakinan (Trust Signal):** Berbeda dengan mengandalkan publisher score utama, algoritma yang ditingkatkan kini menitikberatkan pada Volume Review sebagai variabel penstabil yang muncul di setiap level fuzzy. Review "Mixed" tetap akan memberi hukuman berat dan baru bisa diseimbangkan jika Tag Similarity "Sangat Cocok" dan didukung Volume ulasan yang terbukti "Banyak".
-- **Publisher Favorit Beralih Menjadi Booster (Tiebreaker):** Game yang secara tag hanya "Cocok" dan review "Bagus" kini diproyeksikan sebatas `TINGGI`, dan bukan lagi `SANGAT TINGGI`. Publisher besar hanya dapat mempertahankan gelar `SANGAT TINGGI` bersamaan jika game tersebut punya review sangat memuaskan dengan volume skala masif.
-- **Strict Penalty untuk Tag Meleset:** Review sempurna (Overwhelmingly Positive) tetap tidak akan merekomendasikan sebuah game jika parameter Similarity tidak relevan (Tidak Cocok). Hal ini mengurangi noise dan menegaskan tingkat personalisasi ekstrem bahwa prioritas nomor 1 selalu terletak pada selera tag historis setiap indvidu.
+Rekomendasi kandidat menjaga keseimbangan antara relevansi personal dan bukti kualitas publik:
+- **Tag similarity adalah gerbang utama personalisasi**. Game dengan review sangat bagus tetap ditekan jika tag-nya tidak cocok dengan profil pengguna.
+- **Review positivity mengukur kualitas**. Game dengan proporsi review positif tinggi lebih mudah naik, tetapi tetap membutuhkan similarity yang masuk akal.
+- **Review volume mengukur keyakinan statistik**. Review positif dari 50 pengguna tidak sekuat review positif dari puluhan ribu pengguna, sehingga volume dipakai dalam skala logaritmik.
+- **Publisher score berperan sebagai booster/tiebreaker**. Publisher favorit dapat menaikkan kandidat yang sudah relevan, tetapi tidak boleh sendirian membuat game tidak relevan menjadi rekomendasi utama.
+- **Mixed/buruk diberi penalti**. Kandidat dengan review `mixed` hanya bisa bertahan di level sedang jika similarity sangat kuat dan volume review mendukung.
 
 ---
 
@@ -70,6 +138,18 @@ Faktor determinan untuk modul `FuzzyOwnGamesScorer`:
 | **Recency** | Hari $(t)$ | Tenggat waktu sejak paparan terakhir. Merepresentasikan relevansi ketertarikan aktif dan mengurangi "nostalgia bias". |
 | **Recent Activity** | Menit (2 Minggu) | Intensitas ledakan pemain saat ini (*burst*). Memberikan insentif kuat pada minat game baru/hype. |
 
+Normalisasi yang dipakai:
+
+```math
+PlaytimeNorm_i = \frac{PlaytimeForever_i}{\max(PlaytimeForever)}
+```
+
+```math
+ActivityNorm_i = \frac{Playtime2Weeks_i}{\max(Playtime2Weeks)}
+```
+
+Jika tidak ada aktivitas dua minggu terakhir, `ActivityNorm` bernilai 0. Jika `rtime_last_played` tidak tersedia, sistem memakai nilai konservatif 365 hari agar game tersebut tidak dianggap baru dimainkan.
+
 ### 2.4. Ekstraksi Fitur: Skor Prediktif (Candidate Games)
 Faktor determinan untuk modul `FuzzyNonOwnGamesScorer`:
 
@@ -80,38 +160,81 @@ Faktor determinan untuk modul `FuzzyNonOwnGamesScorer`:
 | **Review Volume** | $\log_{10}(x)$ | Skala logaritma guna meredam disparitas statistik antara game *indie* (sedikit review) dan *AAA* (ratusan ribu review). |
 | **Publisher Score** | $[0, 1]$ | Probabilitas minat berlandaskan loyalitas terhadap suatu *brand*/entitas. Diambil dari modul kalkulasi Profile (Section 2.5). |
 
+Kategori fuzzy kandidat dibentuk sebagai berikut:
+- `review_positivity`: `buruk`, `mixed`, `bagus`, `sangat_bagus`.
+- `tag_similarity`: `tidak_cocok`, `lumayan`, `cocok`, `sangat_cocok`.
+- `review_volume`: `sedikit`, `sedang`, `banyak` berdasarkan $\log_{10}(review\_volume)$.
+- `publisher_score`: `low`, `medium`, `high`.
+
 ---
 
 ### 2.5. Metodologi Matematika Terapan
 
 #### 2.5.1. Normalisasi Loyalitas Publisher
-Skor loyalitas penerbit diekstraksi dari densitas utilitas $Score_i$ dikalikan durasi interaksi (*Playtime*) $P_i$. Untuk mencegah peredaman nilai pada pembandingan total library, normalisasi ditakar terisolasi terhadap agregasi *playtime* penerbit spesifik itu, baru kemudian di-skalakan batas $[0, 1]$:
+Skor loyalitas publisher dihitung dari game historis yang publisher-nya berhasil diambil dari Steam Store. Untuk setiap publisher, sistem menghitung rata-rata skor fuzzy game yang dibobotkan oleh playtime. Artinya, publisher dari game yang lama dimainkan dan punya skor owned tinggi akan memperoleh affinity lebih besar.
 
 ```math
 Score_{pub} = \frac{\sum_{i=1}^{n_{pub}} (Score_i \cdot P_i)}{\sum_{i=1}^{n_{pub}} P_i}
 ```
+
+Setelah itu, semua publisher dinormalisasi terhadap publisher dengan skor tertinggi di profil pengguna:
 
 ```math
 NormalizedScore_{pub} = \min\left(1, \frac{Score_{pub}}{\max(Score_{\text{all\_pubs}})}\right)
 ```
 
 #### 2.5.2. Weighted Tag Similarity
-Alih-alih menggunakan *Jaccard Index* murni, algoritma mengekspansi **Weighted Overlap Coefficient**. Model ini mengkuantifikasi jumlah tag kandidat $T_C$ yang beririsan dengan agregasi tag historis $T_U$, dan dievaluasi membubuhkan prioritas/bobot densitas tag $W_U$:
+Alih-alih menggunakan *Jaccard Index* murni, algoritma memakai **Weighted Overlap Coefficient**. Tujuannya bukan sekadar menghitung berapa banyak tag yang sama, tetapi seberapa penting tag yang sama tersebut dalam profil pengguna.
+
+Misalnya, jika profil pengguna sangat berat pada `RPG` dan `Open World`, kandidat yang cocok pada dua tag itu harus lebih dihargai daripada kandidat yang hanya cocok pada tag berbobot kecil. Karena itu, pembilang menjumlahkan bobot tag kandidat yang beririsan dengan profil pengguna:
 
 ```math
-Similarity(T_C, T_U) = \frac{\sum_{t \in (T_C \cap T_U)} W_U(t)}{\sum_{i=1}^{|T_C|} W_U(\text{sorted\_top}_i)}
+IntersectionWeight = \sum_{t \in (T_C \cap T_U)} W_U(t)
 ```
 
+Penyebut memakai jumlah bobot top-N dari profil pengguna, dengan $N$ sama dengan jumlah tag kandidat yang lolos filter. Ini membuat skor tetap proporsional terhadap tag paling penting milik pengguna:
+
+```math
+MaxPossibleWeight = \sum_{i=1}^{|T_C|} W_U(\text{sorted\_top}_i)
+```
+
+```math
+Similarity(T_C, T_U) = \frac{IntersectionWeight}{MaxPossibleWeight}
+```
+
+Sebelum perhitungan, sistem melakukan normalisasi dan sanitasi tag:
+
+```math
+T_C' = \{t \in T_C \mid t \notin T_{excluded}\}
+```
+
+```math
+T_U' = \{t \in T_U \mid t \notin T_{excluded}\}
+```
+
+Set $T_{excluded}$ berisi kategori teknis Steam, misalnya *Steam Achievements*, *Steam Trading Cards*, *Steam Cloud*, *Remote Play*, *In-App Purchases*, *controller support*, *Steam Leaderboards*, *VR-only*, serta kategori jaringan teknis seperti *LAN PvP* dan *LAN Co-op*. Langkah ini penting karena kategori tersebut menjelaskan fitur platform, bukan preferensi genre. Dengan demikian, nilai similarity tidak bias oleh metadata non-semantik.
+
 #### 2.5.3. Defuzzifikasi Rekomendasi (Final Score)
-Sistem menggunakan *Mamdani-style Weighted Average* untuk konversi transisi yang gradual (smooth) pada peralihan konklusi:
+Setelah rule dievaluasi, sistem memiliki aktivasi untuk lima label output:
+
+| Output | Bobot Numerik |
+| :--- | :--- |
+| `SANGAT_RENDAH` | 0.1 |
+| `RENDAH` | 0.3 |
+| `SEDANG` | 0.5 |
+| `TINGGI` | 0.7 |
+| `SANGAT_TINGGI` | 0.9 |
+
+Sistem menggunakan *Mamdani-style Weighted Average* untuk mengubah aktivasi label menjadi skor final:
 
 ```math
 FinalScore = \frac{\sum_{j=1}^m \mu_{\text{activation}, j} \cdot w_j}{\sum_{j=1}^m \mu_{\text{activation}, j}}
 ```
 
 **Karakteristik Penilaian Tambahan**:
-1. **Strict Data**: Apabila kalkulasi kontradiksi/kosong (yaitu $\sum \mu = 0$), skor dieksekusi menjadi `0` sebagai mekanisme asuransi dari jebakan rata-rata `50%`.
-2. **Korelasi Terstruktur (Cross-Validation)**: Aturan fuzzy meminimalkan skor apabila sebuah game bereputasi sangat tinggi, namun tidak mewakili sama sekali genre preferensi utama di profil.
+1. **Fallback berbeda per konteks**: Pada `FuzzyOwnGamesScorer`, jika tidak ada rule aktif, skor fallback adalah `0.5` agar game historis tidak langsung dianggap buruk karena data tidak lengkap. Pada `FuzzyNonOwnGamesScorer`, fallback adalah `0` agar kandidat baru yang tidak punya bukti cukup tidak naik ke rekomendasi.
+2. **Cross-check personalisasi**: Aturan fuzzy meminimalkan skor apabila sebuah game bereputasi sangat tinggi, tetapi tidak mewakili genre preferensi utama di profil.
+3. **Auditability**: Setiap hasil detailed scorer menyimpan input, membership, rule activation, numerator, denominator, dan skor akhir. Data ini dipakai oleh modal analisis di UI untuk menjelaskan kenapa sebuah game memperoleh skor tertentu.
 
 ---
 
@@ -121,6 +244,8 @@ FinalScore = \frac{\sum_{j=1}^m \mu_{\text{activation}, j} \cdot w_j}{\sum_{j=1}
 Mesin pencarian yang mendukung eksplorasi tak terbatas:
 - **Aggressive Offset**: Halaman berikutnya disuplai lompatan acuan statis (*start offset*) dari populasi yang luas untuk menghindari perulangan popularitas yang sama (no-collusion bias).
 - **Client-side Auto-Fetch & Deduplikasi**: Apabila respons *Server-Side Rendering* terbatas oleh sistem batasan rate, komponen `InfiniteGrid` otomatis mendobrak muatan mandiri. Mekanisme deduplikasi memblokir penumpukan elemen antarmuka dari ID Game duplikat.
+- **Source Data Transparency**: Halaman Recommendation menampilkan ringkasan sumber data tepat di bawah input budget, berupa top weighted tags dari library pengguna. Panel ini menjelaskan bahwa rekomendasi berasal dari gabungan tag historis berbobot fuzzy, review Steam, volume review, dan affinity publisher.
+- **Clickable Recommendation Analysis**: Setiap kartu game rekomendasi, baik pada *Optimized Selection* maupun *Market Discovery*, dapat dibuka menjadi modal analisis. Modal tersebut menampilkan perhitungan fuzzy dalam notasi LaTeX dari input sampai output, mencakup `review_positivity`, `tag_similarity`, `review_volume`, `log_review_volume`, dan `publisher_score`.
 
 ### 3.2. Recommendation Deals (Simulated Annealing)
 Menyelesaikan problem *Knapsack Kombinasi Promosi* lewat optimasi Meta-Heuristik probabilistik **Simulated Annealing**:
@@ -153,6 +278,15 @@ Untuk menangani limitasi IP Datacenter, CPU, dan timeout pada Cloudflare Workers
 Halaman sentral untuk meninjau secara gamblang preferensi pengguna hasil dari kalkulasi Fuzzy Scorer. Selain mendistribusikan skor kecocokan game di masa lalu, Analyzer juga memvisualisasikan:
 -   **Top 12 Preferred Tags**: Diekstrak dari riwayat jam terbang menggunakan fungsi algoritma sentral `buildUserProfile`. Tag disajikan berdampingan dan memberikan insight mendalam tentang *genre* yang paling mendominasi.
 -   **Top 8 Affinity Publishers**: Menyajikan relasi antara loyalitas (*playtime*) dan penilaian pengguna atas game yang dirilis tiap perusahaan, lengkap dengan grafik progres bar.
+-   **Mathematical Process Audit**: Kartu game pada Analyzer membuka modal perhitungan yang tidak lagi memakai pecahan *floating cards*, melainkan alur LaTeX penuh. Urutannya adalah input mentah, normalisasi, fungsi keanggotaan trapezoidal, aktivasi rule Mamdani, agregasi output, hingga defuzzifikasi akhir.
+
+### 3.6. Sanitasi Tag dan Konsistensi Metadata
+Seluruh jalur rekomendasi menerapkan filter tag yang sama:
+-   **Profile Source Tags**: Top tags yang tampil pada Recommendation disaring dari kategori teknis Steam agar tidak menampilkan metadata non-genre.
+-   **Candidate Tags**: Tags kandidat pada rute `/recommendation`, `/api/recommendation-deals`, dan helper `getSimpleRecommendations` difilter ulang setelah proses penggabungan genre dan kategori.
+-   **Matched Tags**: Daftar tag yang menjelaskan kecocokan kandidat hanya mengambil tag yang lolos filter dan benar-benar ditemukan dalam bobot profil pengguna.
+
+Konsistensi ini memastikan bahwa *similarity score* dan penjelasan visual di UI mengacu pada sumber data yang sama. Dengan kata lain, tag seperti *Steam Cloud* atau *Steam Achievements* tidak dapat menaikkan skor maupun muncul sebagai alasan rekomendasi.
 
 ## 4. Struktur Database & Refactoring Redundansi
 Seiring dengan evolusi proyek, sistem melalui *streamlining* fitur. Halaman yang dinilai duplikatif atau redundan (seperti `Engine`, `Co-op`, dan `Tierlist`) telah dihapus secara permanen dari *repository* agar fokus pengembangan tertuju pada optimasi kualitas `Analyzer` dan `Recommendation`.
