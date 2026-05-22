@@ -2,15 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { calculateSimilarity } from '../src/lib/simple-recommendation';
 
 describe('calculateSimilarity', () => {
-  it('should calculate Jaccard similarity correctly', () => {
+  it('should calculate Overlap Coefficient correctly', () => {
     const tags1 = ['Action', 'RPG', 'Adventure'];
     const tags2 = ['Action', 'RPG', 'Indie'];
 
     // Intersection: ['Action', 'RPG'] (size 2)
-    // Union: ['Action', 'RPG', 'Adventure', 'Indie'] (size 4)
-    // Score: 2/4 = 0.5
+    // Smallest set: tags1 or tags2 (size 3)
+    // Score: 2/3 = 0.666...
 
-    expect(calculateSimilarity(tags1, tags2)).toBe(0.5);
+    expect(calculateSimilarity(tags1, tags2)).toBeCloseTo(0.666, 2);
   });
 
   it('should be case insensitive', () => {

@@ -11,7 +11,8 @@ export interface RecommendationResult {
 }
 
 /**
- * Menghitung Jaccard Similarity antara dua set tag.
+ * Menghitung Overlap Coefficient antara dua set tag.
+ * Lebih adil untuk game dengan jumlah tag sedikit.
  */
 export function calculateSimilarity(tags1: string[], tags2: string[]): number {
   if (tags1.length === 0 || tags2.length === 0) return 0;
@@ -20,25 +21,31 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
   const set2 = new Set(tags2.map(t => t.toLowerCase()));
   
   const intersection = new Set([...set1].filter(x => set2.has(x)));
-  const union = new Set([...set1, ...set2]);
   
-  return intersection.size / union.size;
+  // Overlap Coefficient: |A ∩ B| / min(|A|, |B|)
+  return intersection.size / Math.min(set1.size, set2.size);
 }
 
 /**
  * Membangun profil selera pengguna (Tags & Publisher Scores)
  * berdasarkan game yang dimiliki di library.
  */
-export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[]) {
+export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[], steamId?: string) {
+  // 1. Cek Cache KV jika ada steamId
+  const cacheKey = steamId ? `user_profile_${steamId}` : null;
+  if (cacheKey && (api as any).kv) {
+    const cached = await (api as any).kv.get(cacheKey, 'json');
+    if (cached) return cached;
+  }
+
   const ownScorer = new FuzzyOwnGamesScorer(ownedGames);
   
   const topPlayed = ownedGames
     .filter(g => g.playtime_forever > 0)
     .sort((a, b) => b.playtime_forever - a.playtime_forever)
-    .slice(0, 30);
+    .slice(0, 15); // Kurangi dari 30 ke 15 untuk menghemat subrequest
 
-  const detailPromises = topPlayed.map(g => api.getAppStoreDetails(g.appid));
-  const details = await Promise.all(detailPromises);
+  const details = await api.getAppStoreDetailsBatch(topPlayed.map(g => g.appid));
 
   const tagWeights: Record<string, number> = {};
   const publisherStats: Record<string, { weightedScore: number, playtime: number }> = {};
@@ -80,7 +87,14 @@ export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[]) {
     publisherScores[pub] = Math.min(1, publisherScores[pub] / maxPS);
   });
 
-  return { tagWeights, totalTagWeight, publisherScores, userProfileTags: Object.keys(tagWeights) };
+  const profile = { tagWeights, totalTagWeight, publisherScores, userProfileTags: Object.keys(tagWeights) };
+
+  // 2. Simpan ke Cache KV (TTL 24 jam)
+  if (cacheKey && (api as any).kv) {
+    await (api as any).kv.put(cacheKey, JSON.stringify(profile), { expirationTtl: 86400 });
+  }
+
+  return profile;
 }
 
 /**
@@ -92,22 +106,23 @@ export async function getSimpleRecommendations(
   api: SteamAPI,
   ownedGames: SteamGame[],
   amount: number = 12,
-  page: number = 1
+  page: number = 1,
+  steamId?: string
 ): Promise<RecommendationResult[]> {
   if (ownedGames.length === 0) return [];
 
-  const { tagWeights, totalTagWeight, publisherScores, userProfileTags } = await buildUserProfile(api, ownedGames);
+  const { tagWeights, totalTagWeight, publisherScores, userProfileTags } = await buildUserProfile(api, ownedGames, steamId);
   const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
   if (totalTagWeight === 0) return [];
 
   const sortedTags = Object.entries(tagWeights)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 10); // Gunakan Top 10 tags (sebelumnya 8)
+    .slice(0, 5); // Kurangi dari 10 ke 5 untuk menghemat subrequest
 
   const fetchPromises = sortedTags.map(async ([tag, weight]) => {
     const proportion = weight / totalTagWeight;
-    const count = Math.max(12, Math.ceil((amount * 6) * proportion));
+    const count = Math.max(8, Math.ceil((amount * 3) * proportion)); // Perkecil count
     // Offset melompat lebih jauh per halaman
     const start = (page - 1) * 50; 
     return api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start }).then(res => res.slice(0, count));
@@ -117,10 +132,9 @@ export async function getSimpleRecommendations(
   const uniqueIds = [...new Set(searchResults.map(r => r.id).filter((id): id is number => id !== undefined))];
 
   const ownedIds = new Set(ownedGames.map(g => g.appid));
-  const newIds = uniqueIds.filter(id => !ownedIds.has(id)).slice(0, amount * 5);
+  const newIds = uniqueIds.filter(id => !ownedIds.has(id)).slice(0, 20); // Batasi maks 20 kandidat (sebelumnya 60)
 
-  const candidateDetailPromises = newIds.map(id => api.getAppStoreDetails(id));
-  const candidateDetails = await Promise.all(candidateDetailPromises);
+  const candidateDetails = await api.getAppStoreDetailsBatch(newIds);
   const candidateReviewsPromises = newIds.map(id => api.getAppReviews(id));
   const candidateReviews = await Promise.all(candidateReviewsPromises);
 

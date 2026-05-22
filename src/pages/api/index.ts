@@ -16,7 +16,7 @@ app.get('/recommendations', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const games = await steamAPI.getOwnedGames(steamId)
 
-  const recommendations = await getSimpleRecommendations(steamAPI, games, amount, page)
+  const recommendations = await getSimpleRecommendations(steamAPI, games, amount, page, steamId)
 
   return c.json(recommendations)
 })
@@ -26,7 +26,7 @@ app.get('/deals', async (c) => {
   if (!steamId) return c.json({ error: 'Unauthorized' }, 401)
 
   const page = parseInt(c.req.query('page') || '1')
-  const amount = 24
+  const amount = 15 // Kurangi dari 24 ke 15 agar total subrequest aman (<50)
 
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
@@ -35,15 +35,14 @@ app.get('/deals', async (c) => {
    * Menggunakan FuzzyNonOwnGamesScorer untuk game di store.
    * Kita perlu profil selera user (tags & publisher scores).
    */
-  const { publisherScores, userProfileTags } = await buildUserProfile(steamAPI, userGames);
+  const { publisherScores, userProfileTags } = await buildUserProfile(steamAPI, userGames, steamId);
   const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
   const start = (page - 1) * amount
   const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id', start })
   const candidateIds = saleResults.slice(0, amount).map(r => r.id).filter(Boolean) as number[]
   
-  const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'english', 'id'))
-  const rawDetails = await Promise.all(detailPromises)
+  const rawDetails = await steamAPI.getAppStoreDetailsBatch(candidateIds, 'english', 'id')
   const candidateReviewsPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
   const candidateReviews = await Promise.all(candidateReviewsPromises)
   

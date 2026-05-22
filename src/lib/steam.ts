@@ -398,6 +398,79 @@ export class SteamAPI {
     return result;
   }
 
+  /**
+   * Mengambil detail untuk beberapa appId sekaligus.
+   * Steam API mendukung pemisahan koma untuk appids.
+   */
+  async getAppStoreDetailsBatch(appIds: number[], language: string = 'english', cc?: string): Promise<(SteamStoreAppDetails | null)[]> {
+    if (appIds.length === 0) return [];
+
+    const results = new Array(appIds.length).fill(null);
+    const missingIndices: number[] = [];
+    const missingIds: number[] = [];
+
+    // 1. Cek KV untuk setiap ID
+    if (this.kv) {
+      const cachePromises = appIds.map(async (id, idx) => {
+        const cacheKey = `steam_appdetails_${id}_${language}_${cc || ''}`;
+        const cached = await this.kv!.get(cacheKey, 'json');
+        if (cached) {
+          results[idx] = cached as SteamStoreAppDetails;
+        } else {
+          missingIndices.push(idx);
+          missingIds.push(id);
+        }
+      });
+      await Promise.all(cachePromises);
+    } else {
+      appIds.forEach((id, idx) => {
+        missingIndices.push(idx);
+        missingIds.push(id);
+      });
+    }
+
+    if (missingIds.length === 0) return results;
+
+    // 2. Ambil dari Steam API dalam batch (maks 10 per request untuk stabilitas)
+    const batchSize = 10;
+    for (let i = 0; i < missingIds.length; i += batchSize) {
+      const currentBatchIds = missingIds.slice(i, i + batchSize);
+      const url = new URL('https://store.steampowered.com/api/appdetails');
+      url.searchParams.append('appids', currentBatchIds.join(','));
+      url.searchParams.append('l', language);
+      if (cc) url.searchParams.append('cc', cc);
+
+      try {
+        const response = await fetch(url.toString(), {
+          headers: { 'Accept-Language': 'en-US,en;q=0.9' }
+        });
+        if (!response.ok) continue;
+
+        const data = await response.json() as any;
+        
+        for (let j = 0; j < currentBatchIds.length; j++) {
+          const id = currentBatchIds[j];
+          const originalIdx = missingIndices[i + j];
+          
+          if (data[id.toString()] && data[id.toString()].success) {
+            const gameData = data[id.toString()].data as SteamStoreAppDetails;
+            results[originalIdx] = gameData;
+            
+            // Simpan ke KV
+            if (this.kv) {
+              const cacheKey = `steam_appdetails_${id}_${language}_${cc || ''}`;
+              await this.kv.put(cacheKey, JSON.stringify(gameData));
+            }
+          }
+        }
+      } catch (e) {
+        console.error(`Error fetching batch ${currentBatchIds}:`, e);
+      }
+    }
+
+    return results;
+  }
+
 }
 
 export async function resolveVanityURL(apiKey: string, vanityId: string): Promise<string | null> {
