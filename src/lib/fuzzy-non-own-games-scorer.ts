@@ -4,8 +4,8 @@
  * Sistem inferensi fuzzy untuk memprediksi tingkat ketertarikan pengguna
  * terhadap game yang belum mereka miliki.
  * 
- * Perbaikan: Memastikan cakupan total (Total Coverage) pada fungsi keanggotaan
- * agar tidak ada nilai input yang menghasilkan aktivasi nol (menghindari 50% default).
+ * Perbaikan: Menambahkan Linear Tie-Breaker untuk menghindari penumpukan 
+ * skor di angka bulat (50%).
  */
 export class FuzzyNonOwnGamesScorer {
   private trapMF(x: number, a: number, b: number, c: number, d: number): number {
@@ -17,7 +17,6 @@ export class FuzzyNonOwnGamesScorer {
   }
 
   getGameScore(reviewPositivity: number, tagSimilarity: number, reviewVolume: number, publisherScore: number): number {
-    // Fuzzifikasi dengan Overlap yang Sempurna (Cakupan Total 0.0 - 1.0)
     const review = {
       buruk: this.trapMF(reviewPositivity, -0.1, 0, 0.4, 0.5),
       mixed: this.trapMF(reviewPositivity, 0.4, 0.5, 0.6, 0.7),
@@ -53,41 +52,11 @@ export class FuzzyNonOwnGamesScorer {
       SANGAT_TINGGI: 0,
     };
 
-    // Rule Base yang Ditingkatkan (Selalu ada minimal 1 rule yang aktif)
-    activation.SANGAT_TINGGI = Math.max(
-      Math.min(similarity.sangat_cocok, review.sangat_bagus),
-      Math.min(similarity.sangat_cocok, publisher.high)
-    );
-
-    activation.TINGGI = Math.max(
-      Math.min(similarity.cocok, review.bagus),
-      Math.min(similarity.sangat_cocok, review.mixed),
-      Math.min(publisher.high, similarity.lumayan)
-    );
-
-    activation.SEDANG = Math.max(
-      similarity.lumayan,
-      Math.min(publisher.medium, review.mixed)
-    );
-
-    activation.RENDAH = Math.max(
-      Math.min(similarity.tidak_cocok, review.mixed),
-      Math.min(publisher.low, review.buruk)
-    );
-
-    activation.SANGAT_RENDAH = Math.max(
-      Math.min(similarity.tidak_cocok, review.buruk),
-      Math.min(review.buruk, volume.banyak) // Game populer tapi review busuk
-    );
-
-    // Fallback: Jika input di luar dugaan, gunakan kemiripan sebagai basis utama
-    const maxActivation = Math.max(...Object.values(activation));
-    if (maxActivation === 0) {
-      activation.SANGAT_TINGGI = similarity.sangat_cocok;
-      activation.TINGGI = similarity.cocok;
-      activation.SEDANG = similarity.lumayan;
-      activation.RENDAH = similarity.tidak_cocok;
-    }
+    activation.SANGAT_TINGGI = Math.max(Math.min(similarity.sangat_cocok, review.sangat_bagus), Math.min(similarity.sangat_cocok, publisher.high));
+    activation.TINGGI = Math.max(Math.min(similarity.cocok, review.bagus), Math.min(publisher.high, similarity.lumayan));
+    activation.SEDANG = Math.max(similarity.lumayan, Math.min(publisher.medium, review.mixed));
+    activation.RENDAH = Math.max(Math.min(similarity.tidak_cocok, review.mixed), Math.min(publisher.low, review.buruk));
+    activation.SANGAT_RENDAH = Math.max(Math.min(similarity.tidak_cocok, review.buruk), Math.min(review.buruk, volume.banyak));
 
     const weights = {
       SANGAT_RENDAH: 0.1,
@@ -107,6 +76,14 @@ export class FuzzyNonOwnGamesScorer {
       }
     }
 
-    return denominator > 0 ? numerator / denominator : 0.5;
+    const fuzzyScore = denominator > 0 ? numerator / denominator : 0.5;
+
+    /**
+     * Linear Tie-Breaker:
+     * Mencampurkan 10% nilai input mentah (Similarity & Positivity)
+     * untuk membedakan game-game dalam kategori fuzzy yang sama.
+     */
+    const rawBias = (tagSimilarity * 0.05) + (reviewPositivity * 0.05);
+    return Math.min(1, fuzzyScore * 0.9 + rawBias);
   }
 }
