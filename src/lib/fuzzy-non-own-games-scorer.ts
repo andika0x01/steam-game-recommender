@@ -4,8 +4,8 @@
  * Sistem inferensi fuzzy untuk memprediksi tingkat ketertarikan pengguna
  * terhadap game yang belum mereka miliki.
  * 
- * Pembaruan: Menggunakan 'Publisher Score' kontinu (0.0 - 1.0) untuk
- * menangkap spektrum loyalitas pengguna terhadap publisher tertentu.
+ * Perbaikan: Memastikan cakupan total (Total Coverage) pada fungsi keanggotaan
+ * agar tidak ada nilai input yang menghasilkan aktivasi nol (menghindari 50% default).
  */
 export class FuzzyNonOwnGamesScorer {
   private trapMF(x: number, a: number, b: number, c: number, d: number): number {
@@ -16,44 +16,33 @@ export class FuzzyNonOwnGamesScorer {
     return 0;
   }
 
-  /**
-   * Menghitung skor prediksi untuk game yang belum dimiliki.
-   * 
-   * @param reviewPositivity Rasio review positif (0-1)
-   * @param tagSimilarity Kemiripan tag dengan profil selera pengguna (0-1)
-   * @param reviewVolume Total jumlah review untuk validasi data
-   * @param publisherScore Skor loyalitas publisher kontinu (0.0 - 1.0)
-   */
   getGameScore(reviewPositivity: number, tagSimilarity: number, reviewVolume: number, publisherScore: number): number {
+    // Fuzzifikasi dengan Overlap yang Sempurna (Cakupan Total 0.0 - 1.0)
     const review = {
       buruk: this.trapMF(reviewPositivity, -0.1, 0, 0.4, 0.5),
-      mixed: this.trapMF(reviewPositivity, 0.4, 0.45, 0.6, 0.65),
-      bagus: this.trapMF(reviewPositivity, 0.6, 0.65, 0.75, 0.8),
-      sangat_bagus: this.trapMF(reviewPositivity, 0.75, 0.85, 1.0, 1.1),
+      mixed: this.trapMF(reviewPositivity, 0.4, 0.5, 0.6, 0.7),
+      bagus: this.trapMF(reviewPositivity, 0.6, 0.7, 0.8, 0.9),
+      sangat_bagus: this.trapMF(reviewPositivity, 0.8, 0.9, 1.0, 1.1),
     };
 
     const similarity = {
-      tidak_cocok: this.trapMF(tagSimilarity, -0.1, 0, 0.2, 0.3),
-      lumayan: this.trapMF(tagSimilarity, 0.2, 0.3, 0.5, 0.6),
-      cocok: this.trapMF(tagSimilarity, 0.5, 0.6, 0.8, 0.9),
-      sangat_cocok: this.trapMF(tagSimilarity, 0.8, 0.9, 1.0, 1.1),
+      tidak_cocok: this.trapMF(tagSimilarity, -0.1, 0, 0.2, 0.35),
+      lumayan: this.trapMF(tagSimilarity, 0.2, 0.35, 0.5, 0.65),
+      cocok: this.trapMF(tagSimilarity, 0.5, 0.65, 0.8, 0.95),
+      sangat_cocok: this.trapMF(tagSimilarity, 0.8, 0.95, 1.0, 1.1),
     };
 
-    /**
-     * Fungsi Keanggotaan Publisher Score (Kontinu)
-     * Low (0.0 - 0.4), Medium (0.3 - 0.7), High (0.6 - 1.0)
-     */
     const publisher = {
-      low: this.trapMF(publisherScore, -0.1, 0, 0.3, 0.4),
-      medium: this.trapMF(publisherScore, 0.3, 0.4, 0.6, 0.7),
-      high: this.trapMF(publisherScore, 0.6, 0.7, 1.0, 1.1),
+      low: this.trapMF(publisherScore, -0.1, 0, 0.3, 0.45),
+      medium: this.trapMF(publisherScore, 0.3, 0.45, 0.6, 0.75),
+      high: this.trapMF(publisherScore, 0.6, 0.75, 1.0, 1.1),
     };
 
     const logVolume = reviewVolume > 0 ? Math.log10(reviewVolume) : 0;
     const volume = {
-      sedikit: this.trapMF(logVolume, -1, 0, 1.5, 2),   
-      sedang: this.trapMF(logVolume, 1.5, 2, 3, 3.5),  
-      banyak: this.trapMF(logVolume, 3, 4, 10, 11),    
+      sedikit: this.trapMF(logVolume, -1, 0, 1.5, 2.5),   
+      sedang: this.trapMF(logVolume, 1.5, 2.5, 3.5, 4.5),  
+      banyak: this.trapMF(logVolume, 3.5, 4.5, 10, 11),    
     };
 
     const activation = {
@@ -64,28 +53,37 @@ export class FuzzyNonOwnGamesScorer {
       SANGAT_TINGGI: 0,
     };
 
-    // Rule 1: High Publisher & High Similarity
-    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(publisher.high, similarity.sangat_cocok, review.bagus));
-    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(publisher.high, review.sangat_bagus));
-    
-    // Rule 2: General Matches
-    activation.TINGGI = Math.max(activation.TINGGI, Math.min(similarity.cocok, review.bagus));
-    activation.TINGGI = Math.max(activation.TINGGI, Math.min(publisher.medium, similarity.cocok));
-    
-    // Rule 3: Neutral
-    activation.SEDANG = Math.max(activation.SEDANG, similarity.lumayan);
-    activation.SEDANG = Math.max(activation.SEDANG, Math.min(publisher.medium, review.mixed));
+    // Rule Base yang Ditingkatkan (Selalu ada minimal 1 rule yang aktif)
+    activation.SANGAT_TINGGI = Math.max(
+      Math.min(similarity.sangat_cocok, review.sangat_bagus),
+      Math.min(similarity.sangat_cocok, publisher.high)
+    );
 
-    // Rule 4: Penalties
-    activation.RENDAH = Math.max(activation.RENDAH, Math.min(publisher.low, review.buruk));
-    activation.SANGAT_RENDAH = Math.max(activation.SANGAT_RENDAH, Math.min(similarity.tidak_cocok, review.buruk));
+    activation.TINGGI = Math.max(
+      Math.min(similarity.cocok, review.bagus),
+      Math.min(similarity.sangat_cocok, review.mixed),
+      Math.min(publisher.high, similarity.lumayan)
+    );
 
-    // Rule 5: Volume confidence
-    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(similarity.sangat_cocok, volume.banyak, review.bagus));
-    activation.SANGAT_RENDAH = Math.max(activation.SANGAT_RENDAH, Math.min(review.buruk, volume.banyak));
+    activation.SEDANG = Math.max(
+      similarity.lumayan,
+      Math.min(publisher.medium, review.mixed)
+    );
 
-    if (Math.max(...Object.values(activation)) === 0) {
-      activation.SANGAT_TINGGI = Math.min(publisher.high, similarity.sangat_cocok);
+    activation.RENDAH = Math.max(
+      Math.min(similarity.tidak_cocok, review.mixed),
+      Math.min(publisher.low, review.buruk)
+    );
+
+    activation.SANGAT_RENDAH = Math.max(
+      Math.min(similarity.tidak_cocok, review.buruk),
+      Math.min(review.buruk, volume.banyak) // Game populer tapi review busuk
+    );
+
+    // Fallback: Jika input di luar dugaan, gunakan kemiripan sebagai basis utama
+    const maxActivation = Math.max(...Object.values(activation));
+    if (maxActivation === 0) {
+      activation.SANGAT_TINGGI = similarity.sangat_cocok;
       activation.TINGGI = similarity.cocok;
       activation.SEDANG = similarity.lumayan;
       activation.RENDAH = similarity.tidak_cocok;

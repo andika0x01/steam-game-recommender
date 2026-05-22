@@ -86,7 +86,8 @@ export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[]) {
 /**
  * Mesin Rekomendasi Utama
  * 
- * Pembaruan: Menggunakan profil selera terpusat untuk konsistensi.
+ * Perbaikan: Mengambil kandidat dari tag yang lebih bervariasi dan 
+ * memastikan offset Steam lebih besar untuk menghindari duplikasi kandidat.
  */
 export async function getSimpleRecommendations(
   api: SteamAPI,
@@ -101,16 +102,21 @@ export async function getSimpleRecommendations(
 
   if (totalTagWeight === 0) return [];
 
-  // 2. Determine Proportions and Fetch Candidates with Paging
+  // 2. Ambil Top 8 Tags untuk variasi (sebelumnya hanya 5)
   const sortedTags = Object.entries(tagWeights)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5); 
+    .slice(0, 8); 
 
-  const candidatesPerTag = amount * 5; 
+  /**
+   * Paging Strategi:
+   * Kita mengambil pool kandidat yang lebih besar (amount * 5).
+   * Gunakan offset 'start' yang signifikan agar Steam melompati item populer yang sama.
+   */
   const fetchPromises = sortedTags.map(async ([tag, weight]) => {
     const proportion = weight / totalTagWeight;
-    const count = Math.max(8, Math.ceil(candidatesPerTag * proportion));
-    const start = (page - 1) * count * 2;
+    const count = Math.max(10, Math.ceil((amount * 5) * proportion));
+    // Gunakan offset yang lebih besar dan bervariasi per tag
+    const start = (page - 1) * 30 + Math.floor(Math.random() * 10);
     return api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start }).then(res => res.slice(0, count));
   });
 
@@ -118,7 +124,7 @@ export async function getSimpleRecommendations(
   const uniqueIds = [...new Set(searchResults.map(r => r.id).filter((id): id is number => id !== undefined))];
 
   const ownedIds = new Set(ownedGames.map(g => g.appid));
-  const newIds = uniqueIds.filter(id => !ownedIds.has(id)).slice(0, amount * 2);
+  const newIds = uniqueIds.filter(id => !ownedIds.has(id)).slice(0, amount * 4);
 
   const candidateDetailPromises = newIds.map(id => api.getAppStoreDetails(id));
   const candidateDetails = await Promise.all(candidateDetailPromises);
@@ -157,5 +163,6 @@ export async function getSimpleRecommendations(
     });
   });
 
+  // Sort by score and return the requested amount
   return results.sort((a, b) => b.score - a.score).slice(0, amount);
 }

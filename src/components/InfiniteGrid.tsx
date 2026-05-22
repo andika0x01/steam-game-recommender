@@ -10,14 +10,15 @@ interface InfiniteGridProps {
 /**
  * Komponen InfiniteGrid
  * 
- * Menangani pemuatan data tambahan secara otomatis saat pengguna
- * melakukan scroll ke dasar halaman menggunakan Intersection Observer.
+ * Perbaikan: Meningkatkan limit percobaan retry dan memastikan
+ * deduplikasi ID bekerja dengan benar untuk menghindari stall.
  */
 export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoint, type }) => {
   const [items, setItems] = useState(initialItems)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [hasMore, setPageHasMore] = useState(true)
+  const [retryCount, setRetryCount] = useState(0)
   const loaderRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
       if (entries[0].isIntersecting && hasMore && !loading) {
         loadMore()
       }
-    }, { threshold: 1.0 })
+    }, { threshold: 0.1 }) // Mengurangi threshold agar lebih responsif
 
     if (loaderRef.current) {
       observer.observe(loaderRef.current)
@@ -44,16 +45,17 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
       if (newItems.length === 0) {
         setPageHasMore(false)
       } else {
-        // Deduplikasi client-side: hanya tambah game yang ID-nya belum ada
         const existingIds = new Set(items.map(i => i.appid || i.appId))
         const uniqueNewItems = newItems.filter(i => !existingIds.has(i.appid || i.appId))
         
         if (uniqueNewItems.length > 0) {
           setItems(prev => [...prev, ...uniqueNewItems])
           setPage(nextPage)
-        } else if (page < 5) { 
-          // Jika Steam memberikan data yang sama, coba fetch halaman berikutnya lagi (max 5 percobaan)
+          setRetryCount(0) // Reset retry jika berhasil dapat item baru
+        } else if (retryCount < 10) { 
+          // Jika semua duplikat, coba lagi ke halaman berikutnya (limit 10 kali)
           setPage(nextPage)
+          setRetryCount(prev => prev + 1)
         } else {
           setPageHasMore(false)
         }
