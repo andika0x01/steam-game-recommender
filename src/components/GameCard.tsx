@@ -13,6 +13,7 @@ interface GameCardProps {
   className?: string;
   hideScore?: boolean;
   hideTags?: boolean;
+  isActionDiv?: boolean;
 }
 
 export const GameCard = ({
@@ -27,7 +28,8 @@ export const GameCard = ({
   actionLabel = "Lihat Game",
   className = "",
   hideScore = false,
-  hideTags = false
+  hideTags = false,
+  isActionDiv = false
 }: GameCardProps) => {
   const hasDiscount = discount && discount !== "0";
 
@@ -80,13 +82,22 @@ export const GameCard = ({
              </div>
            )}
 
-           <a 
-            href={actionUrl || `https://store.steampowered.com/app/${appId}`} 
-            target="_blank" 
-            className="px-8 py-3 bg-orange-500 text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-orange-400 transition-all text-center shadow-xl shadow-orange-500/20 active:scale-95"
-           >
-            {actionLabel}
-           </a>
+           {isActionDiv ? (
+             <div 
+              className="px-8 py-3 bg-orange-500 text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-orange-400 transition-all text-center shadow-xl shadow-orange-500/20 active:scale-95 cursor-pointer"
+             >
+              {actionLabel}
+             </div>
+           ) : (
+             <a 
+              href={actionUrl || `https://store.steampowered.com/app/${appId}`} 
+              target="_blank" 
+              onClick={(e) => e.stopPropagation()}
+              className="px-8 py-3 bg-orange-500 text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-orange-400 transition-all text-center shadow-xl shadow-orange-500/20 active:scale-95"
+             >
+              {actionLabel}
+             </a>
+           )}
         </div>
       </div>
       <p className="text-[10px] font-black uppercase tracking-tighter truncate text-zinc-500 group-hover:text-orange-500 transition-colors text-center px-4">{name}</p>

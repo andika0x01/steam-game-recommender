@@ -65,20 +65,37 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
   return (
     <div className="space-y-10">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-6 md:gap-10">
-        {items.map((item, idx) => (
-          <GameCard 
-            key={`${item.appid || item.appId}-${idx}`}
-            appId={item.appid || item.appId}
-            name={item.name}
-            score={item.score}
-            tags={item.tags}
-            price={item.price}
-            originalPrice={item.originalPrice}
-            discount={item.discount}
-            hideScore={item.hideScore}
-            hideTags={item.hideTags}
-          />
-        ))}
+        {items.map((item, idx) => {
+          const card = (
+            <GameCard 
+              appId={item.appid || item.appId}
+              name={item.name}
+              score={item.score}
+              tags={item.tags}
+              price={item.price}
+              originalPrice={item.originalPrice}
+              discount={item.discount}
+              hideScore={item.hideScore}
+              hideTags={item.hideTags}
+              actionLabel={item.analyzerData ? 'Lihat Analisis' : undefined}
+              isActionDiv={Boolean(item.analyzerData)}
+            />
+          )
+
+          return item.analyzerData ? (
+            <div
+              key={`${item.appid || item.appId}-${idx}`}
+              className="cursor-pointer recommendation-card-trigger"
+              data-game={JSON.stringify(item.analyzerData)}
+            >
+              {card}
+            </div>
+          ) : (
+            <React.Fragment key={`${item.appid || item.appId}-${idx}`}>
+              {card}
+            </React.Fragment>
+          )
+        })}
       </div>
       
       {hasMore && (

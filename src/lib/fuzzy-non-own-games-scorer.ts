@@ -14,6 +14,10 @@ export class FuzzyNonOwnGamesScorer {
   }
 
   getGameScore(reviewPositivity: number, tagSimilarity: number, reviewVolume: number, publisherScore: number): number {
+    return this.getGameScoreDetailed(reviewPositivity, tagSimilarity, reviewVolume, publisherScore).score;
+  }
+
+  getGameScoreDetailed(reviewPositivity: number, tagSimilarity: number, reviewVolume: number, publisherScore: number) {
     const review = {
       buruk: this.trapMF(reviewPositivity, -0.1, 0, 0.4, 0.5),
       mixed: this.trapMF(reviewPositivity, 0.4, 0.5, 0.6, 0.7),
@@ -41,6 +45,166 @@ export class FuzzyNonOwnGamesScorer {
       banyak: this.trapMF(logVolume, 3.5, 4.5, 10, 11),    
     };
 
+    const ruleDefinitions = [
+      {
+        output: 'SANGAT_TINGGI',
+        label: 'Sangat tinggi',
+        antecedents: [
+          { variable: 'similarity', term: 'sangat_cocok', value: similarity.sangat_cocok },
+          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
+          { variable: 'volume', term: 'banyak', value: volume.banyak }
+        ]
+      },
+      {
+        output: 'SANGAT_TINGGI',
+        label: 'Sangat tinggi',
+        antecedents: [
+          { variable: 'similarity', term: 'sangat_cocok', value: similarity.sangat_cocok },
+          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
+          { variable: 'volume', term: 'sedang', value: volume.sedang }
+        ]
+      },
+      {
+        output: 'SANGAT_TINGGI',
+        label: 'Sangat tinggi',
+        antecedents: [
+          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
+          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
+          { variable: 'volume', term: 'banyak', value: volume.banyak },
+          { variable: 'publisher', term: 'high', value: publisher.high }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'similarity', term: 'sangat_cocok', value: similarity.sangat_cocok },
+          { variable: 'review', term: 'bagus', value: review.bagus },
+          { variable: 'volume', term: 'sedang', value: volume.sedang }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
+          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
+          { variable: 'volume', term: 'sedang', value: volume.sedang }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
+          { variable: 'review', term: 'bagus', value: review.bagus },
+          { variable: 'volume', term: 'banyak', value: volume.banyak }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
+          { variable: 'review', term: 'bagus', value: review.bagus },
+          { variable: 'publisher', term: 'high', value: publisher.high }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
+          { variable: 'review', term: 'bagus', value: review.bagus },
+          { variable: 'volume', term: 'sedang', value: volume.sedang }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
+          { variable: 'review', term: 'bagus', value: review.bagus },
+          { variable: 'volume', term: 'sedikit', value: volume.sedikit }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'similarity', term: 'lumayan', value: similarity.lumayan },
+          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
+          { variable: 'volume', term: 'sedang', value: volume.sedang }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'similarity', term: 'sangat_cocok', value: similarity.sangat_cocok },
+          { variable: 'review', term: 'mixed', value: review.mixed },
+          { variable: 'volume', term: 'banyak', value: volume.banyak }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'similarity', term: 'lumayan', value: similarity.lumayan },
+          { variable: 'review', term: 'bagus', value: review.bagus },
+          { variable: 'volume', term: 'sedikit', value: volume.sedikit }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'similarity', term: 'tidak_cocok', value: similarity.tidak_cocok },
+          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
+          { variable: 'review', term: 'mixed', value: review.mixed }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'similarity', term: 'lumayan', value: similarity.lumayan },
+          { variable: 'review', term: 'mixed', value: review.mixed },
+          { variable: 'volume', term: 'sedang', value: volume.sedang }
+        ]
+      },
+      {
+        output: 'SANGAT_RENDAH',
+        label: 'Sangat rendah',
+        antecedents: [
+          { variable: 'review', term: 'buruk', value: review.buruk },
+          { variable: 'similarity', term: 'tidak_cocok', value: similarity.tidak_cocok }
+        ]
+      },
+      {
+        output: 'SANGAT_RENDAH',
+        label: 'Sangat rendah',
+        antecedents: [
+          { variable: 'review', term: 'buruk', value: review.buruk },
+          { variable: 'volume', term: 'banyak', value: volume.banyak }
+        ]
+      },
+      {
+        output: 'SANGAT_RENDAH',
+        label: 'Sangat rendah',
+        antecedents: [
+          { variable: 'similarity', term: 'tidak_cocok', value: similarity.tidak_cocok }
+        ]
+      }
+    ] as const;
+
     const activation = {
       SANGAT_RENDAH: 0,
       RENDAH: 0,
@@ -49,38 +213,22 @@ export class FuzzyNonOwnGamesScorer {
       SANGAT_TINGGI: 0,
     };
 
-    activation.SANGAT_TINGGI = Math.max(
-      Math.min(similarity.sangat_cocok, review.sangat_bagus, volume.banyak),
-      Math.min(similarity.sangat_cocok, review.sangat_bagus, volume.sedang),
-      Math.min(similarity.cocok, review.sangat_bagus, volume.banyak, publisher.high)
-    );
+    const ruleResults = ruleDefinitions.map((rule) => {
+      const alpha = rule.antecedents.reduce((minValue, antecedent) => Math.min(minValue, antecedent.value), 1);
+      return {
+        output: rule.output,
+        label: rule.label,
+        antecedents: rule.antecedents,
+        alpha,
+        expression: `\\(${rule.antecedents.map((antecedent) => `\\mu_{${antecedent.variable},${antecedent.term}}`).join(' \\wedge ')}\\)`
+      };
+    });
 
-    activation.TINGGI = Math.max(
-      Math.min(similarity.sangat_cocok, review.bagus, volume.sedang),
-      Math.min(similarity.cocok, review.sangat_bagus, volume.sedang),
-      Math.min(similarity.cocok, review.bagus, volume.banyak),
-      Math.min(similarity.cocok, review.bagus, publisher.high)
-    );
-
-    activation.SEDANG = Math.max(
-      Math.min(similarity.cocok, review.bagus, volume.sedang),
-      Math.min(similarity.cocok, review.bagus, volume.sedikit),
-      Math.min(similarity.lumayan, review.sangat_bagus, volume.sedang),
-      Math.min(similarity.sangat_cocok, review.mixed, volume.banyak)
-    );
-
-    activation.RENDAH = Math.max(
-      Math.min(similarity.lumayan, review.bagus, volume.sedikit),
-      Math.min(similarity.tidak_cocok, review.sangat_bagus),
-      Math.min(similarity.cocok, review.mixed),
-      Math.min(similarity.lumayan, review.mixed, volume.sedang)
-    );
-
-    activation.SANGAT_RENDAH = Math.max(
-      Math.min(review.buruk, similarity.tidak_cocok),
-      Math.min(review.buruk, volume.banyak),
-      similarity.tidak_cocok
-    );
+    for (const output of Object.keys(activation) as Array<keyof typeof activation>) {
+      activation[output] = ruleResults
+        .filter((rule) => rule.output === output)
+        .reduce((maxValue, rule) => Math.max(maxValue, rule.alpha), 0);
+    }
 
     const weights = {
       SANGAT_RENDAH: 0.1,
@@ -100,6 +248,49 @@ export class FuzzyNonOwnGamesScorer {
       }
     }
 
-    return denominator > 0 ? numerator / denominator : 0;
+    const score = denominator > 0 ? numerator / denominator : 0;
+
+    return {
+      score,
+      details: {
+        review,
+        similarity,
+        publisher,
+        volume,
+        activation,
+        process: {
+          kind: 'recommendation',
+          fuzzification: {
+            inputs: {
+              review_positivity: reviewPositivity,
+              tag_similarity: tagSimilarity,
+              review_volume: reviewVolume,
+              log_review_volume: logVolume,
+              publisher_score: publisherScore
+            },
+            memberships: {
+              review,
+              similarity,
+              publisher,
+              volume
+            }
+          },
+          inference: {
+            rules: ruleResults,
+            activation
+          },
+          defuzzification: {
+            weights,
+            numerator,
+            denominator,
+            score,
+            usedFallback: denominator === 0,
+            formula: denominator > 0
+              ? '\\[\\begin{aligned}\\text{score} &= \\frac{\\sum(A_k \\cdot w_k)}{\\sum A_k}\\end{aligned}\\]'
+              : '\\[\\text{score} = 0\\]'
+          }
+        }
+      }
+    };
   }
 }

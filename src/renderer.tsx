@@ -23,6 +23,11 @@ export const renderer = reactRenderer(({ children, title, c }: { children?: Reac
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+        <script
+          id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+        ></script>
         <Link href="/src/style.css" rel="stylesheet" />
         <Script src="/src/client.tsx" />
         <script dangerouslySetInnerHTML={{ __html: `

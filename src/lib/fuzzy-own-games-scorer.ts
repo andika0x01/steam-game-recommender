@@ -31,8 +31,102 @@ export class FuzzyOwnGamesScorer {
   }
 
   getGameScore(gameId: number): number {
+    return this.getGameScoreDetailed(gameId).score;
+  }
+
+  getGameScoreDetailed(gameId: number): { 
+    score: number; 
+    details: { 
+      playtime: any, 
+      recency: any, 
+      activity: any, 
+      activation: any,
+      process: {
+        fuzzification: {
+          inputs: {
+            playtime_forever: number,
+            playtime_2weeks: number,
+            days_since_played: number,
+            max_playtime_forever: number,
+            max_playtime_2weeks: number
+          },
+          normalization: {
+            playtime: number,
+            activity: number
+          },
+          memberships: {
+            playtime: any,
+            recency: any,
+            activity: any
+          }
+        },
+        inference: {
+          rules: Array<{
+            output: string,
+            label: string,
+            antecedents: Array<{
+              variable: string,
+              term: string,
+              value: number
+            }>,
+            alpha: number,
+            expression: string
+          }>,
+          activation: any
+        },
+        defuzzification: {
+          weights: Record<string, number>,
+          numerator: number,
+          denominator: number,
+          score: number,
+          usedFallback: boolean,
+          formula: string
+        }
+      }
+    } 
+  } {
     const game = this.userGames.get(gameId);
-    if (!game) return 0;
+    if (!game) return { 
+      score: 0, 
+      details: { 
+        playtime: {}, 
+        recency: {}, 
+        activity: {}, 
+        activation: {},
+        process: {
+          fuzzification: {
+            inputs: {
+              playtime_forever: 0,
+              playtime_2weeks: 0,
+              days_since_played: 0,
+              max_playtime_forever: 0,
+              max_playtime_2weeks: 0
+            },
+            normalization: {
+              playtime: 0,
+              activity: 0
+            },
+            memberships: {
+              playtime: {},
+              recency: {},
+              activity: {}
+            }
+          },
+          inference: {
+            rules: [],
+            activation: {}
+          },
+          defuzzification: {
+            weights: {},
+            numerator: 0,
+            denominator: 0,
+            score: 0,
+            usedFallback: true,
+            formula: '\\[\\text{score} = 0\\]'
+          }
+        }
+      } 
+    };
 
     const playtimeNorm = this.maxPlaytimeForever > 0 ? game.playtime_forever / this.maxPlaytimeForever : 0;
     const activityNorm = this.maxPlaytime2Weeks > 0 ? (game.playtime_2weeks || 0) / this.maxPlaytime2Weeks : 0;
@@ -63,6 +157,121 @@ export class FuzzyOwnGamesScorer {
       sangat_aktif: this.trapMF(activityNorm, 0.6, 0.75, 1.0, 1.1),
     };
 
+    const ruleDefinitions = [
+      {
+        output: 'SANGAT_TINGGI',
+        label: 'Sangat tinggi',
+        antecedents: [
+          { variable: 'playtime', term: 'sangat_banyak', value: playtime.sangat_banyak },
+          { variable: 'recency', term: 'baru_main', value: recency.baru_main }
+        ]
+      },
+      {
+        output: 'SANGAT_TINGGI',
+        label: 'Sangat tinggi',
+        antecedents: [
+          { variable: 'playtime', term: 'sering', value: playtime.sering },
+          { variable: 'activity', term: 'sangat_aktif', value: activity.sangat_aktif },
+          { variable: 'recency', term: 'baru_main', value: recency.baru_main }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'playtime', term: 'sangat_banyak', value: playtime.sangat_banyak },
+          { variable: 'recency', term: 'agak_lama', value: recency.agak_lama }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'playtime', term: 'sering', value: playtime.sering },
+          { variable: 'activity', term: 'aktif', value: activity.aktif }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'playtime', term: 'sering', value: playtime.sering },
+          { variable: 'recency', term: 'baru_main', value: recency.baru_main }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'playtime', term: 'cukup', value: playtime.cukup },
+          { variable: 'recency', term: 'agak_lama', value: recency.agak_lama }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'playtime', term: 'cukup', value: playtime.cukup },
+          { variable: 'activity', term: 'sesekali', value: activity.sesekali }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'playtime', term: 'sering', value: playtime.sering },
+          { variable: 'recency', term: 'lama', value: recency.lama }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'playtime', term: 'dicoba', value: playtime.dicoba },
+          { variable: 'recency', term: 'lama', value: recency.lama }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'playtime', term: 'cukup', value: playtime.cukup },
+          { variable: 'recency', term: 'sangat_lama', value: recency.sangat_lama }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'playtime', term: 'dicoba', value: playtime.dicoba },
+          { variable: 'activity', term: 'tidak_aktif', value: activity.tidak_aktif }
+        ]
+      },
+      {
+        output: 'SANGAT_RENDAH',
+        label: 'Sangat rendah',
+        antecedents: [
+          { variable: 'playtime', term: 'tidak_dimainkan', value: playtime.tidak_dimainkan }
+        ]
+      },
+      {
+        output: 'SANGAT_RENDAH',
+        label: 'Sangat rendah',
+        antecedents: [
+          { variable: 'recency', term: 'ditinggal', value: recency.ditinggal },
+          { variable: 'playtime', term: 'dicoba', value: playtime.dicoba }
+        ]
+      },
+      {
+        output: 'SANGAT_RENDAH',
+        label: 'Sangat rendah',
+        antecedents: [
+          { variable: 'recency', term: 'ditinggal', value: recency.ditinggal },
+          { variable: 'activity', term: 'tidak_aktif', value: activity.tidak_aktif }
+        ]
+      }
+    ] as const;
+
     const activation = {
       SANGAT_RENDAH: 0,
       RENDAH: 0,
@@ -71,34 +280,22 @@ export class FuzzyOwnGamesScorer {
       SANGAT_TINGGI: 0,
     };
 
-    activation.SANGAT_TINGGI = Math.max(
-      Math.min(playtime.sangat_banyak, recency.baru_main),
-      Math.min(playtime.sering, activity.sangat_aktif, recency.baru_main)
-    );
-    
-    activation.TINGGI = Math.max(
-      Math.min(playtime.sangat_banyak, recency.agak_lama),
-      Math.min(playtime.sering, activity.aktif),
-      Math.min(playtime.sering, recency.baru_main)
-    );
-    
-    activation.SEDANG = Math.max(
-      Math.min(playtime.cukup, recency.agak_lama),
-      Math.min(playtime.cukup, activity.sesekali),
-      Math.min(playtime.sering, recency.lama)
-    );
-    
-    activation.RENDAH = Math.max(
-      Math.min(playtime.dicoba, recency.lama),
-      Math.min(playtime.cukup, recency.sangat_lama),
-      Math.min(playtime.dicoba, activity.tidak_aktif)
-    );
-    
-    activation.SANGAT_RENDAH = Math.max(
-      playtime.tidak_dimainkan,
-      Math.min(recency.ditinggal, playtime.dicoba),
-      Math.min(recency.ditinggal, activity.tidak_aktif)
-    );
+    const ruleResults = ruleDefinitions.map((rule) => {
+      const alpha = rule.antecedents.reduce((minValue, antecedent) => Math.min(minValue, antecedent.value), 1)
+      return {
+        output: rule.output,
+        label: rule.label,
+        antecedents: rule.antecedents,
+        alpha,
+        expression: `\\(${rule.antecedents.map((antecedent) => `\\mu_{${antecedent.variable},${antecedent.term}}`).join(' \\wedge ')}\\)`
+      }
+    })
+
+    for (const output of Object.keys(activation) as Array<keyof typeof activation>) {
+      activation[output] = ruleResults
+        .filter((rule) => rule.output === output)
+        .reduce((maxValue, rule) => Math.max(maxValue, rule.alpha), 0)
+    }
 
     const weights = {
       SANGAT_RENDAH: 0.1,
@@ -118,6 +315,51 @@ export class FuzzyOwnGamesScorer {
       }
     }
 
-    return denominator > 0 ? numerator / denominator : 0.5;
+    const score = denominator > 0 ? numerator / denominator : 0.5;
+    const usedFallback = denominator === 0;
+    
+    return {
+      score,
+      details: {
+        playtime,
+        recency,
+        activity,
+        activation,
+        process: {
+          fuzzification: {
+            inputs: {
+              playtime_forever: game.playtime_forever,
+              playtime_2weeks: game.playtime_2weeks || 0,
+              days_since_played: daysSincePlayed,
+              max_playtime_forever: this.maxPlaytimeForever,
+              max_playtime_2weeks: this.maxPlaytime2Weeks
+            },
+            normalization: {
+              playtime: playtimeNorm,
+              activity: activityNorm
+            },
+            memberships: {
+              playtime,
+              recency,
+              activity
+            }
+          },
+          inference: {
+            rules: ruleResults,
+            activation
+          },
+          defuzzification: {
+            weights,
+            numerator,
+            denominator,
+            score,
+            usedFallback,
+            formula: usedFallback
+              ? '\\[\\text{score} = 0.5\\]'
+              : '\\[\\begin{aligned}\\text{score} &= \\frac{\\sum(\\alpha_i \\cdot w_i)}{\\sum \\alpha_i}\\end{aligned}\\]'
+          }
+        }
+      }
+    };
   }
 }

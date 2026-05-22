@@ -24,10 +24,14 @@ app.get('/', async (c) => {
 
   const scorer = new FuzzyOwnGamesScorer(games)
 
-  const analyzedGames = games.map(game => ({
-    ...game,
-    personalMatch: scorer.getGameScore(game.appid)
-  })).sort((a, b) => b.personalMatch - a.personalMatch)
+  const analyzedGames = games.map(game => {
+    const detailed = scorer.getGameScoreDetailed(game.appid);
+    return {
+      ...game,
+      personalMatch: detailed.score,
+      fuzzyDetails: detailed.details
+    };
+  }).sort((a, b) => b.personalMatch - a.personalMatch)
 
   const userProfile = await buildUserProfile(steamAPI, games, steamId)
   
@@ -40,6 +44,8 @@ app.get('/', async (c) => {
     .slice(0, 8)
 
   return c.render(
+    <>
+    <div data-hydrate="AnalyzerModal"></div>
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-12 md:space-y-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
         <div className="space-y-6 max-w-3xl">
@@ -98,17 +104,52 @@ app.get('/', async (c) => {
       <div className="space-y-10">
         <p className="text-[11px] font-black tracking-[0.5em] uppercase text-zinc-500 px-2 text-center md:text-left">Distribusi Skor Preferensi Library</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-6 md:gap-10">
-          {analyzedGames.map((game, idx) => (
-            <GameCard 
-              key={game.appid}
-              appId={game.appid}
-              name={game.name || 'Unknown'}
-              score={game.personalMatch}
-            />
-          ))}
+          {analyzedGames.map((game, idx) => {
+            const gameData = {
+              appId: game.appid,
+              name: game.name || 'Unknown',
+              score: game.personalMatch,
+              fuzzyStats: game.fuzzyDetails,
+              raw: {
+                playtime_forever: game.playtime_forever,
+                rtime_last_played: game.rtime_last_played || 0,
+                playtime_2weeks: game.playtime_2weeks || 0
+              }
+            };
+            
+            return (
+              <div 
+                key={game.appid} 
+                className="cursor-pointer group relative analyzer-card-trigger"
+                data-game={JSON.stringify(gameData)}
+              >
+                <GameCard 
+                  appId={game.appid}
+                  name={game.name || 'Unknown'}
+                  score={game.personalMatch}
+                  actionLabel="Lihat Analisis"
+                  isActionDiv={true}
+                />
+              </div>
+            )
+          })}
         </div>
       </div>
-    </div>,
+      <script dangerouslySetInnerHTML={{
+        __html: `
+          if (typeof document !== 'undefined') {
+            document.addEventListener('click', function(e) {
+              var trigger = e.target.closest('.analyzer-card-trigger');
+              if (trigger) {
+                var gameData = JSON.parse(trigger.getAttribute('data-game'));
+                window.dispatchEvent(new CustomEvent('open-analyzer-modal', { detail: gameData }));
+              }
+            });
+          }
+        `
+      }} />
+    </div>
+    </>,
     { title: 'Library Analysis' } as any
   )
 })

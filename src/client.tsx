@@ -1,9 +1,11 @@
 import React from 'react'
 import { hydrateRoot } from 'react-dom/client'
 import { InfiniteGrid } from './components/InfiniteGrid'
+import { AnalyzerModal } from './components/AnalyzerModal'
 
 const components: Record<string, React.ComponentType<any>> = {
   InfiniteGrid,
+  AnalyzerModal,
 }
 
 const hydrateAll = () => {

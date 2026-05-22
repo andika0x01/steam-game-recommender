@@ -40,6 +40,15 @@ describe('FuzzyOwnGamesScorer', () => {
     const scorer = new FuzzyOwnGamesScorer(mockGames);
     expect(scorer.getGameScore(999)).toBe(0); // getGameScore returns 0 if game not found
   });
+
+  it('should expose a full fuzzy process breakdown', () => {
+    const scorer = new FuzzyOwnGamesScorer(mockGames);
+    const detailed = scorer.getGameScoreDetailed(10);
+
+    expect(detailed.details.process.fuzzification.normalization.playtime).toBeCloseTo(1, 5);
+    expect(detailed.details.process.inference.rules.length).toBeGreaterThan(0);
+    expect(detailed.details.process.defuzzification.score).toBeCloseTo(detailed.score, 10);
+  });
 });
 
 describe('FuzzyNonOwnGamesScorer', () => {

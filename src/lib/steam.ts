@@ -1,3 +1,89 @@
+export const EXCLUDED_CATEGORIES = new Set([
+  'Steam Achievements',
+  'Steam Trading Cards', 
+  'Steam Cloud',
+  'Remote Play on Phone',
+  'Remote Play on Tablet',
+  'Remote Play on TV',
+  'Remote Play Together',
+  'In-App Purchases',
+  'Custom Volume Controls',
+  'Stereo Sound',
+  'Surround Sound',
+  'Stats',
+  'Captions available',
+  'Commentary available',
+  'HDR available',
+  'VR Supported',
+  'VR Only',
+  'Steam Leaderboards',
+  'Full controller support',
+  'Partial controller support',
+  'Includes level editor',
+  'Includes Source SDK',
+  'Valve Anti-Cheat enabled',
+  'Online PvP',
+  'Shared/Split Screen PvP',
+  'LAN PvP',
+  'LAN Co-op'
+]);
+
+export const ALLOWED_STEAM_TAGS = new Set([
+  "Indie", "Action", "Adventure", "Casual", "Singleplayer", "Simulation", "RPG", "Strategy", "2D", "Early Access", "3D", "Free to Play",
+  "Atmospheric", "Colorful", "Story Rich", "Exploration", "Fantasy", "Multiplayer", "Cute", "Pixel Graphics", "Puzzle", "Combat",
+  "First-Person", "Action-Adventure", "Relaxing", "Funny", "Stylized", "Arcade", "Anime", "Controller", "Horror", "Sci-fi", "Sports",
+  "Massively Multiplayer", "PvE", "Third Person", "Violent", "Choices Matter", "Shooter", "Retro", "Family Friendly", "Female Protagonist",
+  "Top-Down", "Sexual Content", "Co-op", "Racing", "Realistic", "Dark", "PvP", "Nudity", "Linear", "Open World", "Mystery", "Survival",
+  "Multiple Endings", "Character Customization", "Comedy", "Cartoony", "Gore", "Visual Novel", "Platformer", "Physics", "Psychological Horror",
+  "Online Co-Op", "2D Platformer", "Roguelike", "Magic", "Roguelite", "Management", "Sandbox", "FPS", "Medieval", "Tactical",
+  "Resource Management", "Hand-drawn", "Action RPG", "Old School", "Immersive Sim", "Minimalist", "Futuristic", "Crafting", "Building",
+  "Point & Click", "Emotional", "Dark Fantasy", "Cartoon", "Action Roguelike", "Difficult", "Space", "3D Platformer",
+  "Procedural Generation", "Romance", "Choose Your Own Adventure", "Interactive Fiction", "Nature", "Survival Horror", "Logic",
+  "Turn-Based Combat", "Turn-Based Tactics", "Turn-Based Strategy", "Local Multiplayer", "Hentai", "1990's", "Base Building",
+  "Hack and Slash", "Surreal", "VR", "Hidden Object", "Dating Sim", "Side Scroller", "Bullet Hell", "Puzzle Platformer",
+  "Post-apocalyptic", "Education", "Walking Simulator", "Incremental", "Dungeon Crawler", "Cinematic", "Shoot 'Em Up", "Lore-Rich",
+  "War", "Life Sim", "Dialogue Heavy", "Score Attack", "Great Soundtrack", "Card Game", "Text-Based", "Inventory Management",
+  "Tabletop", "Zombies", "JRPG", "Psychological", "LGBTQ+", "Stealth", "1980s", "Economy", "Local Co-Op", "Investigation",
+  "Thriller", "2.5D", "Historical", "Idler", "Supernatural", "Isometric", "Party-Based RPG", "Tutorial", "Dark Humor", "Nonlinear",
+  "Third-Person Shooter", "Military", "Time Management", "Top-Down Shooter", "Replay Value", "Deckbuilding", "Demons", "Team-Based",
+  "Artificial Intelligence", "Aliens", "Strategy RPG", "Loot", "Cyberpunk", "Robots", "Detective", "Collectathon", "Turn-Based",
+  "Dystopian", "Modern", "Real Time Tactics", "Abstract", "Perma Death", "Tower Defense", "Driving", "RTS", "Precision Platformer",
+  "Board Game", "Arena Shooter", "Souls-like", "Comic Book", "Psychedelic", "Tactical RPG", "Card Battler", "City Builder", "Memes",
+  "Mythology", "Alternate History", "Automation", "Cats", "Wargame", "Capitalism", "4 Player Local", "Creature Collector",
+  "Grid-Based Movement", "Short", "Crime", "Cozy", "Beat 'em up", "Flight", "Destruction", "Metroidvania", "Parkour", "Fast-Paced",
+  "CRPG", "Level Editor", "Class-Based", "Runner", "Moddable", "Philosophical", "Music", "Dark Comedy", "2D Fighter", "Soundtrack",
+  "Trading", "Gun Customization", "Automobile Sim", "Farming Sim", "Cooking", "3D Fighter", "Rhythm", "Competitive", "Fighting",
+  "Auto Battler", "eSports", "Vehicular Combat", "MMORPG", "Co-op Campaign", "Lovecraftian", "Science", "Noir", "Swordplay",
+  "Quick-Time Events", "Conspiracy", "Party Game", "Twin Stick Shooter", "Dragons", "Word Game", "Colony Sim", "Space Sim", "Satire",
+  "Parody", "Gothic", "Grand Strategy", "Classic", "Experimental", "Dynamic Narration", "Looter Shooter", "Battle Royale", "Mining",
+  "Mystery Dungeon", "Underground", "6DOF", "Split Screen", "Agriculture", "World War II", "Narrative", "Bullet Time",
+  "Time Manipulation", "Fishing", "Political", "Martial Arts", "Wholesome", "Beautiful", "Roguelike Deckbuilder", "Hero Shooter",
+  "Spectacle fighter", "Mechs", "Match 3", "Combat Racing", "Dogs", "Immersive", "Gambling", "Action RTS", "Open World Survival Craft",
+  "Asynchronous Multiplayer", "Time Travel", "Voxel", "FMV", "Ninja", "Vampires", "Otome", "Trading Card Game", "God Game", "Solitaire",
+  "Politics", "Steampunk", "Transportation", "Pirates", "Underwater", "Hunting", "Boomer Shooter", "Hex Grid", "Hacking", "Faith",
+  "Shop Keeper", "Tanks", "Political Sim", "Trains", "MOBA", "Typing", "4X", "Sokoban", "Assassins", "Superhero", "Remake", "Party",
+  "Character Action Game", "Dinosaurs", "Diplomacy", "Western", "Heist", "Minigames", "Cold War", "Mouse Only", "Naval", "Snow",
+  "Transhumanism", "Traditional Roguelike", "Job Simulator", "Naval Combat", "Sailing", "Addictive", "Escape Room", "Archery", "Horses",
+  "Real-Time", "Episodic", "Nostalgia", "Farming", "Epic", "Music-Based Procedural Generation", "Offroad", "Trivia", "Villain Protagonist",
+  "Werewolves", "Football (Soccer)", "Sniper", "Real-Time with Pause", "On-Rails Shooter", "Time Attack", "Sequel", "Spelling", "Mars",
+  "Outbreak Sim", "World War I", "Boxing", "Bullet Heaven", "Dwarves", "Chess", "Touch-Friendly", "Mod", "Spaceships", "Animals",
+  "Basketball", "Golf", "Medical Sim", "Submarine", "Baseball", "Motorbike", "Extraction Shooter", "Jump Scare", "Gaming",
+  "Social Deduction", "Rome", "Bikes", "Pinball", "Dice", "Electronic Music", "Asymmetric VR", "Wrestling", "Boss Rush",
+  "Silent Protagonist", "Skateboarding", "Elves", "Instrumental Music", "Mini Golf", "Football (American)", "Billiards", "Skating",
+  "Vikings", "Rock Music", "Cycling", "Tennis", "Motocross", "Birds", "Intentionally Awkward Controls", "Mahjong", "Bowling", "Hockey",
+  "Based On A Novel", "ATV", "Lemmings", "8-bit Music", "Snowboarding", "Skiing", "Decorating", "Wuxia", "Foxes", "BMX", "Organizing",
+  "Musou", "Cleaning", "Hobby Sim", "Espionage", "Xianxia", "Samurai", "Cult", "Poker", "Falling Blocks", "Volleyball", "Capybaras",
+  "Cricket", "Language Learning", "Wolves", "Zoo", "Rugby", "Snooker", "Reboot"
+]);
+
+const ALLOWED_STEAM_TAGS_LOWER = new Set(
+  Array.from(ALLOWED_STEAM_TAGS).map((tag) => tag.toLowerCase())
+);
+
+export const isAllowedSteamTag = (tag?: string | null) => {
+  return Boolean(tag && ALLOWED_STEAM_TAGS_LOWER.has(tag.toLowerCase()));
+};
+
 export interface SteamPlayer {
   steamid: string;
   communityvisibilitystate: number;

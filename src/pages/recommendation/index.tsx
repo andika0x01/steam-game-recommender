@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import React from 'react'
-import { SteamAPI } from '../../lib/steam'
+import { SteamAPI, isAllowedSteamTag } from '../../lib/steam'
 import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
 import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-non-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
@@ -32,7 +32,13 @@ app.get('/', async (c) => {
   const userGames = await steamAPI.getOwnedGames(steamId)
 
   const { publisherScores, userProfileTags, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
+  const allowedTagWeights = Object.fromEntries(
+    Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))
+  ) as Record<string, number>;
   const nonOwnScorer = new FuzzyNonOwnGamesScorer();
+  const topProfileTags = Object.entries(allowedTagWeights)
+    .sort(([, left], [, right]) => (right as number) - (left as number))
+    .slice(0, 8)
 
   let scoredDeals: any[] = []
   try {
@@ -55,7 +61,7 @@ app.get('/', async (c) => {
         const candidateTags = [
           ...(d.genres || []).map((g: any) => g.description),
           ...(d.categories || []).map((c: any) => c.description)
-        ];
+        ].filter(isAllowedSteamTag);
 
         let candidatePS = 0;
         if (d.publishers) {
@@ -63,10 +69,19 @@ app.get('/', async (c) => {
         }
 
         const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
-        const similarity = calculateWeightedSimilarity(candidateTags, tagWeights);
+        const similarity = calculateWeightedSimilarity(candidateTags, allowedTagWeights);
         const volume = reviews ? reviews.total_reviews : 0;
 
-        const score = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);
+        const detailed = nonOwnScorer.getGameScoreDetailed(positivity, similarity, volume, candidatePS);
+        const score = detailed.score;
+        const lowerTagWeights: Record<string, number> = {};
+        Object.entries(allowedTagWeights).forEach(([tag, weight]) => {
+          lowerTagWeights[tag.toLowerCase()] = weight as number;
+        });
+        const matchedTags = candidateTags
+          .filter((tag: string) => lowerTagWeights[tag.toLowerCase()])
+          .sort((left: string, right: string) => lowerTagWeights[right.toLowerCase()] - lowerTagWeights[left.toLowerCase()])
+          .slice(0, 8);
         
         /**
          * Penanganan Game Gratis (Price = 0)
@@ -82,6 +97,18 @@ app.get('/', async (c) => {
           normalPrice: d!.price_overview!.initial / 100,
           savings: d!.price_overview!.discount_percent.toString(),
           score: score,
+          fuzzyDetails: detailed.details,
+          source: {
+            reviewPositivity: positivity,
+            tagSimilarity: similarity,
+            reviewVolume: volume,
+            publisherScore: candidatePS,
+            matchedTags,
+            publishers: d.publishers || [],
+            price: d!.price_overview!.final_formatted,
+            originalPrice: d!.price_overview!.initial_formatted,
+            discount: d!.price_overview!.discount_percent.toString()
+          },
           density: density,
           formattedPrice: d!.price_overview!.final_formatted,
           formattedInitial: d!.price_overview!.initial_formatted,
@@ -186,10 +213,19 @@ app.get('/', async (c) => {
        tags: d.tags,
        hideScore: false,
        hideTags: true,
-       density: d.density
+       density: d.density,
+       analyzerData: {
+         appId: d.appid,
+         name: d.name,
+         score: d.score,
+         fuzzyStats: d.fuzzyDetails,
+         source: d.source
+       }
     }))
 
   return c.render(
+    <>
+    <div data-hydrate="AnalyzerModal"></div>
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-16 md:space-y-24">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-12">
         <div className="space-y-6 max-w-2xl">
@@ -222,6 +258,20 @@ app.get('/', async (c) => {
               Mulai Optimasi
             </button>
           </form>
+
+          <div className="space-y-3 pt-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-zinc-600">Source Data</p>
+            <p className="max-w-xl text-sm leading-relaxed text-zinc-500">
+              Rekomendasi dibentuk dari top tags library yang sudah diberi bobot fuzzy, review Steam, volume review, dan affinity publisher. Tag dominan saat ini:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {topProfileTags.map(([tag, weight]) => (
+                <span key={tag} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-300">
+                  {tag} <span className="ml-1 font-mono text-orange-400">{(weight as number).toFixed(1)}</span>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
         {budgetIDR > 0 && (
@@ -274,19 +324,35 @@ app.get('/', async (c) => {
             <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-white/10" />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-6">
-            {basketItems.map((deal: any) => (
-              <GameCard 
-                key={deal.appid}
-                appId={deal.appid}
-                name={deal.name}
-                score={deal.score}
-                price={deal.formattedPrice}
-                discount={deal.savings}
-                hideScore={false}
-                hideTags={true}
-                actionLabel="Lihat di Steam"
-              />
-            ))}
+            {basketItems.map((deal: any) => {
+              const gameData = {
+                appId: deal.appid,
+                name: deal.name,
+                score: deal.score,
+                fuzzyStats: deal.fuzzyDetails,
+                source: deal.source
+              }
+
+              return (
+                <div
+                  key={deal.appid}
+                  className="cursor-pointer recommendation-card-trigger"
+                  data-game={JSON.stringify(gameData)}
+                >
+                  <GameCard 
+                    appId={deal.appid}
+                    name={deal.name}
+                    score={deal.score}
+                    price={deal.formattedPrice}
+                    discount={deal.savings}
+                    hideScore={false}
+                    hideTags={true}
+                    actionLabel="Lihat Analisis"
+                    isActionDiv={true}
+                  />
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -309,7 +375,21 @@ app.get('/', async (c) => {
           </div>
         )}
       </div>
-    </div>,
+      <script dangerouslySetInnerHTML={{
+        __html: `
+          if (typeof document !== 'undefined') {
+            document.addEventListener('click', function(e) {
+              var trigger = e.target.closest('.recommendation-card-trigger');
+              if (trigger) {
+                var gameData = JSON.parse(trigger.getAttribute('data-game'));
+                window.dispatchEvent(new CustomEvent('open-analyzer-modal', { detail: gameData }));
+              }
+            });
+          }
+        `
+      }} />
+    </div>
+    </>,
     { title: 'Recommendation' } as any
   )
 })
