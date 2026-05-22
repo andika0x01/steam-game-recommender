@@ -69,6 +69,10 @@ app.get('/deals', async (c) => {
         const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
         const similarity = calculateSimilarity(candidateTags, userProfileTags);
         const volume = reviews ? reviews.total_reviews : 0;
+        
+        const score = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);
+        const floatPrice = d!.price_overview!.final / 100;
+        const density = score / (floatPrice > 0 ? floatPrice : 1);
 
         return {
           appid: d!.steam_appid,
@@ -76,7 +80,8 @@ app.get('/deals', async (c) => {
           price: d!.price_overview!.final_formatted,
           originalPrice: d!.price_overview!.initial_formatted,
           discount: d!.price_overview!.discount_percent.toString(),
-          score: nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS),
+          score: score,
+          density: density,
           tags: candidateTags,
           hideScore: false
         }

@@ -14,7 +14,14 @@ interface InfiniteGridProps {
  * deduplikasi ID bekerja dengan benar untuk menghindari stall.
  */
 export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoint, type }) => {
-  const [items, setItems] = useState(initialItems)
+  const [items, setItems] = useState(() => {
+    const list = [...initialItems];
+    if (type === 'deal') {
+      return list.sort((a, b) => (b.density || 0) - (a.density || 0));
+    } else {
+      return list.sort((a, b) => (b.score || 0) - (a.score || 0));
+    }
+  })
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [hasMore, setPageHasMore] = useState(true)
@@ -58,7 +65,15 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
         const uniqueNewItems = newItems.filter(i => !existingIds.has(i.appid || i.appId))
         
         if (uniqueNewItems.length > 0) {
-          setItems(prev => [...prev, ...uniqueNewItems])
+          setItems(prev => {
+            const combined = [...prev, ...uniqueNewItems];
+            if (type === 'deal') {
+              return combined.sort((a, b) => (b.density || 0) - (a.density || 0));
+            } else {
+              // type === 'game' -> /engine
+              return combined.sort((a, b) => (b.score || 0) - (a.score || 0));
+            }
+          })
           setPage(nextPage)
           setRetryCount(0) // Reset retry jika berhasil dapat item baru
         } else if (retryCount < 10) { 

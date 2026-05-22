@@ -185,7 +185,8 @@ app.get('/', async (c) => {
        discount: d.savings,
        tags: d.tags,
        hideScore: false,
-       hideTags: true
+       hideTags: true,
+       density: d.density
     }))
 
   return c.render(
