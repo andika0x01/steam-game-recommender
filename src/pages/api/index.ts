@@ -15,11 +15,8 @@ app.get('/recommendations', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const games = await steamAPI.getOwnedGames(steamId)
 
-  // Fetch more recommendations based on page
-  // amount * page ensures we bypass already seen items if needed, 
-  // but simple-recommendation currently returns a fresh set.
-  // We can pass a seed or offset if the engine supports it.
-  const recommendations = await getSimpleRecommendations(steamAPI, games, amount)
+  // Gunakan parameter 'page' untuk mengambil set rekomendasi berikutnya
+  const recommendations = await getSimpleRecommendations(steamAPI, games, amount, page)
 
   return c.json(recommendations)
 })
@@ -34,12 +31,10 @@ app.get('/deals', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
 
-  // Fetch search results with offset
-  // Steam search results are usually small per request, we can use 'start' parameter if supported by Steam storefront search
-  // or just fetch a larger pool and slice.
-  const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
-  const offset = (page - 1) * amount
-  const candidateIds = saleResults.slice(offset, offset + amount).map(r => r.id).filter(Boolean) as number[]
+  // Gunakan 'start' offset pada pencarian Steam untuk mendapatkan data baru
+  const start = (page - 1) * amount
+  const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id', start })
+  const candidateIds = saleResults.slice(0, amount).map(r => r.id).filter(Boolean) as number[]
   
   const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'english', 'id'))
   const rawDetails = await Promise.all(detailPromises)

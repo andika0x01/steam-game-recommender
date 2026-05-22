@@ -154,6 +154,7 @@ export interface SteamSearchOptions {
   maxprice?: number | 'free';
   cc?: string;
   l?: string;
+  start?: number; // Menambahkan dukungan offset pagination
 }
 
 /**
@@ -230,6 +231,7 @@ export class SteamAPI {
     if (options.maxprice) url.searchParams.append('maxprice', options.maxprice.toString());
     if (options.cc) url.searchParams.append('cc', options.cc);
     if (options.l) url.searchParams.append('l', options.l);
+    if (options.start) url.searchParams.append('start', options.start.toString());
 
     const response = await fetch(url.toString(), {
       headers: {

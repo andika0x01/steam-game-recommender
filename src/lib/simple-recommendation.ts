@@ -33,7 +33,8 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
 export async function getSimpleRecommendations(
   api: SteamAPI,
   ownedGames: SteamGame[],
-  amount: number = 12
+  amount: number = 12,
+  page: number = 1
 ): Promise<RecommendationResult[]> {
   if (ownedGames.length === 0) return [];
 
@@ -102,7 +103,7 @@ export async function getSimpleRecommendations(
 
   if (totalTagWeight === 0) return [];
 
-  // 2. Fetch Candidates
+  // 2. Determine Proportions and Fetch Candidates with Paging
   const sortedTags = Object.entries(tagWeights)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5); 
@@ -111,7 +112,9 @@ export async function getSimpleRecommendations(
   const fetchPromises = sortedTags.map(async ([tag, weight]) => {
     const proportion = weight / totalTagWeight;
     const count = Math.max(5, Math.ceil(candidatesPerTag * proportion));
-    return api.searchGames({ term: tag, sort_by: 'Reviews_DESC' }).then(res => res.slice(0, count));
+    // Gunakan 'start' offset berdasarkan halaman untuk mendapatkan data baru
+    const start = (page - 1) * count;
+    return api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start }).then(res => res.slice(0, count));
   });
 
   const searchResults = (await Promise.all(fetchPromises)).flat();

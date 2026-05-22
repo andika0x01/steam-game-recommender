@@ -141,5 +141,8 @@ Density = \frac{FuzzyScore}{\max(Price, 1)}
 
 SA mencari solusi yang memaksimalkan utilitas budget $(\frac{TotalCost}{Budget})^2$.
 
+### 3.5. Infinite Scrolling (Pemuatan Data Berkelanjutan)
+Untuk meningkatkan pengalaman pengguna dalam mengeksplorasi ribuan game di Steam, sistem mengimplementasikan *Infinite Scrolling* menggunakan **Intersection Observer API**. Data dimuat secara asinkron melalui API internal (`/api/recommendations` dan `/api/deals`). Sistem menggunakan parameter `start` pada query Steam Storefront untuk memastikan setiap halaman baru memberikan hasil yang unik dan berbeda dari halaman sebelumnya, menghindari pengulangan data yang sama.
+
 ## 4. Kesimpulan
 Sistem ini berhasil mengonversi data Steam yang sangat luas menjadi rekomendasi personal melalui pemodelan spektrum minat manusia menggunakan Logika Fuzzy. Penggunaan skala logaritmik, normalisasi relatif, dan optimasi heuristik memastikan hasil yang presisi dan efisien.
