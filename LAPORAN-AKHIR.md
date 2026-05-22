@@ -9,18 +9,13 @@ Sistem menggunakan pendekatan **Dual-Scorer Fuzzy Logic**:
 2.  **FuzzyNonOwnGamesScorer**: Memprediksi skor untuk game yang belum dimiliki.
 
 ### 2.1. Logika Fuzzy (Fuzzy Logic)
-Sistem menggunakan fungsi keanggotaan trapezoidal ($TrapMF$) untuk mengubah variabel input (crisp) menjadi nilai fuzzy.
+Sistem menggunakan fungsi keanggotaan trapezoidal untuk mengubah variabel input (crisp) menjadi nilai fuzzy.
 
 #### Fungsi Keanggotaan Trapezoidal:
-$$
-\mu_A(x; a, b, c, d) = 
-\begin{cases} 
-0, & x \le a \text{ atau } x \ge d \\
-\frac{x-a}{b-a}, & a < x < b \\
-1, & b \le x \le c \\
-\frac{d-x}{d-c}, & c < x < d 
-\end{cases}
-$$
+
+```math
+\mu_A(x; a, b, c, d) = \begin{cases} 0, & x \le a \text{ atau } x \ge d \\ \frac{x-a}{b-a}, & a < x < b \\ 1, & b \le x \le c \\ \frac{d-x}{d-c}, & c < x < d \end{cases}
+```
 
 #### Variabel Input:
 -   **Owned Games**: $Playtime$ (Playtime Forever), $Activity$ (2 Weeks Playtime), $Recency$ (Days since last played).
@@ -28,23 +23,29 @@ $$
 
 #### Defuzzifikasi (Weighted Average):
 Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor preferensi):
-$$
+
+```math
 Score = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_{activation, i}}
-$$
-Dimana $\mu_{activation}$ adalah derajat aktivasi aturan fuzzy dan $w$ adalah bobot konstanta untuk setiap kategori ($Sangat Rendah = 0.1$, $Rendah = 0.3$, dsb).
+```
+
+Dimana $\mu_{activation}$ adalah derajat aktivasi aturan fuzzy dan $w$ adalah bobot konstanta untuk setiap kategori ($Sangat Rendah = 0.1$, $Rendah = 0.3$, $Sedang = 0.5$, $Tinggi = 0.7$, $Sangat Tinggi = 0.9$).
 
 ### 2.2. Jaccard Similarity
 Digunakan untuk menghitung kemiripan antara dua set tag ($T_1$ dan $T_2$).
-$$
+
+```math
 J(T_1, T_2) = \frac{|T_1 \cap T_2|}{|T_1 \cup T_2|}
-$$
+```
+
 Nilai ini berkisar antara 0 (tidak mirip sama sekali) hingga 1 (identik).
 
 ### 2.3. Proportional Tag Fetching
 Untuk menjaga variasi rekomendasi, sistem menghitung proporsi minat pengguna terhadap setiap tag:
-$$
+
+```math
 Proporsi_{tag} = \frac{\sum Score_{game} \text{ (yang memiliki tag)}}{\sum \text{Total Weight Profile}}
-$$
+```
+
 Kandidat game diambil dari Steam Store secara proporsional berdasarkan nilai ini.
 
 ## 3. Fitur Utama
@@ -56,11 +57,13 @@ Menganalisis library pengguna untuk mengidentifikasi game mana yang paling "berh
 Mesin pencari game baru. Sistem ini mengambil puluhan hingga ratusan kandidat game berdasarkan profil tag pengguna, lalu menyaringnya menggunakan `FuzzyNonOwnGamesScorer` untuk mendapatkan 12 rekomendasi terbaik.
 
 ### 3.3. Co-op Nexus
-Menganalisis irisan (*intersection*) library antara pengguna dan teman-temannya. Rekomendasi dihitung dengan:
-$$
+Menganalisis irisan (*intersection*) library antara pengguna dan teman-temannya. Rekomendasi dihitung dengan rata-rata skor fuzzy anggota:
+
+```math
 Score_{group} = \frac{\sum_{j=1}^m FuzzyScore_j}{m}
-$$
-Dimana $m$ adalah jumlah anggota dalam grup. Menampilkan game multiplayer yang paling disukai secara kolektif.
+```
+
+Dimana $m$ adalah jumlah anggota dalam grup.
 
 ### 3.4. Deal Hunter (Budget Optimization)
 Menggunakan **Simulated Annealing (SA)** untuk menemukan kombinasi game diskon terbaik yang masuk dalam budget pengguna namun tetap memiliki skor preferensi tertinggi.
