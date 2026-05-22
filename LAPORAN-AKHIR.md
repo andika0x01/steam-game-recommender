@@ -25,83 +25,69 @@ Pemilihan bentuk trapezoid didasarkan pada:
 
 ---
 
-### 2.1.2. Fuzzifikasi Library (Owned Games)
-Variabel ini digunakan oleh `FuzzyOwnGamesScorer`. Semua data di-*normalize* terhadap nilai maksimum dalam library pengguna untuk menjaga skalabilitas.
+### 2.1.2. Analisis Variabel Input Library (Owned Games)
+Bagian ini menjelaskan bagaimana `FuzzyOwnGamesScorer` memproses data library pengguna.
 
-#### A. Playtime Forever (Satuan: Rasio Normalisasi 0.0 - 1.0)
-*Metode: $x = \frac{Playtime_{game}}{MaxPlaytime_{library}}$*
+#### A. Playtime Forever (Satuan: Menit)
+Variabel ini mengukur total waktu yang dihabiskan pengguna pada sebuah game sejak dibeli. Input ini di-*normalize* terhadap game dengan durasi terlama di library.
+-   **Kategori Linguistik**:
+    -   `tidak_dimainkan`: Game yang memiliki durasi main mendekati 0 menit.
+    -   `dicoba`: Game dengan durasi main sangat singkat (biasanya < 5% dari game terlama), menandakan game baru dicoba sebentar.
+    -   `cukup`: Menunjukkan pengguna sudah melewati fase perkenalan dan mulai mendalami gameplay.
+    -   `sering`: Game yang sudah dimainkan secara rutin dengan jam terbang signifikan.
+    -   `sangat_banyak`: Game favorit utama yang mendominasi statistik library pengguna.
 
-| Term | a | b | c | d | Interpretasi Pakar |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Tidak Dimainkan** | -0.1 | 0 | 0.02 | 0.05 | Game "backlog" yang belum disentuh. |
-| **Dicoba** | 0.02 | 0.05 | 0.15 | 0.2 | Hanya dimainkan beberapa jam awal. |
-| **Cukup** | 0.1 | 0.2 | 0.4 | 0.5 | Menunjukkan ketertarikan moderat. |
-| **Sering** | 0.3 | 0.4 | 0.7 | 0.8 | Pengguna menghabiskan waktu signifikan. |
-| **Sangat Banyak** | 0.6 | 0.8 | 1.0 | 1.1 | Game utama atau favorit sepanjang masa. |
+#### B. Recency (Satuan: Hari)
+Variabel ini mengitung jumlah hari sejak game tersebut terakhir kali dijalankan.
+-   **Kategori Linguistik**:
+    -   `baru_main` (0 - 7 hari): Game yang sedang hangat-hangatnya dimainkan (High Relevance).
+    -   `agak_lama` (10 - 30 hari): Game yang masih segar dalam ingatan namun frekuensi main mulai menurun.
+    -   `lama` (30 - 90 hari): Game yang mulai ditinggalkan demi judul baru.
+    -   `sangat_lama` (90 - 180 hari): Game yang sudah lama tidak disentuh.
+    -   `ditinggal` (> 180 hari): Game yang kemungkinan besar sudah tidak sesuai dengan minat aktif pengguna saat ini.
 
-#### B. Recency (Satuan: Hari Sejak Terakhir Dimainkan)
-*Alasan: Momentum minat pengguna meluruh seiring waktu.*
-
-| Term | a | b | c | d | Interpretasi Pakar |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Baru Main** | -1 | 0 | 5 | 7 | Masih dalam fase "hype" atau aktif. |
-| **Agak Lama** | 5 | 10 | 25 | 30 | Masih diingat dengan baik. |
-| **Lama** | 20 | 30 | 80 | 90 | Minat mulai beralih ke judul lain. |
-| **Sangat Lama** | 60 | 90 | 150 | 180 | Hampir tidak relevan bagi selera saat ini. |
-| **Ditinggal** | 150 | 180 | $\infty$ | $\infty$ | Game masa lalu yang sudah ditinggalkan. |
-
-#### C. Recent Activity (Satuan: Rasio Normalisasi Playtime 2 Minggu)
-*Metode: $x = \frac{RecentPlaytime_{game}}{MaxRecentPlaytime_{library}}$*
-
-| Term | a | b | c | d | Interpretasi Pakar |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Tidak Aktif** | -0.1 | 0 | 0 | 0.05 | Tidak ada interaksi dalam 2 minggu. |
-| **Sesekali** | 0 | 0.05 | 0.2 | 0.3 | Dimainkan sesekali di waktu luang. |
-| **Aktif** | 0.2 | 0.3 | 0.6 | 0.7 | Sedang sering dimainkan. |
-| **Sangat Aktif** | 0.5 | 0.7 | 1.0 | 1.1 | Fokus utama pengguna saat ini. |
+#### C. Recent Activity (Satuan: Menit)
+Mengukur jumlah menit bermain dalam 2 minggu terakhir. Digunakan untuk mendeteksi tren minat jangka pendek.
+-   **Kategori Linguistik**:
+    -   `tidak_aktif`: 0 menit bermain dalam 14 hari terakhir.
+    -   `sesekali`: Dimainkan dalam durasi singkat di sela-sela waktu luang.
+    -   `aktif`: Sedang sering dimainkan dalam 2 minggu terakhir.
+    -   `sangat_aktif`: Menunjukkan game tersebut adalah fokus utama hiburan pengguna saat ini.
 
 ---
 
-### 2.1.3. Fuzzifikasi Store (Non-Owned Games)
-Variabel ini digunakan oleh `FuzzyNonOwnGamesScorer` untuk prediksi.
+### 2.1.3. Analisis Variabel Input Store (Non-Owned Games)
+Bagian ini menjelaskan variabel yang digunakan `FuzzyNonOwnGamesScorer` untuk memprediksi potensi kepuasan pada game baru.
 
-#### A. Review Positivity (Satuan: Rasio 0.0 - 1.0)
-*Sumber: Data Steam Store AppReviews.*
+#### A. Review Positivity (Satuan: Persentase / Rasio)
+Rasio antara review positif terhadap total review di Steam.
+-   **Kategori Linguistik**:
+    -   `buruk`: Rasio di bawah 40%. Game dengan sentimen negatif kuat dari komunitas.
+    -   `mixed`: Rasio antara 40% - 60%. Kualitas game diperdebatkan atau memiliki masalah teknis.
+    -   `bagus`: Rasio 60% - 80%. Game yang diterima dengan baik secara umum.
+    -   `sangat_bagus`: Rasio di atas 80%. Game berkualitas tinggi yang sangat direkomendasikan komunitas.
 
-| Term | a | b | c | d | Interpretasi Pakar |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Buruk** | -0.1 | 0 | 0.4 | 0.5 | Rating "Mostly Negative" atau sejenisnya. |
-| **Mixed** | 0.4 | 0.45 | 0.6 | 0.65 | Pendapat komunitas terbagi (berisiko). |
-| **Bagus** | 0.6 | 0.65 | 0.75 | 0.8 | Game berkualitas standar industri. |
-| **Sangat Bagus** | 0.75 | 0.85 | 1.0 | 1.1 | "Overwhelmingly Positive" (Wajib direkomendasikan). |
+#### B. Tag Similarity (Satuan: Rasio / Jaccard Index)
+Mengukur kemiripan genre/tag game kandidat dengan profil tag favorit pengguna yang dibangun dari library.
+-   **Kategori Linguistik**:
+    -   `tidak_cocok`: Genre game sangat jauh dari kebiasaan bermain user.
+    -   `lumayan`: Memiliki satu atau dua elemen genre yang pernah dimainkan user.
+    -   `cocok`: Sebagian besar genre dan fitur game sesuai dengan selera user.
+    -   `sangat_cocok`: Game memiliki "DNA" yang identik dengan game-game favorit di library.
 
-#### B. Tag Similarity (Satuan: Jaccard Index 0.0 - 1.0)
-*Rumus: $J(T_{user}, T_{game})$*
+#### C. Review Volume (Satuan: Jumlah Review / Log10)
+Jumlah total review yang diterima game. Skala logaritmik digunakan untuk menyeimbangkan game indie baru dengan game AAA populer.
+-   **Kategori Linguistik**:
+    -   `sedikit` (< 100 review): Data rating dianggap kurang stabil/valid secara statistik.
+    -   `sedang` (100 - 3.000 review): Memiliki basis massa yang cukup untuk validasi kualitas.
+    -   `banyak` (> 10.000 review): Game populer dengan data rating yang sangat kredibel.
 
-| Term | a | b | c | d | Interpretasi Pakar |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Tidak Cocok** | -0.1 | 0 | 0.2 | 0.3 | Genre yang jarang disentuh user. |
-| **Lumayan** | 0.2 | 0.3 | 0.5 | 0.6 | Ada kemiripan elemen minor. |
-| **Cocok** | 0.5 | 0.6 | 0.8 | 0.9 | Genre utama yang disukai user. |
-| **Sangat Cocok** | 0.8 | 0.9 | 1.0 | 1.1 | Identik dengan profil minat tertinggi user. |
-
-#### C. Review Volume (Satuan: Log10 dari Total Review)
-*Alasan: Volume review Steam bersifat eksponensial.*
-
-| Term | a | b | c | d | Interpretasi Pakar |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Sedikit** | -1 | 0 | 1.5 | 2.0 | $10^0 - 10^{1.5}$ (~31 review). Kurang kredibel. |
-| **Sedang** | 1.5 | 2.0 | 3.0 | 3.5 | $10^{1.5} - 10^3$ (~1000 review). Cukup kredibel. |
-| **Banyak** | 3.0 | 4.0 | 10 | 11 | $> 1000$ review. Data sangat valid secara statistik. |
-
-#### D. Publisher Score (Satuan: Rasio Agregasi 0.0 - 1.0)
-*Rumus: $PS = \frac{\sum (Score_{game} \times Playtime_{game})}{\sum Playtime_{all\_games}}$*
-
-| Term | a | b | c | d | Interpretasi Pakar |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Low** | -0.1 | 0 | 0.3 | 0.4 | Publisher asing atau pernah main tapi sebentar. |
-| **Medium** | 0.3 | 0.4 | 0.6 | 0.7 | Publisher yang produknya cukup sering dimainkan. |
-| **High** | 0.6 | 0.7 | 1.0 | 1.1 | Brand loyalitas tinggi (misal: Paradox, Rockstar). |
+#### D. Publisher Score (Satuan: Rasio Skor Berbobot)
+Dihitung menggunakan rumus agregasi: $PS = \frac{\sum (Score \times Playtime)}{\sum Playtime_{all}}$.
+-   **Kategori Linguistik**:
+    -   `low`: Publisher yang produknya jarang dimainkan atau memiliki skor rendah di library user.
+    -   `medium`: Publisher yang produknya beberapa kali dimainkan dengan hasil memuaskan.
+    -   `high`: Brand loyalitas tinggi. User sering menghabiskan waktu lama di game-game keluaran publisher ini.
 
 ---
 
@@ -112,12 +98,8 @@ Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor
 Score = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_{activation, i}}
 ```
 
-Dimana $w$ adalah bobot konstanta:
--   **Sangat Rendah**: 0.1
--   **Rendah**: 0.3
--   **Sedang**: 0.5
--   **Tinggi**: 0.7
--   **Sangat Tinggi**: 0.9
+Dimana $w$ adalah bobot konstanta yang merepresentasikan tingkat kepuasan:
+-   **Sangat Rendah (0.1)**, **Rendah (0.3)**, **Sedang (0.5)**, **Tinggi (0.7)**, **Sangat Tinggi (0.9)**.
 
 ---
 
@@ -142,7 +124,7 @@ Density = \frac{FuzzyScore}{\max(Price, 1)}
 SA mencari solusi yang memaksimalkan utilitas budget $(\frac{TotalCost}{Budget})^2$.
 
 ### 3.5. Infinite Scrolling (Pemuatan Data Berkelanjutan)
-Untuk meningkatkan pengalaman pengguna dalam mengeksplorasi ribuan game di Steam, sistem mengimplementasikan *Infinite Scrolling* menggunakan **Intersection Observer API**. Data dimuat secara asinkron melalui API internal (`/api/recommendations` dan `/api/deals`). Sistem menggunakan parameter `start` pada query Steam Storefront untuk memastikan setiap halaman baru memberikan hasil yang unik dan berbeda dari halaman sebelumnya, menghindari pengulangan data yang sama.
+Data dimuat secara asinkron melalui API internal. Sistem menggunakan parameter `start` pada query Steam untuk memastikan setiap halaman baru memberikan hasil yang unik dan berbeda.
 
 ## 4. Kesimpulan
 Sistem ini berhasil mengonversi data Steam yang sangat luas menjadi rekomendasi personal melalui pemodelan spektrum minat manusia menggunakan Logika Fuzzy. Penggunaan skala logaritmik, normalisasi relatif, dan optimasi heuristik memastikan hasil yang presisi dan efisien.
