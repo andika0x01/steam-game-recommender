@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import { SteamAPI } from '../lib/steam'
-import { getSimpleRecommendations } from '../lib/simple-recommendation'
+import { SteamAPI } from '../../lib/steam'
+import { getSimpleRecommendations } from '../../lib/simple-recommendation'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
