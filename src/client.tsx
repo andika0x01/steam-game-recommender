@@ -1,10 +1,8 @@
 import React from 'react'
 import { hydrateRoot } from 'react-dom/client'
-import { ScoringToggle } from './components/ScoringToggle'
 import { TierList } from './components/TierList'
 
 const components: Record<string, React.ComponentType<any>> = {
-  ScoringToggle,
   TierList,
 }
 

@@ -1,13 +1,15 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import { SteamAPI, resolveVanityURL, getPlayerSummaries, getOwnedGames } from '../../lib/steam'
-import { FuzzyBayesianScorer } from '../../lib/fuzzy-bayesian'
-import { PureFuzzyScorer } from '../../lib/pure-fuzzy'
+import { SteamAPI, resolveVanityURL, getPlayerSummaries } from '../../lib/steam'
+import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
-import { ScoringToggle } from '../../components/ScoringToggle'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
+/**
+ * Fungsi pembantu untuk menerjemahkan input user (URL/ID) 
+ * menjadi SteamID 64-bit yang valid.
+ */
 const resolveInputToSteamId = async (apiKey: string, input: string) => {
   input = input.trim()
   if (!input) return null
@@ -20,6 +22,10 @@ const resolveInputToSteamId = async (apiKey: string, input: string) => {
   return null
 }
 
+/**
+ * Menambahkan teman ke dalam daftar analisis mabar.
+ * Data disimpan sementara di D1 Database.
+ */
 app.post('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
@@ -63,9 +69,15 @@ app.post('/clear', async (c) => {
   return c.redirect('/coop')
 })
 
+/**
+ * Halaman Co-op Nexus
+ * 
+ * Menganalisis irisan library antara pengguna dan teman-temannya.
+ * Menghasilkan rekomendasi game multiplayer yang paling cocok dimainkan bersama
+ * berdasarkan rata-rata skor fuzzy dari setiap anggota grup.
+ */
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
-  const scoringMode = c.var.scoringMode || 'fuzzy'
   if (!steamId) return c.redirect('/')
 
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
@@ -82,11 +94,9 @@ app.get('/', async (c) => {
   let recommendations: any[] = []
 
   if (allAgents.length > 1) {
-    // Fetch owned games for all agents
     const ownedGamesPromises = allAgents.map(id => steamAPI.getOwnedGames(id))
     const ownedGamesLists = await Promise.all(ownedGamesPromises)
 
-    // Find mutually owned games
     const gamesCount: Record<number, { count: number, game: any }> = {}
     ownedGamesLists.forEach(list => {
       list.forEach(game => {
@@ -101,8 +111,6 @@ app.get('/', async (c) => {
       .filter(id => gamesCount[parseInt(id)].count === allAgents.length)
       .map(id => parseInt(id))
 
-    // Filter for Multiplayer/Co-op (requires App Details)
-    // Limit to 30 mutual games for performance
     const candidateIds = mutualAppIds.slice(0, 30)
     const detailsPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id))
     const details = await Promise.all(detailsPromises)
@@ -110,21 +118,15 @@ app.get('/', async (c) => {
     const coopGames = details.filter((d: any) => {
       if (!d || !d.categories) return false
       const categories = d.categories.map((c: any) => c.id)
-      return categories.includes(1) || categories.includes(9) || categories.includes(38) // Multiplayer, Co-op, Online Co-op
+      return categories.includes(1) || categories.includes(9) || categories.includes(38) 
     })
 
-    // Score for each agent
-    const reviewsRecord: Record<number, number> = {} // Simpified, using average review score for all
-    
     recommendations = await Promise.all(coopGames.map(async (game: any) => {
       if (!game) return null
       
-      // Calculate average score across all agents
       let totalScore = 0
       for (let i = 0; i < allAgents.length; i++) {
-        const scorer = scoringMode === 'bayesian' 
-          ? new FuzzyBayesianScorer(ownedGamesLists[i], reviewsRecord)
-          : new PureFuzzyScorer(ownedGamesLists[i], reviewsRecord)
+        const scorer = new FuzzyOwnGamesScorer(ownedGamesLists[i])
         totalScore += scorer.getGameScore(game.steam_appid)
       }
 
@@ -155,7 +157,6 @@ app.get('/', async (c) => {
                   <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Convergence Engine Ready</span>
                 </div>
-                <ScoringToggle scoringMode={scoringMode} />
               </div>
               <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-[0.85]">Co-op <br /><span className="text-white/20 outline-text">Nexus</span></h2>
               <p className="text-zinc-500 text-xs font-mono uppercase tracking-[0.2em]">Analisis Minat Kolektif Multi-Agen</p>
@@ -194,7 +195,7 @@ app.get('/', async (c) => {
                               <span className="text-[8px] font-mono text-zinc-500 uppercase">{f.friend_id.slice(-4)}</span>
                             </div>
                           </div>
-                          <form method="post" action="/coop/remove">
+                          <form method="post" action="/remove">
                             <input type="hidden" name="friendId" value={f.friend_id} />
                             <button type="submit" className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-500 transition-all opacity-0 group-hover/item:opacity-100">
                               <span className="text-lg leading-none">×</span>

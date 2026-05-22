@@ -135,7 +135,7 @@ export interface SteamStoreAppDetailsResponse {
 export interface SteamSearchResult {
   name: string;
   logo: string;
-  id?: number; // Extracted from logo URL if possible
+  id?: number; 
 }
 
 export interface SteamSearchResponse {
@@ -147,7 +147,7 @@ export interface SteamSearchOptions {
   term?: string;
   tags?: number[];
   genre?: string;
-  category1?: number; // 998 for Games
+  category1?: number; 
   os?: 'win' | 'mac' | 'linux';
   sort_by?: 'Released_DESC' | 'Price_ASC' | 'Price_DESC' | 'Reviews_DESC' | 'Name_ASC';
   specials?: boolean;
@@ -156,6 +156,13 @@ export interface SteamSearchOptions {
   l?: string;
 }
 
+/**
+ * Wrapper API Steam
+ * 
+ * Kelas ini menangani semua komunikasi dengan API Web Steam dan API Toko Steam.
+ * Mendukung caching menggunakan Cloudflare KV untuk mengoptimalkan performa
+ * dan menghindari pembatasan rate limit dari Steam.
+ */
 export class SteamAPI {
   private apiKey: string;
   private kv?: KVNamespace;
@@ -168,9 +175,6 @@ export class SteamAPI {
     this.kv = kv;
   }
 
-  /**
-   * Returns basic profile information for a list of 64-bit Steam IDs.
-   */
   async getPlayerSummaries(steamIds: string[]): Promise<SteamPlayer[]> {
     const url = new URL(`${this.baseUrl}/ISteamUser/GetPlayerSummaries/v0002/`);
     url.searchParams.append('key', this.apiKey);
@@ -185,9 +189,6 @@ export class SteamAPI {
     return data.response.players;
   }
 
-  /**
-   * Returns the friend list of any Steam user, provided their profile visibility is set to "Public".
-   */
   async getFriendList(steamId: string, relationship: 'friend' | 'all' = 'friend'): Promise<SteamFriend[]> {
     const url = new URL(`${this.baseUrl}/ISteamUser/GetFriendList/v0001/`);
     url.searchParams.append('key', this.apiKey);
@@ -196,7 +197,7 @@ export class SteamAPI {
 
     const response = await fetch(url.toString());
     if (!response.ok) {
-      if (response.status === 401) return []; // Profile is private
+      if (response.status === 401) return []; 
       throw new Error(`Steam API error: ${response.statusText}`);
     }
 
@@ -204,10 +205,6 @@ export class SteamAPI {
     return data.friendslist.friends || [];
   }
 
-  /**
-   * Searches for games on the Steam Store using various filters and sorting options.
-   * Note: This uses the storefront search results API which returns JSON when json=1 is passed.
-   */
   async searchGames(options: SteamSearchOptions = {}): Promise<SteamSearchResult[]> {
     const cacheKey = `steam_search_${JSON.stringify(options)}`;
     if (this.kv) {
@@ -224,7 +221,6 @@ export class SteamAPI {
     if (options.tags && options.tags.length > 0) url.searchParams.append('tags', options.tags.join(','));
     if (options.genre) url.searchParams.append('genre', options.genre);
     
-    // Default to category1=998 (Games) to exclude Software, DLC, etc.
     const category = options.category1 || 998;
     url.searchParams.append('category1', category.toString());
     
@@ -247,7 +243,6 @@ export class SteamAPI {
 
     const data = (await response.json()) as SteamSearchResponse;
     
-    // Process items and extract ID from logo URL
     const results = (data.items || []).map(item => {
       const idMatch = item.logo.match(/\/apps\/(\d+)\//);
       return {
@@ -263,9 +258,6 @@ export class SteamAPI {
     return results;
   }
 
-  /**
-   * Internal helper to filter out non-game items (Software, Servers, SDKs, etc.)
-   */
   private filterNonGames(games: SteamGame[]): SteamGame[] {
     const softwareKeywords = [
       'software', 'utility', 'utilities', 'tool', 'sdk', 'dedicated server', 
@@ -280,9 +272,6 @@ export class SteamAPI {
     });
   }
 
-  /**
-   * Returns a list of games a player owns along with playtime information.
-   */
   async getOwnedGames(steamId: string, includeAppInfo = true, includeFreeGames = true): Promise<SteamGame[]> {
     const url = new URL(`${this.baseUrl}/IPlayerService/GetOwnedGames/v0001/`);
     url.searchParams.append('key', this.apiKey);
@@ -305,9 +294,6 @@ export class SteamAPI {
     return this.filterNonGames(games);
   }
 
-  /**
-   * Returns a list of games a player has played in the last two weeks.
-   */
   async getRecentlyPlayedGames(steamId: string, count?: number): Promise<SteamGame[]> {
     const url = new URL(`${this.baseUrl}/IPlayerService/GetRecentlyPlayedGames/v0001/`);
     url.searchParams.append('key', this.apiKey);
@@ -327,9 +313,6 @@ export class SteamAPI {
     return this.filterNonGames(games);
   }
 
-  /**
-   * Returns the number of current players for a given app.
-   */
   async getCurrentPlayers(appId: number): Promise<number> {
     const url = new URL(`${this.baseUrl}/ISteamUserStats/GetNumberOfCurrentPlayers/v1/`);
     url.searchParams.append('appid', appId.toString());
@@ -343,9 +326,6 @@ export class SteamAPI {
     return data.response.player_count || 0;
   }
 
-  /**
-   * Returns review summary for a given app from the Steam Storefront.
-   */
   async getAppReviews(appId: number): Promise<SteamAppReviewSummary | null> {
     const cacheKey = `steam_reviews_${appId}`;
     if (this.kv) {
@@ -407,7 +387,6 @@ export class SteamAPI {
     const result = data[appId.toString()].data as SteamStoreAppDetails;
 
     if (this.kv) {
-      // 86400 seconds = 24 hours
       await this.kv.put(cacheKey, JSON.stringify(result), { expirationTtl: 86400 });
     }
 
@@ -415,8 +394,6 @@ export class SteamAPI {
   }
 
 }
-
-// Standalone functions for backward compatibility and simpler usage in pages
 
 export async function resolveVanityURL(apiKey: string, vanityId: string): Promise<string | null> {
   const url = new URL('https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/');
@@ -442,6 +419,6 @@ export async function getPlayerSummaries(apiKey: string, steamIds: string | stri
 }
 
 export async function getAppDetails(appId: number): Promise<SteamStoreAppDetails | null> {
-  const api = new SteamAPI(''); // No key needed for store API
+  const api = new SteamAPI(''); 
   return await api.getAppStoreDetails(appId);
 }

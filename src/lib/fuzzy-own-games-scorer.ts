@@ -1,12 +1,19 @@
 import { SteamGame } from './steam';
 
-export class PureFuzzyScorer {
+/**
+ * Kelas FuzzyOwnGamesScorer
+ * 
+ * Sistem inferensi fuzzy yang dirancang khusus untuk mengevaluasi
+ * game yang sudah berada di dalam library pengguna (sudah dimiliki).
+ * Parameter utama yang dievaluasi meliputi durasi bermain (playtime),
+ * tingkat aktivitas baru-baru ini, dan seberapa lama sejak terakhir kali dimainkan.
+ */
+export class FuzzyOwnGamesScorer {
   private maxPlaytimeForever: number = 0;
   private maxPlaytime2Weeks: number = 0;
   private userGames: Map<number, SteamGame> = new Map();
-  private gameReviews: Map<number, number> = new Map();
 
-  constructor(userGames: SteamGame[], gameReviews: Record<number, number>) {
+  constructor(userGames: SteamGame[]) {
     userGames.forEach((game) => {
       this.userGames.set(game.appid, game);
       if (game.playtime_forever > this.maxPlaytimeForever) {
@@ -16,12 +23,14 @@ export class PureFuzzyScorer {
         this.maxPlaytime2Weeks = game.playtime_2weeks || 0;
       }
     });
-
-    for (const [appid, score] of Object.entries(gameReviews)) {
-      this.gameReviews.set(Number(appid), score);
-    }
   }
 
+  /**
+   * Fungsi Keanggotaan Trapezoidal (TrapMF)
+   * 
+   * Digunakan untuk menghitung derajat keanggotaan suatu nilai x 
+   * dalam himpunan fuzzy yang didefinisikan oleh koordinat a, b, c, dan d.
+   */
   private trapMF(x: number, a: number, b: number, c: number, d: number): number {
     if (x <= a || x >= d) return 0;
     if (x >= b && x <= c) return 1;
@@ -30,20 +39,21 @@ export class PureFuzzyScorer {
     return 0;
   }
 
+  /**
+   * Menghitung skor preferensi untuk game tertentu di library.
+   * Proses melibatkan normalisasi data, fuzzifikasi input,
+   * evaluasi aturan fuzzy, dan defuzzifikasi rata-rata berbobot.
+   */
   getGameScore(gameId: number): number {
     const game = this.userGames.get(gameId);
     if (!game) return 0;
 
-    const reviewPositivity = this.gameReviews.get(gameId) ?? 0.5;
-
-    // 1. Normalisasi
     const playtimeNorm = this.maxPlaytimeForever > 0 ? game.playtime_forever / this.maxPlaytimeForever : 0;
     const activityNorm = this.maxPlaytime2Weeks > 0 ? (game.playtime_2weeks || 0) / this.maxPlaytime2Weeks : 0;
     const daysSincePlayed = game.rtime_last_played 
       ? (Date.now() / 1000 - game.rtime_last_played) / 86400 
       : 365;
 
-    // 2. Fuzzifikasi
     const playtime = {
       tidak_dimainkan: this.trapMF(playtimeNorm, -0.1, 0, 0.02, 0.05),
       dicoba: this.trapMF(playtimeNorm, 0.02, 0.05, 0.15, 0.2),
@@ -67,14 +77,6 @@ export class PureFuzzyScorer {
       sangat_aktif: this.trapMF(activityNorm, 0.5, 0.7, 1.0, 1.1),
     };
 
-    const review = {
-      buruk: this.trapMF(reviewPositivity, -0.1, 0, 0.4, 0.5),
-      mixed: this.trapMF(reviewPositivity, 0.4, 0.45, 0.6, 0.65),
-      bagus: this.trapMF(reviewPositivity, 0.6, 0.65, 0.75, 0.8),
-      sangat_bagus: this.trapMF(reviewPositivity, 0.75, 0.85, 1.0, 1.1),
-    };
-
-    // 3. Rule Evaluation
     const activation = {
       SANGAT_RENDAH: 0,
       RENDAH: 0,
@@ -83,7 +85,6 @@ export class PureFuzzyScorer {
       SANGAT_TINGGI: 0,
     };
 
-    // Base Rules
     activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(playtime.sangat_banyak, recency.baru_main));
     activation.TINGGI = Math.max(activation.TINGGI, Math.min(playtime.sering, activity.aktif));
     activation.SEDANG = Math.max(activation.SEDANG, Math.min(playtime.cukup, recency.lama));
@@ -91,13 +92,6 @@ export class PureFuzzyScorer {
     activation.SANGAT_RENDAH = Math.max(activation.SANGAT_RENDAH, playtime.tidak_dimainkan);
     activation.SEDANG = Math.max(activation.SEDANG, Math.min(playtime.sangat_banyak, recency.ditinggal));
 
-    // Review Rules
-    activation.TINGGI = Math.max(activation.TINGGI, Math.min(review.sangat_bagus, 1 - playtime.tidak_dimainkan));
-    activation.TINGGI = Math.max(activation.TINGGI, Math.min(review.bagus, activity.aktif));
-    activation.RENDAH = Math.max(activation.RENDAH, review.buruk);
-    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(review.sangat_bagus, activity.sangat_aktif));
-
-    // 4. Defuzzifikasi (Weighted Average)
     const weights = {
       SANGAT_RENDAH: 0.1,
       RENDAH: 0.3,

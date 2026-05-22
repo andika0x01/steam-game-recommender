@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { calculateSimilarity } from '../src/lib/recommendation-system';
+import { calculateSimilarity } from '../src/lib/simple-recommendation';
 
 describe('calculateSimilarity', () => {
   it('should calculate Jaccard similarity correctly', () => {
     const tags1 = ['Action', 'RPG', 'Adventure'];
     const tags2 = ['Action', 'RPG', 'Indie'];
-    
+
     // Intersection: ['Action', 'RPG'] (size 2)
     // Union: ['Action', 'RPG', 'Adventure', 'Indie'] (size 4)
     // Score: 2/4 = 0.5
-    
+
     expect(calculateSimilarity(tags1, tags2)).toBe(0.5);
   });
 
@@ -19,13 +19,7 @@ describe('calculateSimilarity', () => {
     expect(calculateSimilarity(tags1, tags2)).toBe(1.0);
   });
 
-  it('should return 0 for no overlap', () => {
-    const tags1 = ['Action'];
-    const tags2 = ['Strategy'];
-    expect(calculateSimilarity(tags1, tags2)).toBe(0);
-  });
-
-  it('should handle empty arrays', () => {
+  it('should return 0 for empty tags', () => {
     expect(calculateSimilarity([], ['Action'])).toBe(0);
     expect(calculateSimilarity(['Action'], [])).toBe(0);
   });

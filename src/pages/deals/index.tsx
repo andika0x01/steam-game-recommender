@@ -2,16 +2,20 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import React from 'react'
 import { SteamAPI } from '../../lib/steam'
-import { FuzzyBayesianScorer } from '../../lib/fuzzy-bayesian'
-import { PureFuzzyScorer } from '../../lib/pure-fuzzy'
+import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
-import { ScoringToggle } from '../../components/ScoringToggle'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
+/**
+ * Halaman Deal Hunter
+ * 
+ * Mengoptimalkan anggaran pengguna untuk mendapatkan kombinasi game terbaik
+ * yang sedang diskon di Steam Store. Menggunakan algoritma Simulated Annealing
+ * untuk menyelesaikan masalah optimasi kombinatorial (Knapsack Problem varian).
+ */
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
-  const scoringMode = c.var.scoringMode || 'fuzzy'
   if (!steamId) return c.redirect('/')
 
   const budgetQuery = c.req.query('budget')
@@ -20,21 +24,18 @@ app.get('/', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
 
-  // 1. Fetch Deals from Steam Storefront directly
   let scoredDeals: any[] = []
   try {
-    const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
+    const basePoolSize = 30
+    const dynamicPoolSize = budgetIDR > 0 ? Math.min(500, Math.max(basePoolSize, Math.floor(budgetIDR / 5000))) : basePoolSize
     
-    // 2. Fetch AppDetails (cc=id) for localized pricing and metadata
-    const candidateIds = saleResults.slice(0, 30).map(r => r.id).filter(Boolean) as number[]
+    const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
+    const candidateIds = saleResults.slice(0, dynamicPoolSize).map(r => r.id).filter(Boolean) as number[]
+    
     const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'english', 'id'))
     const rawDetails = await Promise.all(detailPromises)
 
-    // 3. Score Deals against user profile
-    const reviewsRecord: Record<number, number> = {} 
-    const scorer = scoringMode === 'bayesian' 
-      ? new FuzzyBayesianScorer(userGames, reviewsRecord)
-      : new PureFuzzyScorer(userGames, reviewsRecord)
+    const scorer = new FuzzyOwnGamesScorer(userGames)
 
     scoredDeals = rawDetails
       .filter((d: any) => d && d.price_overview)
@@ -53,7 +54,6 @@ app.get('/', async (c) => {
     console.error('Steam Search error:', e)
   }
 
-  // 4. Simulated Annealing for Budget
   let basketItems: any[] = []
   let totalCostIDR = 0
   if (budgetIDR > 0 && scoredDeals.length > 0) {
@@ -61,11 +61,13 @@ app.get('/', async (c) => {
     const getCost = (items: any[]) => items.reduce((sum, item) => sum + item.salePrice, 0)
     const getScore = (items: any[]) => items.reduce((sum, item) => sum + item.score, 0)
 
-    let temp = 1000.0
-    const coolingRate = 0.98
+    let temp = 2000.0
+    const coolingRate = 0.995 
 
     while (temp > 1) {
-      const neighbor = [...scoredDeals].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 5) + 1)
+      const neighborSize = Math.floor(Math.random() * 8) + 1
+      const neighbor = [...scoredDeals].sort(() => Math.random() - 0.5).slice(0, neighborSize)
+      
       const currentCost = getCost(currentBasket)
       const neighborCost = getCost(neighbor)
 
@@ -85,7 +87,6 @@ app.get('/', async (c) => {
 
   const remainingIDR = budgetIDR - totalCostIDR
 
-  // 5. Discovery Items (Sorted by Price Descending)
   const discoveryItems = [...scoredDeals]
     .sort((a, b) => b.salePrice - a.salePrice)
     .slice(0, 24)
@@ -95,7 +96,6 @@ app.get('/', async (c) => {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-12">
         <div className="space-y-6 max-w-2xl">
           <div className="flex flex-col gap-4">
-            <ScoringToggle scoringMode={scoringMode} />
             <div className="inline-flex items-center gap-3 px-3 py-1 bg-white/5 border border-white/10 rounded-full w-fit">
               <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Pure Steam Value Engine Active</span>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { FuzzyBayesianScorer } from '../src/lib/fuzzy-bayesian';
-import { PureFuzzyScorer } from '../src/lib/pure-fuzzy';
+import { FuzzyOwnGamesScorer } from '../src/lib/fuzzy-own-games-scorer';
+import { FuzzyNonOwnGamesScorer } from '../src/lib/fuzzy-non-own-games-scorer';
 
 const mockGames = [
   {
@@ -9,6 +9,9 @@ const mockGames = [
     playtime_forever: 10000,
     playtime_2weeks: 500,
     rtime_last_played: Math.floor(Date.now() / 1000) - 86400, // 1 day ago
+    playtime_windows_forever: 10000,
+    playtime_mac_forever: 0,
+    playtime_linux_forever: 0,
   },
   {
     appid: 20,
@@ -16,31 +19,48 @@ const mockGames = [
     playtime_forever: 100,
     playtime_2weeks: 0,
     rtime_last_played: Math.floor(Date.now() / 1000) - (86400 * 365), // 1 year ago
-  }
+    playtime_windows_forever: 100,
+    playtime_mac_forever: 0,
+    playtime_linux_forever: 0,
+  },
 ];
 
-const mockReviews = {
-  10: 0.9, // Very positive
-  20: 0.4, // Mixed/Low
-};
+describe('FuzzyOwnGamesScorer', () => {
+  it('should calculate higher score for active games', () => {
+    const scorer = new FuzzyOwnGamesScorer(mockGames);
+    const score10 = scorer.getGameScore(10);
+    const score20 = scorer.getGameScore(20);
 
-describe('FuzzyBayesianScorer', () => {
-  it('should give higher score to active games with positive reviews', () => {
-    const scorer = new FuzzyBayesianScorer(mockGames as any, mockReviews);
-    const highMatch = scorer.getGameScore(10);
-    const lowMatch = scorer.getGameScore(20);
-    
-    expect(highMatch).toBeGreaterThan(lowMatch);
-    expect(highMatch).toBeGreaterThan(0.5);
+    expect(score10).toBeGreaterThan(score20);
+    expect(score10).toBeGreaterThan(0.5);
+    expect(score20).toBeLessThan(0.5);
+  });
+
+  it('should return 0.5 for unknown games', () => {
+    const scorer = new FuzzyOwnGamesScorer(mockGames);
+    expect(scorer.getGameScore(999)).toBe(0); // getGameScore returns 0 if game not found
   });
 });
 
-describe('PureFuzzyScorer', () => {
-  it('should give higher score to active games', () => {
-    const scorer = new PureFuzzyScorer(mockGames as any, mockReviews);
-    const highMatch = scorer.getGameScore(10);
-    const lowMatch = scorer.getGameScore(20);
-    
+describe('FuzzyNonOwnGamesScorer', () => {
+  const scorer = new FuzzyNonOwnGamesScorer();
+
+  it('should favor high similarity and high reviews', () => {
+    const highMatch = scorer.getGameScore(0.9, 0.9, 10000); // 90% positive, 90% similar, 10k reviews
+    const lowMatch = scorer.getGameScore(0.5, 0.2, 100);    // 50% positive, 20% similar, 100 reviews
+
     expect(highMatch).toBeGreaterThan(lowMatch);
+    expect(highMatch).toBeGreaterThan(0.7);
+  });
+
+  it('should give decent score to high similarity even with low reviews', () => {
+    const score = scorer.getGameScore(0.8, 0.9, 50);
+    expect(score).toBeGreaterThan(0.4);
+  });
+
+  it('should penalize bad reviews even if similar', () => {
+    const goodReview = scorer.getGameScore(0.9, 0.8, 1000);
+    const badReview = scorer.getGameScore(0.2, 0.8, 1000);
+    expect(goodReview).toBeGreaterThan(badReview);
   });
 });
