@@ -127,7 +127,7 @@ app.get('/', async (c) => {
        originalPrice: d.formattedInitial,
        discount: d.savings,
        tags: d.tags,
-       hideScore: true,
+       hideScore: false,
        hideTags: true
     }))
 
@@ -224,7 +224,7 @@ app.get('/', async (c) => {
                 score={deal.score}
                 price={deal.formattedPrice}
                 discount={deal.savings}
-                hideScore={true}
+                hideScore={false}
                 hideTags={true}
                 actionLabel="Lihat di Steam"
               />

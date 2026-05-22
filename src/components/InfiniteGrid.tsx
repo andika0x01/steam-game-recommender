@@ -67,7 +67,7 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
             price={item.price}
             originalPrice={item.originalPrice}
             discount={item.discount}
-            hideScore={type === 'game' || item.hideScore}
+            hideScore={item.hideScore}
             hideTags={item.hideTags}
           />
         ))}
