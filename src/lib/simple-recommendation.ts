@@ -27,6 +27,32 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
 }
 
 /**
+ * Menghitung Weighted Overlap Coefficient berdasarkan bobot tag dari profil pengguna.
+ */
+export function calculateWeightedSimilarity(candidateTags: string[], userTagWeights: Record<string, number>): number {
+  if (candidateTags.length === 0 || Object.keys(userTagWeights).length === 0) return 0;
+  
+  const lowerTagWeights: Record<string, number> = {};
+  for (const [tag, weight] of Object.entries(userTagWeights)) {
+    lowerTagWeights[tag.toLowerCase()] = weight;
+  }
+  
+  const set1 = new Set(candidateTags.map(t => t.toLowerCase()));
+  let intersectionWeight = 0;
+  
+  for (const tag of set1) {
+    if (lowerTagWeights[tag]) {
+      intersectionWeight += lowerTagWeights[tag];
+    }
+  }
+  
+  const sortedWeights = Object.values(userTagWeights).sort((a, b) => b - a);
+  const maxPossibleWeight = sortedWeights.slice(0, set1.size).reduce((sum, w) => sum + w, 0);
+
+  return maxPossibleWeight > 0 ? intersectionWeight / maxPossibleWeight : 0;
+}
+
+/**
  * Membangun profil selera pengguna (Tags & Publisher Scores)
  * berdasarkan game yang dimiliki di library.
  */
@@ -79,7 +105,7 @@ export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[], s
 
   const publisherScores: Record<string, number> = {};
   Object.entries(publisherStats).forEach(([pub, stats]) => {
-    publisherScores[pub] = totalLibraryPlaytime > 0 ? stats.weightedScore / totalLibraryPlaytime : 0;
+    publisherScores[pub] = stats.playtime > 0 ? stats.weightedScore / stats.playtime : 0;
   });
 
   const maxPS = Math.max(...Object.values(publisherScores), 0.001);

@@ -7,7 +7,7 @@ import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-non-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
 import { getIdrRate } from '../../lib/currency'
 import { InfiniteGrid } from '../../components/InfiniteGrid'
-import { buildUserProfile, calculateSimilarity } from '../../lib/simple-recommendation'
+import { buildUserProfile, calculateSimilarity, calculateWeightedSimilarity } from '../../lib/simple-recommendation'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
@@ -31,7 +31,7 @@ app.get('/', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
 
-  const { publisherScores, userProfileTags } = await buildUserProfile(steamAPI, userGames);
+  const { publisherScores, userProfileTags, tagWeights } = await buildUserProfile(steamAPI, userGames);
   const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
   let scoredDeals: any[] = []
@@ -48,9 +48,9 @@ app.get('/', async (c) => {
     const rawReviews = await Promise.all(reviewPromises)
 
     scoredDeals = rawDetails
-      .filter((d: any) => d && d.price_overview)
-      .map((d: any, idx: number) => {
-        const reviews = rawReviews[idx];
+      .map((d: any, idx: number) => ({ d, reviews: rawReviews[idx] }))
+      .filter(({ d }: any) => d && d.price_overview)
+      .map(({ d, reviews }: any) => {
         const price = d!.price_overview!.final / 100
         const candidateTags = [
           ...(d.genres || []).map((g: any) => g.description),
@@ -63,7 +63,7 @@ app.get('/', async (c) => {
         }
 
         const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
-        const similarity = calculateSimilarity(candidateTags, userProfileTags);
+        const similarity = calculateWeightedSimilarity(candidateTags, tagWeights);
         const volume = reviews ? reviews.total_reviews : 0;
 
         const score = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);
@@ -119,7 +119,7 @@ app.get('/', async (c) => {
      */
     const getEnergy = (items: any[]) => {
       const cost = getCost(items)
-      if (cost > budgetIDR || cost === 0) return -9999999
+      if (cost > budgetIDR || cost === 0) return Number.NEGATIVE_INFINITY
       
       const totalDensity = items.reduce((sum, item) => sum + item.density, 0)
       const budgetUtilization = cost / budgetIDR
