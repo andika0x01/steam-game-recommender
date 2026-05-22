@@ -32,7 +32,7 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
  */
 export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[], steamId?: string) {
   // 1. Cek Cache KV jika ada steamId
-  const cacheKey = steamId ? `user_profile_${steamId}` : null;
+  const cacheKey = steamId ? `user_profile_v2_${steamId}` : null;
   if (cacheKey && (api as any).kv) {
     const cached = await (api as any).kv.get(cacheKey, 'json');
     if (cached) return cached;
@@ -120,15 +120,20 @@ export async function getSimpleRecommendations(
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5); // Kurangi dari 10 ke 5 untuk menghemat subrequest
 
-  const fetchPromises = sortedTags.map(async ([tag, weight]) => {
+  const searchResults: SteamSearchResult[] = [];
+  for (const [tag, weight] of sortedTags) {
     const proportion = weight / totalTagWeight;
     const count = Math.max(8, Math.ceil((amount * 3) * proportion)); // Perkecil count
     // Offset lebih rapat agar tidak kehabisan hasil dari pencarian "term"
     const start = (page - 1) * 15; 
-    return api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start }).then(res => res.slice(0, count));
-  });
+    try {
+      const res = await api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start });
+      searchResults.push(...res.slice(0, count));
+    } catch (e) {
+      console.warn(`Search failed for tag ${tag}:`, e);
+    }
+  }
 
-  const searchResults = (await Promise.all(fetchPromises)).flat();
   const uniqueIds = [...new Set(searchResults.map(r => r.id).filter((id): id is number => id !== undefined))];
 
   const ownedIds = new Set(ownedGames.map(g => g.appid));
@@ -143,7 +148,6 @@ export async function getSimpleRecommendations(
   candidateDetails.forEach((detail, idx) => {
     if (!detail || detail.type !== 'game') return;
     const reviews = candidateReviews[idx];
-    if (!reviews) return;
 
     const candidateTags = [
       ...(detail.genres || []).map(g => g.description),
@@ -155,9 +159,9 @@ export async function getSimpleRecommendations(
       candidatePS = detail.publishers.reduce((max, pub) => Math.max(max, publisherScores[pub] || 0), 0);
     }
 
-    const positivity = reviews.total_positive / (reviews.total_reviews || 1);
+    const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
     const similarity = calculateSimilarity(candidateTags, userProfileTags);
-    const volume = reviews.total_reviews;
+    const volume = reviews ? reviews.total_reviews : 0;
 
     const finalScore = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);
 

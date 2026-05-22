@@ -207,7 +207,7 @@ export class SteamAPI {
   }
 
   async searchGames(options: SteamSearchOptions = {}): Promise<SteamSearchResult[]> {
-    const cacheKey = `steam_search_${JSON.stringify(options)}`;
+    const cacheKey = `steam_search_v2_${JSON.stringify(options)}`;
     if (this.kv) {
       const cached = await this.kv.get(cacheKey, 'json');
       if (cached) {
@@ -260,7 +260,7 @@ export class SteamAPI {
       };
     });
 
-    if (this.kv) {
+    if (this.kv && results.length > 0) {
       // Cache pencarian bertahan 7 hari agar stabil tapi tetap bisa update mingguan
       await this.kv.put(cacheKey, JSON.stringify(results), { expirationTtl: 604800 });
     }
