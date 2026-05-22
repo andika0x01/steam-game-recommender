@@ -207,7 +207,7 @@ export class SteamAPI {
   }
 
   async searchGames(options: SteamSearchOptions = {}): Promise<SteamSearchResult[]> {
-    const cacheKey = `steam_search_v2_${JSON.stringify(options)}`;
+    const cacheKey = `steam_search_v3_${JSON.stringify(options)}`;
     if (this.kv) {
       const cached = await this.kv.get(cacheKey, 'json');
       if (cached) {
@@ -446,12 +446,13 @@ export class SteamAPI {
 
     if (missingIds.length === 0) return results;
 
-    // 2. Ambil dari Steam API dalam batch (maks 10 per request untuk stabilitas)
-    const batchSize = 10;
-    for (let i = 0; i < missingIds.length; i += batchSize) {
-      const currentBatchIds = missingIds.slice(i, i + batchSize);
+    // 2. Ambil dari Steam API secara individual karena Steam memblokir multi-appid 
+    // jika tanpa parameter spesifik (mengembalikan null).
+    for (let i = 0; i < missingIds.length; i += 1) {
+      const id = missingIds[i];
+      const originalIdx = missingIndices[i];
       const url = new URL('https://store.steampowered.com/api/appdetails');
-      url.searchParams.append('appids', currentBatchIds.join(','));
+      url.searchParams.append('appids', id.toString());
       url.searchParams.append('l', language);
       if (cc) url.searchParams.append('cc', cc);
 
@@ -463,23 +464,23 @@ export class SteamAPI {
 
         const data = await response.json() as any;
         
-        for (let j = 0; j < currentBatchIds.length; j++) {
-          const id = currentBatchIds[j];
-          const originalIdx = missingIndices[i + j];
+        if (data && data[id.toString()] && data[id.toString()].success) {
+          const gameData = data[id.toString()].data as SteamStoreAppDetails;
+          results[originalIdx] = gameData;
           
-          if (data[id.toString()] && data[id.toString()].success) {
-            const gameData = data[id.toString()].data as SteamStoreAppDetails;
-            results[originalIdx] = gameData;
-            
-            // Simpan ke KV
-            if (this.kv) {
-              const cacheKey = `steam_appdetails_${id}_${language}_${cc || ''}`;
-              await this.kv.put(cacheKey, JSON.stringify(gameData));
-            }
+          // Simpan ke KV
+          if (this.kv) {
+            const cacheKey = `steam_appdetails_${id}_${language}_${cc || ''}`;
+            await this.kv.put(cacheKey, JSON.stringify(gameData));
           }
         }
       } catch (e) {
-        console.error(`Error fetching batch ${currentBatchIds}:`, e);
+        console.error(`Error fetching detail for ${id}:`, e);
+      }
+      
+      // Delay kecil untuk mencegah rate limit 429
+      if (i < missingIds.length - 1) {
+        await new Promise(res => setTimeout(res, 200));
       }
     }
 

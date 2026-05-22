@@ -32,7 +32,7 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
  */
 export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[], steamId?: string) {
   // 1. Cek Cache KV jika ada steamId
-  const cacheKey = steamId ? `user_profile_v2_${steamId}` : null;
+  const cacheKey = steamId ? `user_profile_v3_${steamId}` : null;
   if (cacheKey && (api as any).kv) {
     const cached = await (api as any).kv.get(cacheKey, 'json');
     if (cached) return cached;
@@ -90,7 +90,8 @@ export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[], s
   const profile = { tagWeights, totalTagWeight, publisherScores, userProfileTags: Object.keys(tagWeights) };
 
   // 2. Simpan ke Cache KV (TTL 24 jam)
-  if (cacheKey && (api as any).kv) {
+  // Jangan cache profile kosong: jika Steam gagal mengembalikan tags, kita harus mencoba lagi nanti.
+  if (cacheKey && (api as any).kv && totalTagWeight > 0) {
     await (api as any).kv.put(cacheKey, JSON.stringify(profile), { expirationTtl: 86400 });
   }
 
@@ -114,6 +115,7 @@ export async function getSimpleRecommendations(
   const { tagWeights, totalTagWeight, publisherScores, userProfileTags } = await buildUserProfile(api, ownedGames, steamId);
   const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
+  console.log(`[Engine] totalTagWeight: ${totalTagWeight}, profile tags: ${userProfileTags.length}`);
   if (totalTagWeight === 0) return [];
 
   const sortedTags = Object.entries(tagWeights)
@@ -124,11 +126,13 @@ export async function getSimpleRecommendations(
   for (const [tag, weight] of sortedTags) {
     // Offset lompat per 50 item as per Steam's default pagination
     const start = (page - 1) * 50; 
+    console.log(`[Engine] Fetching for tag: ${tag}, start: ${start}`);
     try {
       // Hilangkan batasan 'count' statis, ambil seluruh 50 hasil per tag agar kolam probabilitas > 200 kandidat.
       // Hal ini mencegah "Popularity Bias Empty Array" di mana user kebetulan sudah punya semua top 10 game genre tersebut!
       const res = await api.searchGames({ term: tag, sort_by: 'Reviews_DESC', start, cc: 'id' });
       searchResults.push(...res);
+      console.log(`[Engine] Tag ${tag} got ${res.length} items`);
     } catch (e) {
       console.warn(`Search failed for tag ${tag}:`, e);
     }
@@ -139,6 +143,8 @@ export async function getSimpleRecommendations(
 
   const ownedIds = new Set(ownedGames.map(g => g.appid));
   const newIds = uniqueIds.filter(id => !ownedIds.has(id)).slice(0, 20); // Maksimalkan dapat 20 kandidat bersih
+
+  console.log(`[Engine] Found ${uniqueIds.length} unique candidates. Filtered to ${newIds.length} new IDs.`);
 
   const candidateDetails = await api.getAppStoreDetailsBatch(newIds, 'english', 'id');
   
