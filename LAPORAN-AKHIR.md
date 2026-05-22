@@ -136,5 +136,11 @@ Data dimuat secara asinkron melalui API internal. Untuk memastikan pengguna tida
 1.  **Paging Offset**: Menggunakan parameter `start` pada query Steam yang melompat lebih jauh di setiap halaman (misal: halaman 2 mengambil mulai dari urutan 50+).
 2.  **Deduplikasi Client-side**: Memastikan ID game yang sudah ada di layar tidak akan ditambahkan lagi jika muncul di hasil pencarian berikutnya.
 
+### 3.6. Tiered Caching Strategy (Cloudflare KV)
+Untuk menjaga performa dan menghindari pembatasan rate-limit API Steam, sistem menerapkan strategi caching berlapis menggunakan Cloudflare KV:
+1.  **Search Results Cache (1 Jam)**: Hasil pencarian di-cache selama 1 jam. TTL yang pendek memastikan daftar game di *Market Discovery* tetap segar dan mengikuti pembaruan katalog Steam.
+2.  **Metadata & Review Cache (24 Jam)**: Detail game (gambar, harga, tag) dan rangkuman review di-cache selama 24 jam karena data ini jarang berubah secara drastis dalam waktu singkat.
+3.  **Unique Cache Keys**: Setiap key cache dibentuk secara unik berdasarkan kombinasi parameter (seperti `appid`, `language`, `country code`, dan `start offset`), memastikan tidak ada tabrakan data antar halaman *infinite scroll*.
+
 ## 4. Kesimpulan
 Sistem ini berhasil mengonversi data Steam yang sangat luas menjadi rekomendasi personal melalui pemodelan spektrum minat manusia menggunakan Logika Fuzzy. Penggunaan Linear Tie-Breaker, normalisasi relatif, dan optimasi heuristik memastikan hasil yang presisi, bervariasi, dan efisien.

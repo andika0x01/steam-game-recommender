@@ -254,7 +254,8 @@ export class SteamAPI {
     });
 
     if (this.kv) {
-      await this.kv.put(cacheKey, JSON.stringify(results), { expirationTtl: 86400 });
+      // Cache pencarian hanya bertahan 1 jam agar daftar game tetap segar
+      await this.kv.put(cacheKey, JSON.stringify(results), { expirationTtl: 3600 });
     }
 
     return results;
