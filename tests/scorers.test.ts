@@ -45,22 +45,28 @@ describe('FuzzyOwnGamesScorer', () => {
 describe('FuzzyNonOwnGamesScorer', () => {
   const scorer = new FuzzyNonOwnGamesScorer();
 
-  it('should favor high similarity and high reviews', () => {
-    const highMatch = scorer.getGameScore(0.9, 0.9, 10000); // 90% positive, 90% similar, 10k reviews
-    const lowMatch = scorer.getGameScore(0.5, 0.2, 100);    // 50% positive, 20% similar, 100 reviews
+  it('should favor high similarity, high reviews and known publisher', () => {
+    const highMatch = scorer.getGameScore(0.9, 0.9, 10000, 0.9); // 90% positive, 90% similar, 10k reviews, 90% pub match
+    const lowMatch = scorer.getGameScore(0.5, 0.2, 100, 0.1);    // 50% positive, 20% similar, 100 reviews, 10% pub match
 
     expect(highMatch).toBeGreaterThan(lowMatch);
     expect(highMatch).toBeGreaterThan(0.7);
   });
 
   it('should give decent score to high similarity even with low reviews', () => {
-    const score = scorer.getGameScore(0.8, 0.9, 50);
+    const score = scorer.getGameScore(0.8, 0.9, 50, 0.5);
     expect(score).toBeGreaterThan(0.4);
   });
 
-  it('should penalize bad reviews even if similar', () => {
-    const goodReview = scorer.getGameScore(0.9, 0.8, 1000);
-    const badReview = scorer.getGameScore(0.2, 0.8, 1000);
+  it('should penalize bad reviews even if similar and good publisher', () => {
+    const goodReview = scorer.getGameScore(0.9, 0.8, 1000, 0.8);
+    const badReview = scorer.getGameScore(0.2, 0.8, 1000, 0.8);
     expect(goodReview).toBeGreaterThan(badReview);
+  });
+
+  it('should boost score for favorite publishers', () => {
+    const favPub = scorer.getGameScore(0.8, 0.7, 1000, 0.9);
+    const unknownPub = scorer.getGameScore(0.8, 0.7, 1000, 0.1);
+    expect(favPub).toBeGreaterThan(unknownPub);
   });
 });

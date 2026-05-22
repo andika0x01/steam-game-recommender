@@ -26,8 +26,9 @@ export class FuzzyNonOwnGamesScorer {
    * @param reviewPositivity Rasio review positif (0-1)
    * @param tagSimilarity Kemiripan tag dengan profil selera pengguna (0-1)
    * @param reviewVolume Total jumlah review untuk validasi data
+   * @param publisherMatch Seberapa dikenal/disukai publisher oleh user (0-1)
    */
-  getGameScore(reviewPositivity: number, tagSimilarity: number, reviewVolume: number): number {
+  getGameScore(reviewPositivity: number, tagSimilarity: number, reviewVolume: number, publisherMatch: number): number {
     const review = {
       buruk: this.trapMF(reviewPositivity, -0.1, 0, 0.4, 0.5),
       mixed: this.trapMF(reviewPositivity, 0.4, 0.45, 0.6, 0.65),
@@ -42,7 +43,14 @@ export class FuzzyNonOwnGamesScorer {
       sangat_cocok: this.trapMF(tagSimilarity, 0.8, 0.9, 1.0, 1.1),
     };
 
+    const publisher = {
+      asing: this.trapMF(publisherMatch, -0.1, 0, 0.02, 0.05),
+      pernah_main: this.trapMF(publisherMatch, 0.05, 0.2, 0.3, 0.4),
+      favorit: this.trapMF(publisherMatch, 0.4, 0.6, 1.0, 1.1),
+    };
+
     const logVolume = reviewVolume > 0 ? Math.log10(reviewVolume) : 0;
+
     const volume = {
       sedikit: this.trapMF(logVolume, -1, 0, 1.5, 2),   
       sedang: this.trapMF(logVolume, 1.5, 2, 3, 3.5),  
@@ -57,26 +65,40 @@ export class FuzzyNonOwnGamesScorer {
       SANGAT_TINGGI: 0,
     };
 
-    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(similarity.sangat_cocok, review.sangat_bagus));
-    activation.TINGGI = Math.max(activation.TINGGI, Math.min(similarity.cocok, review.bagus));
+    // Rule 1: Similarity & Reviews combined
+    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(similarity.sangat_cocok, review.sangat_bagus, publisher.favorit));
+    activation.TINGGI = Math.max(activation.TINGGI, Math.min(similarity.cocok, review.bagus, publisher.pernah_main));
     activation.TINGGI = Math.max(activation.TINGGI, Math.min(similarity.sangat_cocok, review.bagus));
     activation.SEDANG = Math.max(activation.SEDANG, Math.min(similarity.lumayan, review.bagus));
     activation.SEDANG = Math.max(activation.SEDANG, Math.min(similarity.cocok, review.mixed));
     
-    activation.TINGGI = Math.max(activation.TINGGI, Math.min(similarity.sangat_cocok, review.mixed));
+    activation.TINGGI = Math.max(activation.TINGGI, Math.min(similarity.sangat_cocok, review.mixed, publisher.favorit));
     activation.SEDANG = Math.max(activation.SEDANG, Math.min(similarity.cocok, review.mixed));
     activation.RENDAH = Math.max(activation.RENDAH, Math.min(similarity.tidak_cocok, review.mixed));
 
+    // Rule 2: Penalties for bad reviews
     activation.RENDAH = Math.max(activation.RENDAH, Math.min(similarity.lumayan, review.buruk));
     activation.RENDAH = Math.max(activation.RENDAH, Math.min(similarity.cocok, review.buruk));
     activation.SANGAT_RENDAH = Math.max(activation.SANGAT_RENDAH, Math.min(similarity.tidak_cocok, review.buruk));
     activation.SANGAT_RENDAH = Math.max(activation.SANGAT_RENDAH, Math.min(similarity.sangat_cocok, review.buruk)); 
 
+    // Rule 3: Publisher specific boosts
+    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(publisher.favorit, similarity.cocok, review.bagus));
+    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(publisher.favorit, similarity.sangat_cocok));
+    activation.TINGGI = Math.max(activation.TINGGI, Math.min(publisher.favorit, similarity.lumayan));
+    activation.TINGGI = Math.max(activation.TINGGI, Math.min(publisher.pernah_main, similarity.cocok));
+    
+    // Direct influence of publisher on final categories
+    activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, publisher.favorit); 
+    activation.RENDAH = Math.max(activation.RENDAH, publisher.asing);
+    activation.SANGAT_RENDAH = Math.max(activation.SANGAT_RENDAH, Math.min(publisher.asing, review.mixed));
+
+    // Rule 4: Volume adds confidence to high scores
     activation.SANGAT_TINGGI = Math.max(activation.SANGAT_TINGGI, Math.min(similarity.sangat_cocok, volume.banyak, review.bagus));
     activation.SANGAT_RENDAH = Math.max(activation.SANGAT_RENDAH, Math.min(review.buruk, volume.banyak));
     
+    // Rule 5: Small volume keeps it moderate even if looks good
     activation.SEDANG = Math.max(activation.SEDANG, Math.min(similarity.sangat_cocok, volume.sedikit));
-
     if (Math.max(...Object.values(activation)) === 0) {
       activation.SANGAT_TINGGI = similarity.sangat_cocok;
       activation.TINGGI = similarity.cocok;

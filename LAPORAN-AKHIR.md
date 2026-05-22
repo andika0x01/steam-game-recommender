@@ -19,7 +19,7 @@ Sistem menggunakan fungsi keanggotaan trapezoidal untuk mengubah variabel input 
 
 #### Variabel Input:
 -   **Owned Games**: $Playtime$ (Playtime Forever), $Activity$ (2 Weeks Playtime), $Recency$ (Days since last played).
--   **Non-Owned Games**: $Positivity$ (Review Ratio), $Similarity$ (Tag Match), $Volume$ (Review Count).
+-   **Non-Owned Games**: $Positivity$ (Review Ratio), $Similarity$ (Tag Match), $Volume$ (Review Count), $PublisherMatch$ (Publisher Match).
 
 #### Defuzzifikasi (Weighted Average):
 Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor preferensi):

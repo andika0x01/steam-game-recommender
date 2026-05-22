@@ -30,9 +30,9 @@ export function calculateSimilarity(tags1: string[], tags2: string[]): number {
  * Mesin Rekomendasi Utama
  * 
  * Fungsi ini mengorkestrasi seluruh proses rekomendasi:
- * 1. Menganalisis library pengguna untuk membangun profil tag favorit.
+ * 1. Menganalisis library pengguna untuk membangun profil tag favorit dan publisher favorit.
  * 2. Mengambil kandidat game dari Steam Store secara proporsional.
- * 3. Menilai setiap kandidat menggunakan logika fuzzy non-owned.
+ * 3. Menilai setiap kandidat menggunakan logika fuzzy non-owned (termasuk kecocokan publisher).
  * 4. Mengurutkan dan mengembalikan hasil terbaik.
  */
 export async function getSimpleRecommendations(
@@ -54,7 +54,9 @@ export async function getSimpleRecommendations(
   const details = await Promise.all(detailPromises);
 
   const tagWeights: Record<string, number> = {};
-  let totalWeight = 0;
+  const publisherWeights: Record<string, number> = {};
+  let totalTagWeight = 0;
+  let totalPublisherWeight = 0;
 
   details.forEach((detail, idx) => {
     if (!detail) return;
@@ -68,11 +70,18 @@ export async function getSimpleRecommendations(
 
     tags.forEach(tag => {
       tagWeights[tag] = (tagWeights[tag] || 0) + score;
-      totalWeight += score;
+      totalTagWeight += score;
     });
+
+    if (detail.publishers) {
+      detail.publishers.forEach(pub => {
+        publisherWeights[pub] = (publisherWeights[pub] || 0) + score;
+        totalPublisherWeight += score;
+      });
+    }
   });
 
-  if (totalWeight === 0) return [];
+  if (totalTagWeight === 0) return [];
 
   const sortedTags = Object.entries(tagWeights)
     .sort((a, b) => b[1] - a[1])
@@ -80,7 +89,7 @@ export async function getSimpleRecommendations(
 
   const candidatesPerTag = amount * 3; 
   const fetchPromises = sortedTags.map(async ([tag, weight]) => {
-    const proportion = weight / totalWeight;
+    const proportion = weight / totalTagWeight;
     const count = Math.max(5, Math.ceil(candidatesPerTag * proportion));
     return api.searchGames({ term: tag, sort_by: 'Reviews_DESC' }).then(res => res.slice(0, count));
   });
@@ -109,11 +118,18 @@ export async function getSimpleRecommendations(
       ...(detail.categories || []).map(c => c.description)
     ];
 
+    // Hitung seberapa cocok publisher game ini dengan preferensi user
+    let publisherMatchScore = 0;
+    if (detail.publishers && totalPublisherWeight > 0) {
+      const matchSum = detail.publishers.reduce((sum, pub) => sum + (publisherWeights[pub] || 0), 0);
+      publisherMatchScore = Math.min(1, matchSum / (totalPublisherWeight / 5)); // Normalize, assume top 5 pubs are major
+    }
+
     const positivity = reviews.total_positive / (reviews.total_reviews || 1);
     const similarity = calculateSimilarity(candidateTags, userProfileTags);
     const volume = reviews.total_reviews;
 
-    const finalScore = nonOwnScorer.getGameScore(positivity, similarity, volume);
+    const finalScore = nonOwnScorer.getGameScore(positivity, similarity, volume, publisherMatchScore);
 
     results.push({
       appId: detail.steam_appid,
