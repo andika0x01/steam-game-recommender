@@ -4,11 +4,25 @@
 Steam Game Recommender adalah platform berbasis web yang menggunakan **Logika Fuzzy (Fuzzy Logic)** dan algoritma optimasi untuk memberikan rekomendasi game yang sangat personal. Sistem ini membedah library pengguna, menganalisis perilaku bermain, dan memprediksi tingkat ketertarikan terhadap game baru di Steam Store.
 
 ## 2. Arsitektur Sistem Rekomendasi
-Sistem menggunakan pendekatan **Dual-Scorer Fuzzy Logic**:
-1.  **FuzzyOwnGamesScorer**: Menilai game yang sudah dimiliki pengguna.
-2.  **FuzzyNonOwnGamesScorer**: Memprediksi skor untuk game yang belum dimiliki.
+Sistem ini mengadopsi arsitektur **Dual-Scorer Fuzzy Logic** yang memisahkan penilaian pengalaman masa lalu dengan prediksi minat masa depan.
 
-### 2.1. Logika Fuzzy (Fuzzy Logic)
+### 2.1. Orkestrasi Algoritma Rekomendasi
+Proses rekomendasi dilakukan melalui tahapan sistematis berikut:
+
+1.  **Library Profiling**:
+    Sistem mengevaluasi seluruh game di library pengguna menggunakan `FuzzyOwnGamesScorer`. Setiap game diberikan skor kepuasan (0-1) berdasarkan data perilaku nyata (*real behavior*).
+2.  **Fingerprint Generation**:
+    Sistem membangun "sidik jari minat" dengan cara mengagregasi tag dan publisher dari game-game di library. Bobot setiap tag dihitung secara proporsional terhadap skor kepuasan game pemiliknya.
+3.  **Proportional Tag Fetching**:
+    Bukannya mencari game secara acak, sistem mengambil Top 10 tag favorit pengguna dan menghitung persentase minat untuk masing-masing. Jika profil Anda 40% adalah "RPG", sistem akan mengalokasikan 40% kuota pencarian kandidat ke genre tersebut.
+4.  **Candidate Scoring**:
+    Setiap kandidat game baru yang ditemukan dari Steam Store dinilai ulang secara independen menggunakan `FuzzyNonOwnGamesScorer` yang mempertimbangkan faktor kualitas publik (review) dan kecocokan profil (tag & publisher).
+5.  **Final Ranking**:
+    Semua kandidat diurutkan berdasarkan skor prediksi tertinggi untuk ditampilkan kepada pengguna.
+
+---
+
+### 2.2. Logika Fuzzy (Fuzzy Logic)
 Sistem menggunakan fungsi keanggotaan trapezoidal ($TrapMF$) untuk mengubah variabel input (crisp) menjadi nilai fuzzy.
 
 #### Fungsi Keanggotaan Trapezoidal:
@@ -17,130 +31,60 @@ Sistem menggunakan fungsi keanggotaan trapezoidal ($TrapMF$) untuk mengubah vari
 \mu_A(x; a, b, c, d) = \begin{cases} 0, & x \le a \text{ atau } x \ge d \\ \frac{x-a}{b-a}, & a < x < b \\ 1, & b \le x \le c \\ \frac{d-x}{d-c}, & c < x < d \end{cases}
 ```
 
-### 2.1.1. Justifikasi Pemilihan Fungsi Trapezoidal ($TrapMF$)
-Pemilihan bentuk trapezoid didasarkan pada:
-1.  **Representasi Core/Plateau**: Memungkinkan rentang nilai memiliki derajat keanggotaan penuh ($\mu = 1.0$), lebih realistis untuk pemodelan perilaku manusia.
-2.  **Stabilitas Sistem**: Mencegah hasil rekomendasi yang "jittery" akibat fluktuasi kecil pada data input.
-3.  **Efisiensi Komputasi**: Hanya menggunakan operasi linear sederhana, ideal untuk *edge computing* (Cloudflare Workers).
+#### Justifikasi Pemilihan TrapMF:
+1.  **Representasi Plateau**: Memungkinkan rentang nilai memiliki derajat keanggotaan penuh ($\mu = 1.0$), memberikan stabilitas pada hasil scoring.
+2.  **Efisiensi Komputasi**: Hanya menggunakan operasi linear sederhana, ideal untuk platform *edge* (Cloudflare Workers).
 
 ---
 
-### 2.1.2. Analisis Variabel Input Library (Owned Games)
-Bagian ini menjelaskan bagaimana `FuzzyOwnGamesScorer` memproses data library pengguna.
+### 2.3. Analisis Variabel Input Library (Owned Games)
+Variabel ini digunakan oleh `FuzzyOwnGamesScorer` (Skor Kepuasan).
 
-#### A. Playtime Forever (Satuan: Menit)
-Variabel ini mengukur total waktu yang dihabiskan pengguna pada sebuah game sejak dibeli. Input ini di-*normalize* terhadap game dengan durasi terlama di library.
--   **Kategori Linguistik**:
-    -   `tidak_dimainkan`: Game yang memiliki durasi main mendekati 0 menit.
-    -   `dicoba`: Game dengan durasi main sangat singkat (biasanya < 5% dari game terlama), menandakan game baru dicoba sebentar.
-    -   `cukup`: Menunjukkan pengguna sudah melewati fase perkenalan dan mulai mendalami gameplay.
-    -   `sering`: Game yang sudah dimainkan secara rutin dengan jam terbang signifikan.
-    -   `sangat_banyak`: Game favorit utama yang mendominasi statistik library pengguna.
+| Variabel | Satuan | Deskripsi Pakar |
+| :--- | :--- | :--- |
+| **Playtime Forever** | Menit (Normalisasi) | Total jam terbang pengguna. Dibagi terhadap nilai tertinggi di library untuk mendapatkan skala relatif. |
+| **Recency** | Hari | Jumlah hari sejak terakhir dimainkan. Mengukur apakah game tersebut masih relevan dengan minat aktif saat ini. |
+| **Recent Activity** | Menit (Normalisasi) | Intensitas bermain dalam 2 minggu terakhir. Mendeteksi game yang sedang "hype" di mata user. |
 
-#### B. Recency (Satuan: Hari)
-Variabel ini mengitung jumlah hari sejak game tersebut terakhir kali dijalankan.
--   **Kategori Linguistik**:
-    -   `baru_main` (0 - 7 hari): Game yang sedang hangat-hangatnya dimainkan (High Relevance).
-    -   `agak_lama` (10 - 30 hari): Game yang masih segar dalam ingatan namun frekuensi main mulai menurun.
-    -   `lama` (30 - 90 hari): Game yang mulai ditinggalkan demi judul baru.
-    -   `sangat_lama` (90 - 180 hari): Game yang sudah lama tidak disentuh.
-    -   `ditinggal` (> 180 hari): Game yang kemungkinan besar sudah tidak sesuai dengan minat aktif pengguna saat ini.
+### 2.4. Analisis Variabel Input Store (Non-Owned Games)
+Variabel ini digunakan oleh `FuzzyNonOwnGamesScorer` (Skor Prediksi).
 
-#### C. Recent Activity (Satuan: Menit)
-Mengukur jumlah menit bermain dalam 2 minggu terakhir. Digunakan untuk mendeteksi tren minat jangka pendek.
--   **Kategori Linguistik**:
-    -   `tidak_aktif`: 0 menit bermain dalam 14 hari terakhir.
-    -   `sesekali`: Dimainkan dalam durasi singkat di sela-sela waktu luang.
-    -   `aktif`: Sedang sering dimainkan dalam 2 minggu terakhir.
-    -   `sangat_aktif`: Menunjukkan game tersebut adalah fokus utama hiburan pengguna saat ini.
+| Variabel | Satuan | Deskripsi Pakar |
+| :--- | :--- | :--- |
+| **Review Positivity** | Rasio (0-1) | Persentase review positif di Steam. Digunakan sebagai indikator kualitas objektif. |
+| **Tag Similarity** | Jaccard Index (0-1) | Mengukur irisan tag kandidat terhadap profil minat user. Semakin mendekati 1, semakin cocok "DNA" game tersebut. |
+| **Review Volume** | Log10 (Jumlah) | Kredibilitas data. Skala logaritmik digunakan untuk menyeimbangkan statistik antara game indie kecil dan judul AAA. |
+| **Publisher Score** | Rasio (0-1) | Loyalitas brand. Dihitung dari sigma skor kepuasan dikali durasi bermain game rilisan publisher tersebut di masa lalu. |
 
 ---
 
-### 2.1.3. Analisis Variabel Input Store (Non-Owned Games)
-Bagian ini menjelaskan variabel yang digunakan `FuzzyNonOwnGamesScorer` untuk memprediksi potensi kepuasan pada game baru.
-
-#### A. Review Positivity (Satuan: Persentase / Rasio)
-Rasio antara review positif terhadap total review di Steam.
--   **Kategori Linguistik**:
-    -   `buruk`: Rasio di bawah 40%. Game dengan sentimen negatif kuat dari komunitas.
-    -   `mixed`: Rasio antara 40% - 60%. Kualitas game diperdebatkan atau memiliki masalah teknis.
-    -   `bagus`: Rasio 60% - 80%. Game yang diterima dengan baik secara umum.
-    -   `sangat_bagus`: Rasio di atas 80%. Game berkualitas tinggi yang sangat direkomendasikan komunitas.
-
-#### B. Tag Similarity (Satuan: Rasio / Jaccard Index)
-Mengukur kemiripan genre/tag game kandidat dengan profil tag favorit pengguna yang dibangun dari library.
--   **Kategori Linguistik**:
-    -   `tidak_cocok`: Genre game sangat jauh dari kebiasaan bermain user.
-    -   `lumayan`: Memiliki satu atau dua elemen genre yang pernah dimainkan user.
-    -   `cocok`: Sebagian besar genre dan fitur game sesuai dengan selera user.
-    -   `sangat_cocok`: Game memiliki "DNA" yang identik dengan game-game favorit di library.
-
-#### C. Review Volume (Satuan: Jumlah Review / Log10)
-Jumlah total review yang diterima game. Skala logaritmik digunakan untuk menyeimbangkan game indie baru dengan game AAA populer.
--   **Kategori Linguistik**:
-    -   `sedikit` (< 100 review): Data rating dianggap kurang stabil/valid secara statistik.
-    -   `sedang` (100 - 3.000 review): Memiliki basis massa yang cukup untuk validasi kualitas.
-    -   `banyak` (> 10.000 review): Game populer dengan data rating yang sangat kredibel.
-
-#### D. Publisher Score (Satuan: Rasio Skor Berbobot)
-Dihitung menggunakan rumus agregasi: $PS = \frac{\sum (Score \times Playtime)}{\sum Playtime_{all}}$.
--   **Kategori Linguistik**:
-    -   `low`: Publisher yang produknya jarang dimainkan atau memiliki skor rendah di library user.
-    -   `medium`: Publisher yang produknya beberapa kali dimainkan dengan hasil memuaskan.
-    -   `high`: Brand loyalitas tinggi. User sering menghabiskan waktu lama di game-game keluaran publisher ini.
-
----
-
-### 2.2. Defuzzifikasi & Linear Tie-Breaker
-Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor preferensi). Untuk menghindari penumpukan skor pada angka bulat (misalnya semua game masuk kategori 50%), sistem menggunakan teknik **Linear Tie-Breaker**.
-
-#### Rumus Defuzzifikasi Berbobot:
+### 2.5. Defuzzifikasi (Weighted Average)
+Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor preferensi):
 
 ```math
-Score_{fuzzy} = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_{activation, i}}
+Score = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_{activation, i}}
 ```
 
-#### Rumus Linear Tie-Breaker (Skor Akhir):
-Sistem mencampurkan 10% bobot dari nilai input mentah (*raw bias*) untuk memberikan variasi granularitas pada hasil akhir.
-
-```math
-Score_{final} = (Score_{fuzzy} \times 0.9) + (RawBias \times 0.1)
-```
-
-Dimana $RawBias$ adalah rata-rata dari input normalisasi (seperti *playtime* atau *tag similarity*). Hal ini memastikan bahwa dua game yang berada dalam kategori fuzzy yang sama tetap memiliki skor unik berdasarkan keunggulan nilai absolutnya.
+Dimana $w$ adalah konstanta tingkat kepuasan: **Sangat Rendah (0.1)** hingga **Sangat Tinggi (0.9)**.
 
 ---
 
-## 3. Fitur Utama
+## 3. Fitur Utama & Optimasi
 
-### 3.1. Library Analysis (Backlog)
-Menganalisis library pengguna untuk mengidentifikasi game mana yang paling "berharga" bagi mereka berdasarkan perilaku nyata. Skor ini digunakan untuk membangun profil selera dasar.
+### 3.1. Discovery Engine & Infinite Scrolling
+Mesin pencari yang mendukung eksplorasi tanpa batas. Untuk menjamin kualitas dan variasi:
+-   **Aggressive Offset**: Setiap halaman baru menggunakan parameter `start` yang melompat signifikan (50+ game) untuk menghindari pengulangan hasil populer yang sama.
+-   **Deduplikasi Client-side**: Memastikan ID game yang sudah tampil tidak akan muncul kembali di layar.
 
-### 3.2. Discovery Engine
-Mesin pencari game baru dengan **Infinite Scrolling**. Sistem mengambil ratusan kandidat game berdasarkan profil tag, lalu menyaringnya menggunakan `FuzzyNonOwnGamesScorer`.
+### 3.2. Deal Hunter (Budget Optimization)
+Menggunakan **Simulated Annealing (SA)** untuk memaksimalkan kepuasan dalam batas budget.
+-   **Density Function**: $Density = \frac{Score}{\max(Price, 1)}$. Memprioritaskan game berkualitas tinggi dengan harga terendah.
+-   **Utility Maximization**: SA secara agresif mencari kombinasi yang memaksimalkan utilitas budget $(\frac{TotalCost}{Budget})^2$ agar sisa saldo pengguna seminimal mungkin.
 
-### 3.3. Co-op Nexus
-Menganalisis irisan (*intersection*) library antara grup. Rekomendasi dihitung dengan rata-rata skor fuzzy anggota grup.
-
-### 3.4. Deal Hunter (Budget & Density Optimization)
-Menggunakan **Simulated Annealing (SA)** untuk menemukan kombinasi game terbaik dengan memaksimalkan **Density**:
-
-```math
-Density = \frac{FuzzyScore}{\max(Price, 1)}
-```
-
-SA mencari solusi yang memaksimalkan utilitas budget $(\frac{TotalCost}{Budget})^2$.
-
-### 3.5. Infinite Scrolling & Aggressive Pagination
-Data dimuat secara asinkron melalui API internal. Untuk memastikan pengguna tidak melihat game yang sama berulang kali, sistem menggunakan strategi **Aggressive Offset**:
-1.  **Paging Offset**: Menggunakan parameter `start` pada query Steam yang melompat lebih jauh di setiap halaman (misal: halaman 2 mengambil mulai dari urutan 50+).
-2.  **Deduplikasi Client-side**: Memastikan ID game yang sudah ada di layar tidak akan ditambahkan lagi jika muncul di hasil pencarian berikutnya.
-
-### 3.6. Tiered Caching Strategy (Cloudflare KV)
-Untuk menjaga performa dan menghindari pembatasan rate-limit API Steam, sistem menerapkan strategi caching berlapis menggunakan Cloudflare KV:
-1.  **Search Results Cache (1 Jam)**: Hasil pencarian di-cache selama 1 jam. TTL yang pendek memastikan daftar game di *Market Discovery* tetap segar dan mengikuti pembaruan katalog Steam.
-2.  **Metadata & Review Cache (24 Jam)**: Detail game (gambar, harga, tag) dan rangkuman review di-cache selama 24 jam karena data ini jarang berubah secara drastis dalam waktu singkat.
-3.  **Unique Cache Keys**: Setiap key cache dibentuk secara unik berdasarkan kombinasi parameter (seperti `appid`, `language`, `country code`, dan `start offset`), memastikan tidak ada tabrakan data antar halaman *infinite scroll*.
+### 3.3. Strategi Caching (Cloudflare KV)
+Untuk performa maksimal dan efisiensi API Steam:
+-   **Search Cache (7 Hari)**: Menjaga stabilitas daftar rekomendasi mingguan.
+-   **Details & Review Cache (Permanen)**: Informasi metadata game yang sudah pernah di-*fetch* akan disimpan selamanya untuk kecepatan akses instan.
 
 ## 4. Kesimpulan
-Sistem ini berhasil mengonversi data Steam yang sangat luas menjadi rekomendasi personal melalui pemodelan spektrum minat manusia menggunakan Logika Fuzzy. Penggunaan Linear Tie-Breaker, normalisasi relatif, dan optimasi heuristik memastikan hasil yang presisi, bervariasi, dan efisien.
+Dengan menggabungkan Logika Fuzzy untuk penilaian subjektif dan algoritma heuristik untuk optimasi data, Steam Game Recommender mampu mentransformasi data mentah Steam menjadi pengalaman penemuan game yang benar-benar personal dan akurat.

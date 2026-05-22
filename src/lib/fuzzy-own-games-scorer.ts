@@ -3,8 +3,7 @@ import { SteamGame } from './steam';
 /**
  * Kelas FuzzyOwnGamesScorer
  * 
- * Perbaikan: Menambahkan Linear Tie-Breaker untuk memastikan skor bervariasi
- * dan tidak menumpuk di nilai bulat (seperti 30%, 50%).
+ * Sistem inferensi fuzzy untuk mengevaluasi game di library pengguna.
  */
 export class FuzzyOwnGamesScorer {
   private maxPlaytimeForever: number = 0;
@@ -96,14 +95,6 @@ export class FuzzyOwnGamesScorer {
       }
     }
 
-    const fuzzyScore = denominator > 0 ? numerator / denominator : 0.5;
-    
-    /**
-     * Linear Tie-Breaker:
-     * Mencampurkan 10% nilai input mentah untuk memberikan variasi
-     * pada game dalam kategori yang sama.
-     */
-    const rawBias = (playtimeNorm * 0.05) + (activityNorm * 0.05);
-    return Math.min(1, fuzzyScore * 0.9 + rawBias);
+    return denominator > 0 ? numerator / denominator : 0.5;
   }
 }

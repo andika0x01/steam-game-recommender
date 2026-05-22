@@ -3,9 +3,6 @@
  * 
  * Sistem inferensi fuzzy untuk memprediksi tingkat ketertarikan pengguna
  * terhadap game yang belum mereka miliki.
- * 
- * Perbaikan: Menambahkan Linear Tie-Breaker untuk menghindari penumpukan 
- * skor di angka bulat (50%).
  */
 export class FuzzyNonOwnGamesScorer {
   private trapMF(x: number, a: number, b: number, c: number, d: number): number {
@@ -91,14 +88,6 @@ export class FuzzyNonOwnGamesScorer {
       }
     }
 
-    const fuzzyScore = denominator > 0 ? numerator / denominator : 0.5;
-
-    /**
-     * Linear Tie-Breaker:
-     * Mencampurkan 10% nilai input mentah untuk memberikan variasi presisi.
-     * Termasuk publisherScore agar brand loyalty memberikan perbedaan skor nyata.
-     */
-    const rawBias = (tagSimilarity * 0.04) + (reviewPositivity * 0.03) + (publisherScore * 0.03);
-    return Math.min(1, fuzzyScore * 0.9 + rawBias);
+    return denominator > 0 ? numerator / denominator : 0.5;
   }
 }
