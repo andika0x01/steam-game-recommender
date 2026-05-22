@@ -52,20 +52,23 @@ Variabel ini digunakan oleh `FuzzyNonOwnGamesScorer` (Skor Prediksi).
 | Variabel | Satuan | Deskripsi Pakar |
 | :--- | :--- | :--- |
 | **Review Positivity** | Rasio (0-1) | Persentase review positif di Steam. Digunakan sebagai indikator kualitas objektif. |
-| **Tag Similarity** | Jaccard Index (0-1) | Mengukur irisan tag kandidat terhadap profil minat user. Semakin mendekati 1, semakin cocok "DNA" game tersebut. |
+| **Tag Similarity** | Overlap Coeff (0-1) | Mengukur irisan tag kandidat terhadap profil minat user menggunakan rumus Overlap Coefficient. Lebih adil untuk game dengan jumlah tag sedikit dibandingkan Jaccard Index. |
 | **Review Volume** | Log10 (Jumlah) | Kredibilitas data. Skala logaritmik digunakan untuk menyeimbangkan statistik antara game indie kecil dan judul AAA. |
-| **Publisher Score** | Rasio (0-1) | Loyalitas brand. Dihitung dari sigma skor kepuasan dikali durasi bermain game rilisan publisher tersebut di masa lalu. |
+| **Publisher Score** | Rasio (0-1) | Loyalitas brand. Dihitung dari sigma skor kepuasan dikali durasi bermain game rilisan publisher tersebut di masa lalu. Memberikan boost langsung pada skor akhir. |
 
 ---
 
-### 2.5. Defuzzifikasi (Weighted Average)
-Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor preferensi):
+### 2.5. Defuzzifikasi & Final Score
+Sistem menggunakan metode rata-rata berbobot (Weighted Average) untuk mendapatkan skor prediksi akhir secara langsung dari sistem inferensi fuzzy:
 
 ```math
-Score = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_{activation, i}}
+FinalScore = \frac{\sum_{i=1}^n \mu_{activation, i} \cdot w_i}{\sum_{i=1}^n \mu_{activation, i}}
 ```
 
-Dimana $w$ adalah konstanta tingkat kepuasan: **Sangat Rendah (0.1)** hingga **Sangat Tinggi (0.9)**.
+#### Karakteristik Penilaian:
+1.  **Strict Data**: Jika tidak ada aturan yang aktif ($\sum \mu = 0$), skor diatur ke **0** untuk menghindari ambiguitas (menghapus "perangkap 50%").
+2.  **Publisher Integration**: Publisher Score bukan merupakan bonus eksternal, melainkan variabel input utama. Aturan fuzzy dirancang agar kombinasi game berkualitas (Review Bagus) dengan Publisher favorit (Publisher High) dapat mendorong aktivasi ke tingkat **Sangat Tinggi (0.9)**.
+3.  **Cross-Validation**: Aturan fuzzy juga menangani kasus kontradiktif, seperti menurunkan skor game berkualitas tinggi jika genrenya sangat tidak cocok dengan profil pengguna.
 
 ---
 
@@ -74,6 +77,7 @@ Dimana $w$ adalah konstanta tingkat kepuasan: **Sangat Rendah (0.1)** hingga **S
 ### 3.1. Discovery Engine & Infinite Scrolling
 Mesin pencari yang mendukung eksplorasi tanpa batas. Untuk menjamin kualitas dan variasi:
 -   **Aggressive Offset**: Setiap halaman baru menggunakan parameter `start` yang melompat signifikan (50+ game) untuk menghindari pengulangan hasil populer yang sama.
+-   **Client-side Auto-Fetch**: Jika render sisi server gagal atau kosong karena limitasi sistem, komponen InfiniteGrid akan mendeteksi dan melakukan pengambilan data pertama secara otomatis di sisi browser.
 -   **Deduplikasi Client-side**: Memastikan ID game yang sudah tampil tidak akan muncul kembali di layar.
 
 ### 3.2. Deal Hunter (Budget Optimization)
@@ -81,10 +85,17 @@ Menggunakan **Simulated Annealing (SA)** untuk memaksimalkan kepuasan dalam bata
 -   **Density Function**: $Density = \frac{Score}{\max(Price, 1)}$. Memprioritaskan game berkualitas tinggi dengan harga terendah.
 -   **Utility Maximization**: SA secara agresif mencari kombinasi yang memaksimalkan utilitas budget $(\frac{TotalCost}{Budget})^2$ agar sisa saldo pengguna seminimal mungkin.
 
-### 3.3. Strategi Caching (Cloudflare KV)
-Untuk performa maksimal dan efisiensi API Steam:
+### 3.3. Strategi Caching & Batching (Cloudflare KV)
+Untuk performa maksimal dan efisiensi API Steam dalam batasan 50-subrequest Cloudflare:
+-   **App Details Batching**: Pengambilan detail game dilakukan dalam batch (hingga 10 ID per request) untuk menghemat kuota subrequest fetch.
+-   **User Profile Cache (24 Jam)**: Sidik jari minat (tag weights & publisher scores) disimpan di KV. Menghilangkan kebutuhan untuk memproses ulang library pada setiap navigasi halaman.
 -   **Search Cache (7 Hari)**: Menjaga stabilitas daftar rekomendasi mingguan.
--   **Details & Review Cache (Permanen)**: Informasi metadata game yang sudah pernah di-*fetch* akan disimpan selamanya untuk kecepatan akses instan.
+-   **Details & Review Cache (Permanen)**: Informasi metadata game disimpan permanen untuk kecepatan akses instan.
+
+### 3.4. Stabilitas Produksi (Edge Computing)
+Untuk menangani limitasi CPU dan timeout pada Cloudflare Workers:
+-   **Graceful Rendering**: Rute kritis seperti `/engine` menggunakan blok error handling yang mencegah halaman blank. Jika perhitungan algoritma di sisi server terlalu berat, sistem akan merender UI placeholder dan memindahkan beban komputasi ke API asinkron.
+-   **Safety Thresholds**: Membatasi jumlah kandidat yang diproses secara real-time (maks 20 kandidat per batch) untuk menjaga latensi tetap rendah.
 
 ## 4. Kesimpulan
 Dengan menggabungkan Logika Fuzzy untuk penilaian subjektif dan algoritma heuristik untuk optimasi data, Steam Game Recommender mampu mentransformasi data mentah Steam menjadi pengalaman penemuan game yang benar-benar personal dan akurat.
