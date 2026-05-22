@@ -43,6 +43,14 @@ app.get('/', async (c) => {
     .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 8)
 
+  const latexName = (value: string) => value.replace(/\\/g, '\\textbackslash{}').replace(/_/g, '\\_').replace(/&/g, '\\&')
+  const topTagLatexRows = topTags
+    .map(([tag, score], index) => `W_{\\mathrm{${latexName(tag)}}} &= ${Number(score).toFixed(3)}\\quad\\text{rank ${index + 1}}`)
+    .join('\\\\')
+  const topPublisherLatexRows = topPublishers
+    .map(([publisher, score], index) => `P_{\\mathrm{${latexName(publisher)}}} &= ${Number(score).toFixed(3)}\\quad (${Math.round(Number(score) * 100)}\\%)\\quad\\text{rank ${index + 1}}`)
+    .join('\\\\')
+
   return c.render(
     <>
     <div data-hydrate="AnalyzerModal"></div>
@@ -66,6 +74,19 @@ app.get('/', async (c) => {
         {/* Top Tags */}
         <div className="glass p-6 md:p-8 rounded-3xl border border-white/5 space-y-6">
           <h3 className="text-lg font-black tracking-widest uppercase text-white/80 border-b border-white/10 pb-4">Top 12 Preferred Tags</h3>
+          <div className="rounded-2xl border border-orange-500/10 bg-orange-500/[0.04] p-4 text-sm leading-relaxed text-zinc-400">
+            <div className="overflow-x-auto py-1 text-zinc-200 [&_.mjx-container]:my-0 [&_.mjx-container]:text-left">
+              {`\\[
+\\begin{aligned}
+W_t &= \\sum_{g\\in L,\\ t\\in T_g} score_g\\\\
+${topTagLatexRows || 'W_t &= 0'}
+\\end{aligned}
+\\]`}
+            </div>
+            <p>
+              Setiap baris adalah hasil agregasi bobot tag yang tampil di kartu. Nilai ini bukan persentase; tag makin besar jika sering muncul pada game library yang skor fuzzy-nya tinggi.
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             {topTags.map(([tag, score]) => {
               const displayScore = (score as number).toFixed(1);
@@ -82,6 +103,20 @@ app.get('/', async (c) => {
         {/* Top Publishers */}
         <div className="glass p-6 md:p-8 rounded-3xl border border-white/5 space-y-6">
           <h3 className="text-lg font-black tracking-widest uppercase text-white/80 border-b border-white/10 pb-4">Top 8 Affinity Publishers</h3>
+          <div className="rounded-2xl border border-orange-500/10 bg-orange-500/[0.04] p-4 text-sm leading-relaxed text-zinc-400">
+            <div className="overflow-x-auto py-1 text-zinc-200 [&_.mjx-container]:my-0 [&_.mjx-container]:text-left">
+              {`\\[
+\\begin{aligned}
+P_p &= \\frac{\\sum_{g\\in L_p}(score_g\\cdot playtime_g)}{\\sum_{g\\in L_p}playtime_g}\\\\
+P_p^{norm} &= \\frac{P_p}{\\max(P)}\\\\
+${topPublisherLatexRows || 'P_p^{norm} &= 0'}
+\\end{aligned}
+\\]`}
+            </div>
+            <p>
+              Publisher dihitung dari rata-rata skor fuzzy berbobot playtime, lalu dinormalisasi ke 0-1. Persentase di kanan adalah nilai affinity publisher setelah normalisasi.
+            </p>
+          </div>
           <div className="flex flex-col gap-3">
             {topPublishers.map(([pub, score]) => {
               const percentage = Math.round((score as number) * 100);

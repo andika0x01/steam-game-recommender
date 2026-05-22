@@ -39,6 +39,10 @@ app.get('/', async (c) => {
   const topProfileTags = Object.entries(allowedTagWeights)
     .sort(([, left], [, right]) => (right as number) - (left as number))
     .slice(0, 8)
+  const latexName = (value: string) => value.replace(/\\/g, '\\textbackslash{}').replace(/_/g, '\\_').replace(/&/g, '\\&')
+  const topProfileTagLatexRows = topProfileTags
+    .map(([tag, weight], index) => `W_{\\mathrm{${latexName(tag)}}} &= ${Number(weight).toFixed(3)}\\quad\\text{rank ${index + 1}}`)
+    .join('\\\\')
 
   let scoredDeals: any[] = []
   try {
@@ -264,6 +268,20 @@ app.get('/', async (c) => {
             <p className="max-w-xl text-sm leading-relaxed text-zinc-500">
               Rekomendasi dibentuk dari top tags library yang sudah diberi bobot fuzzy, review Steam, volume review, dan affinity publisher. Tag dominan saat ini:
             </p>
+            <div className="max-w-xl rounded-2xl border border-orange-500/10 bg-orange-500/[0.04] p-4 text-sm leading-relaxed text-zinc-500">
+              <div className="overflow-x-auto py-1 text-zinc-200 [&_.mjx-container]:my-0 [&_.mjx-container]:text-left">
+                {`\\[
+\\begin{aligned}
+W_t &= \\sum_{g\\in L,\\ t\\in T_g} score_g\\\\
+${topProfileTagLatexRows || 'W_t &= 0'}\\\\
+s &= \\frac{\\sum_{t\\in C\\cap P}W_t}{\\sum_{i=1}^{|C|}W_{(i)}}
+\\end{aligned}
+\\]`}
+              </div>
+              <p>
+                Baris tag menunjukkan bobot aktual dari library Anda. Nilai similarity kandidat dihitung dari jumlah bobot tag kandidat yang cocok dibandingkan bobot top tag profil dengan ukuran set kandidat yang sama.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               {topProfileTags.map(([tag, weight]) => (
                 <span key={tag} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-300">
