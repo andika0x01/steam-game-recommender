@@ -28,6 +28,45 @@ Pemilihan bentuk trapezoid dibandingkan dengan segitiga atau Gaussian didasarkan
 -   **Owned Games**: $Playtime$ (Playtime Forever), $Activity$ (2 Weeks Playtime), $Recency$ (Days since last played).
 -   **Non-Owned Games**: $Positivity$ (Review Ratio), $Similarity$ (Tag Match), $Volume$ (Review Count), $PublisherMatch$ (Publisher Match).
 
+### 2.1.2. Detail Fuzzifikasi Variabel Library (Owned Games)
+Variabel ini digunakan oleh `FuzzyOwnGamesScorer` untuk memahami seberapa besar pengguna menyukai game yang sudah mereka miliki:
+
+1.  **Playtime (Normalisasi 0-1)**:
+    -   `tidak_dimainkan` (-0.1 - 0.05): Mendeteksi game yang hanya ada di library tanpa interaksi.
+    -   `dicoba` (0.02 - 0.2): Game yang baru dimainkan beberapa jam (hanya untuk testing).
+    -   `sering` (0.3 - 0.8): Game yang sudah menjadi bagian dari rutinitas pengguna.
+    -   `sangat_banyak` (0.6 - 1.1): Game "main" atau favorit utama dengan jam terbang tinggi.
+    *Alasan*: Menggunakan normalisasi terhadap playtime tertinggi di library untuk menangkap skala relatif antar game.
+
+2.  **Recency (Hari sejak terakhir dimainkan)**:
+    -   `baru_main` (-1 - 7 hari): Memberikan skor tinggi pada game yang sedang aktif dimainkan (momentum).
+    -   `lama` (20 - 90 hari): Game yang mulai terlupakan namun masih memiliki potensi relevansi.
+    -   `ditinggal` (> 150 hari): Game yang kemungkinan besar sudah tidak relevan dengan minat saat ini.
+    *Alasan*: Minat manusia berubah seiring waktu; game yang baru dimainkan memiliki bobot "DNA minat" yang lebih segar.
+
+3.  **Activity (Normalisasi Playtime 2 Minggu)**:
+    -   `aktif` (0.2 - 0.7) & `sangat_aktif` (0.5 - 1.1).
+    *Alasan*: Membedakan antara game yang punya total playtime besar di masa lalu vs game yang *sedang* gila-gilaan dimainkan saat ini.
+
+### 2.1.3. Detail Fuzzifikasi Variabel Store (Non-Owned Games)
+Variabel ini digunakan oleh `FuzzyNonOwnGamesScorer` untuk memprediksi ketertarikan terhadap game baru:
+
+1.  **Review Positivity (0.0 - 1.0)**:
+    -   `buruk` (< 0.4), `mixed` (0.4 - 0.6), `bagus` (0.6 - 0.8), `sangat_bagus` (> 0.75).
+    *Alasan*: Mengikuti standar klasifikasi Steam. Game di bawah 60% positif dianggap berisiko tinggi bagi sistem rekomendasi.
+
+2.  **Tag Similarity (Jaccard Index 0-1)**:
+    -   `tidak_cocok` (< 0.2), `lumayan` (0.2 - 0.6), `sangat_cocok` (> 0.8).
+    *Alasan*: Ambang batas 0.8 menandakan hampir seluruh genre dan fitur game identik dengan profil favorit pengguna.
+
+3.  **Review Volume (Skala Logaritmik)**:
+    -   `sedikit` ($10^0$ - $10^{1.5}$), `sedang` ($10^{1.5}$ - $10^{3.5}$), `banyak` (> $10^3$).
+    *Alasan*: Menggunakan **Log10** karena volume review Steam sangat timpang (eksponensial). Game dengan 100.000 review jauh lebih kredibel secara statistik dibandingkan game dengan 10 review.
+
+4.  **Publisher Score (Weighted Aggregation 0-1)**:
+    -   `low` (0.0 - 0.4), `medium` (0.3 - 0.7), `high` (0.6 - 1.0).
+    *Alasan*: Berdasarkan rumus sigma skor dikali durasi bermain. Jika pengguna menghabiskan ribuan jam di game rilisan Paradox, maka game baru dari Paradox secara otomatis dianggap lebih menarik oleh sistem pakar.
+
 #### Defuzzifikasi (Weighted Average):
 Sistem menggunakan metode rata-rata berbobot untuk mendapatkan nilai akhir (skor preferensi):
 
