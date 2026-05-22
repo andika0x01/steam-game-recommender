@@ -1,9 +1,11 @@
 import React from 'react'
 import { hydrateRoot } from 'react-dom/client'
 import { TierList } from './components/TierList'
+import { InfiniteGrid } from './components/InfiniteGrid'
 
 const components: Record<string, React.ComponentType<any>> = {
   TierList,
+  InfiniteGrid,
 }
 
 const hydrateAll = () => {

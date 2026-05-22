@@ -11,6 +11,7 @@ import backlogApp from './pages/backlog'
 import coopApp from './pages/coop'
 import tierlistApp from './pages/tierlist'
 import dealsApp from './pages/deals'
+import apiApp from './pages/api'
 
 type Bindings = {
   STEAM_API_KEY: string
@@ -69,5 +70,6 @@ app.route('/backlog', backlogApp)
 app.route('/coop', coopApp)
 app.route('/tierlist', tierlistApp)
 app.route('/deals', dealsApp)
+app.route('/api', apiApp)
 
 export default app

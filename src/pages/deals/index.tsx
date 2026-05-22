@@ -5,6 +5,7 @@ import { SteamAPI } from '../../lib/steam'
 import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
 import { getIdrRate } from '../../lib/currency'
+import { InfiniteGrid } from '../../components/InfiniteGrid'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
@@ -14,7 +15,8 @@ const app = new Hono<{ Bindings: any, Variables: any }>()
  * Mengoptimalkan anggaran pengguna untuk mendapatkan kombinasi game terbaik
  * yang sedang diskon di Steam Store. Menggunakan algoritma Simulated Annealing
  * untuk menyelesaikan masalah optimasi kombinatorial dengan mempertimbangkan 
- * 'density' (skor preferensi per satuan harga).
+ * 'density' (skor preferensi per satuan harga) dan maksimalisasi budget.
+ * Mendukung eksplorasi pasar berkelanjutan (Infinite Scrolling).
  */
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
@@ -52,7 +54,7 @@ app.get('/', async (c) => {
           normalPrice: d!.price_overview!.initial / 100,
           savings: d!.price_overview!.discount_percent.toString(),
           score: score,
-          density: score / (price || 1), // Menghitung skor per rupiah
+          density: score / (price || 1),
           formattedPrice: d!.price_overview!.final_formatted,
           formattedInitial: d!.price_overview!.initial_formatted,
           tags: (d!.genres || []).map((g: any) => g.description).concat((d!.categories || []).map((c: any) => c.description))
@@ -68,29 +70,43 @@ app.get('/', async (c) => {
     let currentBasket = scoredDeals.filter(() => Math.random() > 0.8)
     const getCost = (items: any[]) => items.reduce((sum, item) => sum + item.salePrice, 0)
     
-    /**
-     * getScore menggunakan density (skor/harga)
-     * Memastikan game yang murah tapi disukai user mendapatkan prioritas lebih.
-     */
-    const getScore = (items: any[]) => items.reduce((sum, item) => sum + item.density, 0)
+    const getEnergy = (items: any[]) => {
+      const cost = getCost(items)
+      if (cost > budgetIDR) return -1
+      
+      const totalDensity = items.reduce((sum, item) => sum + item.density, 0)
+      const budgetUtilization = cost / budgetIDR
+      
+      return totalDensity * Math.pow(budgetUtilization, 2)
+    }
 
-    let temp = 2000.0
-    const coolingRate = 0.995 
+    let temp = 3000.0 
+    const coolingRate = 0.997 
 
     while (temp > 1) {
-      const neighborSize = Math.floor(Math.random() * 8) + 1
-      const neighbor = [...scoredDeals].sort(() => Math.random() - 0.5).slice(0, neighborSize)
+      let neighbor = [...currentBasket]
+      const action = Math.random()
       
-      const currentCost = getCost(currentBasket)
-      const neighborCost = getCost(neighbor)
-
-      if (neighborCost <= budgetIDR) {
-        const currentScore = getScore(currentBasket)
-        const neighborScore = getScore(neighbor)
-
-        if (neighborScore > currentScore || Math.random() < Math.exp((neighborScore - currentScore) / temp)) {
-          currentBasket = neighbor
+      if (action < 0.4 && neighbor.length < scoredDeals.length) {
+        const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
+        if (available.length > 0) {
+          neighbor.push(available[Math.floor(Math.random() * available.length)])
         }
+      } else if (action < 0.7 && neighbor.length > 1) {
+        neighbor.splice(Math.floor(Math.random() * neighbor.length), 1)
+      } else {
+        const idx = Math.floor(Math.random() * neighbor.length)
+        const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
+        if (available.length > 0) {
+          neighbor[idx] = available[Math.floor(Math.random() * available.length)]
+        }
+      }
+      
+      const currentEnergy = getEnergy(currentBasket)
+      const neighborEnergy = getEnergy(neighbor)
+
+      if (neighborEnergy > currentEnergy || Math.random() < Math.exp((neighborEnergy - currentEnergy) / temp)) {
+        currentBasket = neighbor
       }
       temp *= coolingRate
     }
@@ -100,12 +116,20 @@ app.get('/', async (c) => {
 
   const remainingIDR = budgetIDR - totalCostIDR
 
-  /**
-   * Discovery items diurutkan berdasarkan density (terbaik nilainya terhadap harga)
-   */
   const discoveryItems = [...scoredDeals]
     .sort((a, b) => b.density - a.density)
     .slice(0, 24)
+    .map(d => ({
+       appid: d.appid,
+       name: d.name,
+       score: d.score,
+       price: d.formattedPrice,
+       originalPrice: d.formattedInitial,
+       discount: d.savings,
+       tags: d.tags,
+       hideScore: true,
+       hideTags: true
+    }))
 
   return c.render(
     <div className="max-w-7xl mx-auto px-4 md:px-6 py-12 md:py-20 space-y-16 md:space-y-24">
@@ -213,27 +237,13 @@ app.get('/', async (c) => {
         <div className="flex items-center gap-6">
           <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-white/10" />
           <h3 className="text-xs font-black uppercase tracking-[0.5em] text-zinc-500 whitespace-nowrap">
-            {budgetIDR > 0 ? 'Market Discovery (Highest Price First)' : 'Active Steam Specials'}
+            Market Discovery
           </h3>
           <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-white/10" />
         </div>
         {discoveryItems.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6 gap-6 md:gap-8">
-            {discoveryItems.map((deal: any) => (
-              <GameCard 
-                key={deal.appid}
-                appId={deal.appid}
-                name={deal.name}
-                score={deal.score}
-                price={deal.formattedPrice}
-                originalPrice={deal.formattedInitial}
-                discount={deal.savings}
-                tags={deal.tags}
-                hideScore={true}
-                hideTags={true}
-                actionLabel="Lihat di Steam"
-              />
-            ))}
+          <div data-hydrate="InfiniteGrid" data-props={JSON.stringify({ initialItems: discoveryItems, endpoint: '/api/deals', type: 'deal' })}>
+            <InfiniteGrid initialItems={discoveryItems} endpoint="/api/deals" type="deal" />
           </div>
         ) : (
           <div className="glass p-20 rounded-[3rem] text-center border border-dashed border-white/10">

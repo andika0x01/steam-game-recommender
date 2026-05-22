@@ -74,14 +74,21 @@ Density = \frac{FuzzyScore}{Price}
 
 Sistem bertujuan memaksimalkan total density dalam keranjang belanja tanpa melebihi budget pengguna. Selain itu, sistem mengintegrasikan kurs **USD/IDR secara real-time** menggunakan API Wise untuk memberikan konteks nilai tukar saat ini kepada pengguna.
 
-#### Algoritma Simulated Annealing:
+#### Algoritma Simulated Annealing (Disempurnakan):
 1.  Inisialisasi solusi acak ($S_{current}$) dalam batas budget.
 2.  Lakukan iterasi dengan menurunkan temperatur ($T$):
-    -   Pilih tetangga ($S_{next}$).
-    -   Hitung selisih energi (total density): $\Delta E = Energy(S_{next}) - Energy(S_{current})$.
-    -   Jika $\Delta E > 0$, terima $S_{next}$.
+    -   Pilih tetangga ($S_{next}$) dengan strategi: Tambah, Hapus, atau Ganti game.
+    -   Hitung energi menggunakan fungsi utilitas:
+      ```math
+      Energy = (\sum Density) \times \left(\frac{TotalCost}{Budget}\right)^2
+      ```
+    -   Selisih energi: $\Delta E = Energy(S_{next}) - Energy(S_{current})$.
+    -   Jika $\Delta E > 0$, terima $S_{next}$ (solusi lebih padat atau lebih menghabiskan budget).
     -   Jika $\Delta E < 0$, terima $S_{next}$ dengan probabilitas $P = e^{\frac{\Delta E}{T}}$.
 3.  Ulangi hingga temperatur mencapai batas minimum.
+
+### 3.5. Infinite Scrolling (Pemuatan Data Berkelanjutan)
+Untuk meningkatkan pengalaman pengguna dalam mengeksplorasi ribuan game di Steam, sistem mengimplementasikan *Infinite Scrolling* menggunakan **Intersection Observer API**. Data dimuat secara asinkron melalui API internal (`/api/recommendations` dan `/api/deals`) saat pengguna mencapai dasar daftar game, memungkinkan eksplorasi tanpa batas tanpa membebani performa awal halaman.
 
 ## 4. Kesimpulan
 Dengan menggabungkan Logika Fuzzy untuk penilaian subjektif dan algoritma heuristik (SA & Jaccard) untuk optimasi, Steam Game Recommender mampu memberikan hasil yang jauh lebih akurat dan personal dibandingkan dengan sistem pencarian berbasis popularitas standar.
