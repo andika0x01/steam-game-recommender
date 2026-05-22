@@ -4,6 +4,7 @@ import React from 'react'
 import { SteamAPI } from '../../lib/steam'
 import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
+import { getIdrRate } from '../../lib/currency'
 
 const app = new Hono<{ Bindings: any, Variables: any }>()
 
@@ -12,12 +13,14 @@ const app = new Hono<{ Bindings: any, Variables: any }>()
  * 
  * Mengoptimalkan anggaran pengguna untuk mendapatkan kombinasi game terbaik
  * yang sedang diskon di Steam Store. Menggunakan algoritma Simulated Annealing
- * untuk menyelesaikan masalah optimasi kombinatorial (Knapsack Problem varian).
+ * untuk menyelesaikan masalah optimasi kombinatorial dengan mempertimbangkan 
+ * 'density' (skor preferensi per satuan harga).
  */
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
   if (!steamId) return c.redirect('/')
 
+  const idrRate = await getIdrRate(c)
   const budgetQuery = c.req.query('budget')
   const budgetIDR = budgetQuery ? parseInt(budgetQuery) : 0
 
@@ -39,17 +42,22 @@ app.get('/', async (c) => {
 
     scoredDeals = rawDetails
       .filter((d: any) => d && d.price_overview)
-      .map((d: any) => ({
-        appid: d!.steam_appid,
-        name: d!.name,
-        salePrice: d!.price_overview!.final / 100, 
-        normalPrice: d!.price_overview!.initial / 100,
-        savings: d!.price_overview!.discount_percent.toString(),
-        score: scorer.getGameScore(d!.steam_appid) || 0.5,
-        formattedPrice: d!.price_overview!.final_formatted,
-        formattedInitial: d!.price_overview!.initial_formatted,
-        tags: (d!.genres || []).map((g: any) => g.description).concat((d!.categories || []).map((c: any) => c.description))
-      }))
+      .map((d: any) => {
+        const score = scorer.getGameScore(d!.steam_appid) || 0.5
+        const price = d!.price_overview!.final / 100
+        return {
+          appid: d!.steam_appid,
+          name: d!.name,
+          salePrice: price, 
+          normalPrice: d!.price_overview!.initial / 100,
+          savings: d!.price_overview!.discount_percent.toString(),
+          score: score,
+          density: score / (price || 1), // Menghitung skor per rupiah
+          formattedPrice: d!.price_overview!.final_formatted,
+          formattedInitial: d!.price_overview!.initial_formatted,
+          tags: (d!.genres || []).map((g: any) => g.description).concat((d!.categories || []).map((c: any) => c.description))
+        }
+      })
   } catch (e) {
     console.error('Steam Search error:', e)
   }
@@ -59,7 +67,12 @@ app.get('/', async (c) => {
   if (budgetIDR > 0 && scoredDeals.length > 0) {
     let currentBasket = scoredDeals.filter(() => Math.random() > 0.8)
     const getCost = (items: any[]) => items.reduce((sum, item) => sum + item.salePrice, 0)
-    const getScore = (items: any[]) => items.reduce((sum, item) => sum + item.score, 0)
+    
+    /**
+     * getScore menggunakan density (skor/harga)
+     * Memastikan game yang murah tapi disukai user mendapatkan prioritas lebih.
+     */
+    const getScore = (items: any[]) => items.reduce((sum, item) => sum + item.density, 0)
 
     let temp = 2000.0
     const coolingRate = 0.995 
@@ -87,8 +100,11 @@ app.get('/', async (c) => {
 
   const remainingIDR = budgetIDR - totalCostIDR
 
+  /**
+   * Discovery items diurutkan berdasarkan density (terbaik nilainya terhadap harga)
+   */
   const discoveryItems = [...scoredDeals]
-    .sort((a, b) => b.salePrice - a.salePrice)
+    .sort((a, b) => b.density - a.density)
     .slice(0, 24)
 
   return c.render(
@@ -104,9 +120,12 @@ app.get('/', async (c) => {
           <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-[0.9]">Deal <br /><span className="text-white/20 outline-text">Hunter</span></h2>
           <p className="text-zinc-400 text-base md:text-lg leading-relaxed">Sistem kami memindai katalog resmi Steam Indonesia untuk menemukan penawaran yang paling sesuai dengan profil bermain Anda.</p>
           
-          <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-white uppercase leading-[0.9] mt-8">Rp{totalCostIDR.toLocaleString('id-ID')}</h1>
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600">Kurs Konversi Wise</p>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white uppercase leading-[0.9]">1 USD = Rp{idrRate.toLocaleString('id-ID')}</h1>
+          </div>
           
-          <form method="get" action="/deals" className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <form method="get" action="/deals" className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-8">
             <div className="relative flex-1 max-w-sm">
               <input 
                 type="number" 

@@ -65,14 +65,20 @@ Score_{group} = \frac{\sum_{j=1}^m FuzzyScore_j}{m}
 
 Dimana $m$ adalah jumlah anggota dalam grup.
 
-### 3.4. Deal Hunter (Budget Optimization)
-Menggunakan **Simulated Annealing (SA)** untuk menemukan kombinasi game diskon terbaik yang masuk dalam budget pengguna namun tetap memiliki skor preferensi tertinggi.
+### 3.4. Deal Hunter (Budget & Density Optimization)
+Menggunakan **Simulated Annealing (SA)** untuk menemukan kombinasi game diskon terbaik. Algoritma ini dimodifikasi untuk mempertimbangkan **Density**, yaitu efisiensi skor terhadap harga:
+
+```math
+Density = \frac{FuzzyScore}{Price}
+```
+
+Sistem bertujuan memaksimalkan total density dalam keranjang belanja tanpa melebihi budget pengguna. Selain itu, sistem mengintegrasikan kurs **USD/IDR secara real-time** menggunakan API Wise untuk memberikan konteks nilai tukar saat ini kepada pengguna.
 
 #### Algoritma Simulated Annealing:
 1.  Inisialisasi solusi acak ($S_{current}$) dalam batas budget.
 2.  Lakukan iterasi dengan menurunkan temperatur ($T$):
     -   Pilih tetangga ($S_{next}$).
-    -   Hitung selisih energi (skor): $\Delta E = Energy(S_{next}) - Energy(S_{current})$.
+    -   Hitung selisih energi (total density): $\Delta E = Energy(S_{next}) - Energy(S_{current})$.
     -   Jika $\Delta E > 0$, terima $S_{next}$.
     -   Jika $\Delta E < 0$, terima $S_{next}$ dengan probabilitas $P = e^{\frac{\Delta E}{T}}$.
 3.  Ulangi hingga temperatur mencapai batas minimum.
