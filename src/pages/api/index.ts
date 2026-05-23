@@ -324,25 +324,35 @@ app.get('/perform-optimization', async (c) => {
       }
 
       // Record animation step every 40 iterations
+      // Use bestBasket for basketIds so frontend animation is consistent with final result
       if (iteration % 40 === 0) {
         const costK = (getCost(currentBasket) / 1000).toFixed(0)
+        const bestCostK = (getCost(bestBasket) / 1000).toFixed(0)
         const logT = temp.toFixed(0).padStart(4, ' ')
-        const log = `[T:${logT}] ${actionName.padEnd(6)}: ${gameName.slice(0, 15).padEnd(15)} | dE:${(dE >= 0 ? '+' : '')}${dE.toExponential(1)} | Rp${costK}k | ${reason}`
+        const log = `[T:${logT}] ${actionName.padEnd(6)}: ${gameName.slice(0, 15).padEnd(15)} | dE:${(dE >= 0 ? '+' : '')}${dE.toExponential(1)} | Cur:Rp${costK}k Best:Rp${bestCostK}k | ${reason}`
         
         animationSteps.push({
           iteration,
           temp,
           log,
-          basketIds: currentBasket.map(g => g.appid)
+          // bestBasket IDs — always in sync with what will be returned
+          basketIds: bestBasket.map(g => g.appid)
         })
       }
 
-      // Per 500 Iterations Logs for Terminal
+      // Per 500 Iterations Logs for Terminal — show both current and best
       if (iteration % 500 === 0) {
         const currentCost = getCost(currentBasket);
+        const bestCost = getCost(bestBasket);
         const utilization = ((currentCost / budgetIDR) * 100).toFixed(2);
+        const bestUtilization = ((bestCost / budgetIDR) * 100).toFixed(2);
         const energyScaled = (getEnergy(currentBasket) * 1000).toFixed(4);
-        console.log(`[ITER ${iteration.toString().padStart(4, ' ')}] T:${temp.toFixed(1).padStart(6, ' ')} | Cost: Rp${currentCost.toLocaleString('id-ID').padEnd(12)} | Util: ${utilization.padStart(6)}% | Energy: ${energyScaled}`);
+        const bestEnergyScaled = (bestEnergy * 1000).toFixed(4);
+        console.log(
+          `[ITER ${iteration.toString().padStart(4, ' ')}] T:${temp.toFixed(1).padStart(6, ' ')}` +
+          ` | Cur: Rp${currentCost.toLocaleString('id-ID').padEnd(10)} (${utilization.padStart(6)}%) E:${energyScaled}` +
+          ` | Best: Rp${bestCost.toLocaleString('id-ID').padEnd(10)} (${bestUtilization.padStart(6)}%) E:${bestEnergyScaled} [${bestBasket.length} games]`
+        );
       }
 
       temp *= coolingRate
