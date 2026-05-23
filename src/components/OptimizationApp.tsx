@@ -16,6 +16,7 @@ export const OptimizationApp = ({ defaultBudget }: OptimizationAppProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [basket, setBasket] = useState<Candidate[]>([]);
+  const [computationTime, setComputationTime] = useState<number | null>(null);
   const [budgetValue, setBudgetValue] = useState(defaultBudget > 0 ? defaultBudget.toString() : '');
   const [hasRun, setHasRun] = useState(false);
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
@@ -48,6 +49,7 @@ export const OptimizationApp = ({ defaultBudget }: OptimizationAppProps) => {
 
     setIsLoading(true);
     setHasRun(true);
+    setComputationTime(null);
     
     // Update URL agar bisa di-refresh/share
     if (typeof window !== 'undefined') {
@@ -57,14 +59,20 @@ export const OptimizationApp = ({ defaultBudget }: OptimizationAppProps) => {
     }
 
     try {
-      const res = await fetch(`/api/optimization-candidates?budget=${targetBudget}`);
+      // Panggil server-side optimization untuk men-trigger logs di terminal
+      const res = await fetch(`/api/perform-optimization?budget=${targetBudget}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setCandidates(data);
+      
+      // Simpan data untuk digunakan nanti setelah animasi
+      setCandidates(data.candidates);
+      setComputationTime(data.computationTimeMs);
+      
+      // Aktifkan overlay animasi (client-side SA tetap jalan sebagai visual)
       setIsOptimizing(true);
     } catch (err) {
-      console.error("Failed to fetch candidates", err);
-      alert("Gagal memuat data kandidat Steam.");
+      console.error("Failed to perform optimization", err);
+      alert("Gagal menjalankan optimasi di server.");
     } finally {
       setIsLoading(false);
     }
@@ -92,6 +100,12 @@ export const OptimizationApp = ({ defaultBudget }: OptimizationAppProps) => {
             </div>
             <h3 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter italic">Engine Results</h3>
             <p className="text-zinc-500 text-sm md:text-base leading-relaxed">Sistem telah berhasil menyusun kombinasi game optimal dari katalog Steam Indonesia menggunakan budget Rp{targetBudgetNum.toLocaleString('id-ID')}.</p>
+            {computationTime !== null && (
+              <div className="inline-block px-4 py-2 bg-white/5 border border-white/10 rounded-xl">
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Server Computation Time</p>
+                <p className="text-lg font-black text-orange-500 font-mono">{computationTime}ms</p>
+              </div>
+            )}
          </div>
          
          <div className="w-full lg:w-auto shrink-0">

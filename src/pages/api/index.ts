@@ -277,6 +277,9 @@ app.get('/perform-optimization', async (c) => {
         }
       })
 
+    // Start time tracking
+    const startTime = performance.now();
+
     // Algoritma SA yang sama dengan di backend asli
     let currentBasket: any[] = []
     const sortedByPrice = [...scoredDeals].sort((a, b) => a.salePrice - b.salePrice)
@@ -299,6 +302,18 @@ app.get('/perform-optimization', async (c) => {
 
     let temp = 3000.0 
     const coolingRate = 0.998 
+    let iteration = 0
+
+    // Initial State Logs for Terminal
+    console.log("\n" + "=".repeat(60));
+    console.log("SIMULATED ANNEALING - ENGINE INITIALIZATION");
+    console.log("=".repeat(60));
+    console.log(`Target Budget    : Rp${budgetIDR.toLocaleString('id-ID')}`);
+    console.log(`Candidate Pool   : ${scoredDeals.length} games`);
+    console.log(`Initial Basket   : ${currentBasket.length} games`);
+    console.log(`Initial Cost     : Rp${getCost(currentBasket).toLocaleString('id-ID')}`);
+    console.log(`Initial Energy   : ${(getEnergy(currentBasket) * 1000).toFixed(4)} (Scaled x1000)`);
+    console.log("-".repeat(60));
 
     while (temp > 1) {
       let neighbor = [...currentBasket]
@@ -326,13 +341,47 @@ app.get('/perform-optimization', async (c) => {
       if (neighborEnergy > currentEnergy || Math.random() < Math.exp((neighborEnergy - currentEnergy) / temp)) {
         currentBasket = neighbor
       }
+
+      // Per 500 Iterations Logs for Terminal
+      if (iteration % 500 === 0) {
+        const currentCost = getCost(currentBasket);
+        const utilization = ((currentCost / budgetIDR) * 100).toFixed(2);
+        const energyScaled = (getEnergy(currentBasket) * 1000).toFixed(4);
+        console.log(`[ITER ${iteration.toString().padStart(4, ' ')}] T:${temp.toFixed(1).padStart(6, ' ')} | Cost: Rp${currentCost.toLocaleString('id-ID').padEnd(12)} | Util: ${utilization.padStart(6)}% | Energy: ${energyScaled}`);
+      }
+
       temp *= coolingRate
+      iteration++
     }
+
+    const endTime = performance.now();
+    const computationTimeMs = Math.round(endTime - startTime);
+
+    const finalCost = getCost(currentBasket);
+    const finalEnergy = getEnergy(currentBasket);
+    console.log("-".repeat(60));
+    console.log("SIMULATED ANNEALING - COMPLETED");
+    console.log(`Final Iteration  : ${iteration}`);
+    console.log(`Final Temp       : ${temp.toFixed(2)}`);
+    console.log(`Final Cost       : Rp${finalCost.toLocaleString('id-ID')}`);
+    console.log(`Final Energy     : ${(finalEnergy * 1000).toFixed(4)} (Scaled x1000)`);
+    console.log(`Total Games      : ${currentBasket.length}`);
+    console.log(`Computation Time : ${computationTimeMs}ms`);
+    console.log("=".repeat(60));
+    console.table(currentBasket.map(g => ({
+      AppID: g.appid,
+      Name: g.name.length > 30 ? g.name.substring(0, 27) + "..." : g.name,
+      Price: `Rp${g.salePrice.toLocaleString('id-ID')}`,
+      Score: g.score.toFixed(2),
+      Density: g.density.toFixed(4)
+    })));
+    console.log("=".repeat(60) + "\n");
 
     return c.json({
       basket: currentBasket,
-      totalCost: getCost(currentBasket),
-      candidates: scoredDeals.slice(0, 50) // Kembalikan sampel kandidat untuk animasi
+      totalCost: finalCost,
+      computationTimeMs: computationTimeMs,
+      candidates: scoredDeals.slice(0, 50) 
     })
   } catch (error) {
     console.error('Error in /api/perform-optimization:', error)
