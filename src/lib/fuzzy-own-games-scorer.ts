@@ -150,11 +150,6 @@ export class FuzzyOwnGamesScorer {
     };
 
     const ruleDefinitions = [
-// ... (rules unchanged)
-    ]; // I will use a larger context for replace to be safe.
-
-
-    const ruleDefinitions = [
       {
         output: 'SANGAT_TINGGI',
         label: 'Sangat tinggi',
