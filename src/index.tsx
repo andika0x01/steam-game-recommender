@@ -8,6 +8,7 @@ import authApp from './pages/auth'
 import dashboardApp from './pages/dashboard'
 import analyzerApp from './pages/analyzer'
 import recommendationApp from './pages/recommendation'
+import settingsApp from './pages/settings'
 import apiApp from './pages/api'
 
 type Bindings = {
@@ -64,6 +65,7 @@ app.route('/auth', authApp)
 app.route('/dashboard', dashboardApp)
 app.route('/analyzer', analyzerApp)
 app.route('/recommendation', recommendationApp)
+app.route('/settings', settingsApp)
 app.route('/api', apiApp)
 
 export default app
