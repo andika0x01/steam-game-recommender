@@ -64,10 +64,10 @@ export class FuzzyOwnGamesScorer {
           rules: Array<{
             output: string,
             label: string,
-            antecedents: Array<{
-              variable: string,
-              term: string,
-              value: number
+            antecedents: ReadonlyArray<{
+              readonly variable: string,
+              readonly term: string,
+              readonly value: number
             }>,
             alpha: number,
             expression: string
@@ -133,6 +133,9 @@ export class FuzzyOwnGamesScorer {
     const daysSincePlayed = game.rtime_last_played 
       ? (Date.now() / 1000 - game.rtime_last_played) / 86400 
       : 365;
+
+    const playtimeNorm = this.maxPlaytimeForever > 0 ? playtimeRaw / this.maxPlaytimeForever : 0;
+    const activityNorm = this.maxPlaytime2Weeks > 0 ? activityRaw / this.maxPlaytime2Weeks : 0;
 
     const playtime = {
       tidak_dimainkan: this.trapMF(playtimeRaw, -1, 0, 30, 60),
