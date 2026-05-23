@@ -50,10 +50,6 @@ export class FuzzyOwnGamesScorer {
             max_playtime_forever: number,
             max_playtime_2weeks: number
           },
-          normalization: {
-            playtime: number,
-            activity: number
-          },
           memberships: {
             playtime: any,
             recency: any,
@@ -102,10 +98,6 @@ export class FuzzyOwnGamesScorer {
               max_playtime_forever: 0,
               max_playtime_2weeks: 0
             },
-            normalization: {
-              playtime: 0,
-              activity: 0
-            },
             memberships: {
               playtime: {},
               recency: {},
@@ -134,9 +126,6 @@ export class FuzzyOwnGamesScorer {
       ? (Date.now() / 1000 - game.rtime_last_played) / 86400 
       : 365;
 
-    const playtimeNorm = this.maxPlaytimeForever > 0 ? playtimeRaw / this.maxPlaytimeForever : 0;
-    const activityNorm = this.maxPlaytime2Weeks > 0 ? activityRaw / this.maxPlaytime2Weeks : 0;
-
     const playtime = {
       tidak_dimainkan: this.trapMF(playtimeRaw, -1, 0, 30, 60),
       dicoba: this.trapMF(playtimeRaw, 30, 60, 300, 600),
@@ -159,6 +148,11 @@ export class FuzzyOwnGamesScorer {
       aktif: this.trapMF(activityRaw, 420, 840, 1680, 2520),
       sangat_aktif: this.trapMF(activityRaw, 1680, 2520, 99999, 100000),
     };
+
+    const ruleDefinitions = [
+// ... (rules unchanged)
+    ]; // I will use a larger context for replace to be safe.
+
 
     const ruleDefinitions = [
       {
@@ -336,10 +330,6 @@ export class FuzzyOwnGamesScorer {
               days_since_played: daysSincePlayed,
               max_playtime_forever: this.maxPlaytimeForever,
               max_playtime_2weeks: this.maxPlaytime2Weeks
-            },
-            normalization: {
-              playtime: playtimeNorm,
-              activity: activityNorm
             },
             memberships: {
               playtime,
