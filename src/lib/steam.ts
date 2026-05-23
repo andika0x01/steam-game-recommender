@@ -1,33 +1,3 @@
-export const EXCLUDED_CATEGORIES = new Set([
-  'Steam Achievements',
-  'Steam Trading Cards', 
-  'Steam Cloud',
-  'Remote Play on Phone',
-  'Remote Play on Tablet',
-  'Remote Play on TV',
-  'Remote Play Together',
-  'In-App Purchases',
-  'Custom Volume Controls',
-  'Stereo Sound',
-  'Surround Sound',
-  'Stats',
-  'Captions available',
-  'Commentary available',
-  'HDR available',
-  'VR Supported',
-  'VR Only',
-  'Steam Leaderboards',
-  'Full controller support',
-  'Partial controller support',
-  'Includes level editor',
-  'Includes Source SDK',
-  'Valve Anti-Cheat enabled',
-  'Online PvP',
-  'Shared/Split Screen PvP',
-  'LAN PvP',
-  'LAN Co-op'
-]);
-
 export const ALLOWED_STEAM_TAGS = new Set([
   "Indie", "Action", "Adventure", "Casual", "Singleplayer", "Simulation", "RPG", "Strategy", "2D", "Early Access", "3D", "Free to Play",
   "Atmospheric", "Colorful", "Story Rich", "Exploration", "Fantasy", "Multiplayer", "Cute", "Pixel Graphics", "Puzzle", "Combat",

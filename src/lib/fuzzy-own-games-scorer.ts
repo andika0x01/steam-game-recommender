@@ -128,18 +128,18 @@ export class FuzzyOwnGamesScorer {
       } 
     };
 
-    const playtimeNorm = this.maxPlaytimeForever > 0 ? game.playtime_forever / this.maxPlaytimeForever : 0;
-    const activityNorm = this.maxPlaytime2Weeks > 0 ? (game.playtime_2weeks || 0) / this.maxPlaytime2Weeks : 0;
+    const playtimeRaw = game.playtime_forever;
+    const activityRaw = game.playtime_2weeks || 0;
     const daysSincePlayed = game.rtime_last_played 
       ? (Date.now() / 1000 - game.rtime_last_played) / 86400 
       : 365;
 
     const playtime = {
-      tidak_dimainkan: this.trapMF(playtimeNorm, -0.1, 0, 0.02, 0.08),
-      dicoba: this.trapMF(playtimeNorm, 0.02, 0.08, 0.15, 0.25),
-      cukup: this.trapMF(playtimeNorm, 0.15, 0.25, 0.45, 0.55),
-      sering: this.trapMF(playtimeNorm, 0.45, 0.55, 0.75, 0.85),
-      sangat_banyak: this.trapMF(playtimeNorm, 0.75, 0.85, 1.0, 1.1),
+      tidak_dimainkan: this.trapMF(playtimeRaw, -1, 0, 30, 60),
+      dicoba: this.trapMF(playtimeRaw, 30, 60, 300, 600),
+      cukup: this.trapMF(playtimeRaw, 300, 600, 3000, 6000),
+      sering: this.trapMF(playtimeRaw, 3000, 6000, 9000, 12000),
+      sangat_banyak: this.trapMF(playtimeRaw, 9000, 12000, 99999, 100000),
     };
 
     const recency = {
@@ -151,10 +151,10 @@ export class FuzzyOwnGamesScorer {
     };
 
     const activity = {
-      tidak_aktif: this.trapMF(activityNorm, -0.1, 0, 0, 0.1),
-      sesekali: this.trapMF(activityNorm, 0, 0.1, 0.25, 0.4),
-      aktif: this.trapMF(activityNorm, 0.25, 0.4, 0.6, 0.75),
-      sangat_aktif: this.trapMF(activityNorm, 0.6, 0.75, 1.0, 1.1),
+      tidak_aktif: this.trapMF(activityRaw, -1, 0, 30, 120),
+      sesekali: this.trapMF(activityRaw, 30, 120, 420, 840),
+      aktif: this.trapMF(activityRaw, 420, 840, 1680, 2520),
+      sangat_aktif: this.trapMF(activityRaw, 1680, 2520, 99999, 100000),
     };
 
     const ruleDefinitions = [
