@@ -32,12 +32,14 @@ export const GameCard = ({
   isActionDiv = false
 }: GameCardProps) => {
   const hasDiscount = discount && discount !== "0";
+  const placeholder = 'https://placehold.co/600x900/18181b/71717a?text=No+Image';
 
   return (
     <div className={`group space-y-3 animate-in fade-in zoom-in-95 duration-700 ${className}`}>
       <div className="aspect-[3/4] bg-zinc-900 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden relative border border-white/5 group-hover:border-orange-500/50 transition-all duration-500 shadow-2xl group-hover:shadow-orange-500/10">
         <img 
           src={`https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`}
+          onError={(e) => { e.currentTarget.src = placeholder }}
           className="w-full h-full object-cover transition-all duration-1000 group-hover:scale-110 group-hover:rotate-1"
           alt={name}
         />

@@ -123,6 +123,203 @@ app.get('/recommendation-deals', async (c) => {
   }
 })
 
+app.get('/optimization-candidates', async (c) => {
+  const steamId = getCookie(c, 'steam_id')
+  if (!steamId) return c.json({ error: 'Unauthorized' }, 401)
+
+  const budget = parseInt(c.req.query('budget') || '0')
+  const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
+  
+  try {
+    const userGames = await steamAPI.getOwnedGames(steamId)
+    const { publisherScores, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
+    const allowedTagWeights = Object.fromEntries(
+      Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))
+    ) as Record<string, number>;
+    const nonOwnScorer = new FuzzyNonOwnGamesScorer();
+
+    const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
+    const poolSize = budget > 0 ? Math.min(100, Math.max(30, Math.floor(budget / 5000))) : 40
+    const candidateIds = saleResults.slice(0, poolSize).map(r => r.id).filter(Boolean) as number[]
+    
+    const rawDetails = await steamAPI.getAppStoreDetailsBatch(candidateIds, 'english', 'id')
+    const candidateReviewsPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
+    const candidateReviews = await Promise.all(candidateReviewsPromises)
+    
+    const candidates = rawDetails
+      .map((d: any, idx: number) => ({ d, reviews: candidateReviews[idx] }))
+      .filter(({ d }: any) => d && d.price_overview && !isGame18Plus(d))
+      .map(({ d, reviews }: any) => {
+        const price = d!.price_overview!.final / 100
+        const candidateTags = [
+          ...(d.genres || []).map((g: any) => g.description),
+          ...(d.categories || []).map((c: any) => c.description)
+        ].filter(isAllowedSteamTag);
+
+        let candidatePS = 0;
+        if (d.publishers) {
+          candidatePS = d.publishers.reduce((max: number, pub: string) => Math.max(max, publisherScores[pub] || 0), 0);
+        }
+
+        const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
+        const similarity = calculateWeightedSimilarity(candidateTags, allowedTagWeights);
+        const volume = reviews ? reviews.total_reviews : 0;
+        
+        const detailed = nonOwnScorer.getGameScoreDetailed(positivity, similarity, volume, candidatePS);
+        const score = detailed.score;
+        const safePrice = price > 0 ? price : 1;
+        const density = score / safePrice;
+
+        return {
+          appid: d!.steam_appid,
+          name: d!.name,
+          salePrice: price,
+          score: score,
+          density: density,
+          image: `https://cdn.akamai.steamstatic.com/steam/apps/${d!.steam_appid}/header.jpg`
+        }
+      })
+
+    return c.json(candidates)
+  } catch (error) {
+    console.error('Error in /api/optimization-candidates:', error)
+    return c.json({ error: 'Failed to fetch candidates' }, 500)
+  }
+})
+
+app.get('/perform-optimization', async (c) => {
+  const steamId = getCookie(c, 'steam_id')
+  if (!steamId) return c.json({ error: 'Unauthorized' }, 401)
+
+  const budgetIDR = parseInt(c.req.query('budget') || '0')
+  const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
+  
+  try {
+    const userGames = await steamAPI.getOwnedGames(steamId)
+    const { publisherScores, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
+    const allowedTagWeights = Object.fromEntries(
+      Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))
+    ) as Record<string, number>;
+    const nonOwnScorer = new FuzzyNonOwnGamesScorer();
+
+    const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
+    const dynamicPoolSize = budgetIDR > 0 ? Math.min(200, Math.max(30, Math.floor(budgetIDR / 5000))) : 30
+    const candidateIds = saleResults.slice(0, dynamicPoolSize).map(r => r.id).filter(Boolean) as number[]
+    
+    const rawDetails = await steamAPI.getAppStoreDetailsBatch(candidateIds, 'english', 'id')
+    const candidateReviewsPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
+    const candidateReviews = await Promise.all(candidateReviewsPromises)
+    
+    const scoredDeals = rawDetails
+      .map((d: any, idx: number) => ({ d, reviews: candidateReviews[idx] }))
+      .filter(({ d }: any) => d && d.price_overview && !isGame18Plus(d))
+      .map(({ d, reviews }: any) => {
+        const price = d!.price_overview!.final / 100
+        const candidateTags = [
+          ...(d.genres || []).map((g: any) => g.description),
+          ...(d.categories || []).map((c: any) => c.description)
+        ].filter(isAllowedSteamTag);
+
+        let candidatePS = 0;
+        if (d.publishers) {
+          candidatePS = d.publishers.reduce((max: number, pub: string) => Math.max(max, publisherScores[pub] || 0), 0);
+        }
+
+        const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
+        const similarity = calculateWeightedSimilarity(candidateTags, allowedTagWeights);
+        const volume = reviews ? reviews.total_reviews : 0;
+        
+        const detailed = nonOwnScorer.getGameScoreDetailed(positivity, similarity, volume, candidatePS);
+        const score = detailed.score;
+        const safePrice = price > 0 ? price : 1;
+        const density = score / safePrice;
+
+        return {
+          appid: d!.steam_appid,
+          name: d!.name,
+          salePrice: price,
+          score: score,
+          density: density,
+          image: `https://cdn.akamai.steamstatic.com/steam/apps/${d!.steam_appid}/header.jpg`,
+          formattedPrice: d!.price_overview!.final_formatted,
+          savings: d!.price_overview!.discount_percent.toString(),
+          fuzzyDetails: detailed.details,
+          source: {
+            reviewPositivity: positivity,
+            tagSimilarity: similarity,
+            reviewVolume: volume,
+            publisherScore: candidatePS,
+            publishers: d.publishers || [],
+            price: d!.price_overview!.final_formatted,
+            originalPrice: d!.price_overview!.initial_formatted,
+            discount: d!.price_overview!.discount_percent.toString()
+          }
+        }
+      })
+
+    // Algoritma SA yang sama dengan di backend asli
+    let currentBasket: any[] = []
+    const sortedByPrice = [...scoredDeals].sort((a, b) => a.salePrice - b.salePrice)
+    let tempCost = 0
+    for (const deal of sortedByPrice) {
+      if (tempCost + deal.salePrice <= budgetIDR) {
+        currentBasket.push(deal)
+        tempCost += deal.salePrice
+      } else break
+    }
+
+    const getCost = (items: any[]) => items.reduce((sum, item) => sum + item.salePrice, 0)
+    const getEnergy = (items: any[]) => {
+      const cost = getCost(items)
+      if (cost > budgetIDR || cost === 0) return Number.NEGATIVE_INFINITY
+      const totalDensity = items.reduce((sum, item) => sum + item.density, 0)
+      const budgetUtilization = cost / budgetIDR
+      return totalDensity * Math.pow(budgetUtilization, 2)
+    }
+
+    let temp = 3000.0 
+    const coolingRate = 0.998 
+
+    while (temp > 1) {
+      let neighbor = [...currentBasket]
+      const action = Math.random()
+      if (action < 0.4 && neighbor.length < scoredDeals.length) {
+        const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
+        if (available.length > 0) {
+          const randomItem = available[Math.floor(Math.random() * available.length)]
+          if (getCost(neighbor) + randomItem.salePrice <= budgetIDR) neighbor.push(randomItem)
+        }
+      } else if (action < 0.6 && neighbor.length > 0) {
+        neighbor.splice(Math.floor(Math.random() * neighbor.length), 1)
+      } else if (neighbor.length > 0) {
+        const idx = Math.floor(Math.random() * neighbor.length)
+        const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
+        if (available.length > 0) {
+          const newItem = available[Math.floor(Math.random() * available.length)]
+          const costWithoutOld = getCost(neighbor) - neighbor[idx].salePrice
+          if (costWithoutOld + newItem.salePrice <= budgetIDR) neighbor[idx] = newItem
+        }
+      }
+      
+      const currentEnergy = getEnergy(currentBasket)
+      const neighborEnergy = getEnergy(neighbor)
+      if (neighborEnergy > currentEnergy || Math.random() < Math.exp((neighborEnergy - currentEnergy) / temp)) {
+        currentBasket = neighbor
+      }
+      temp *= coolingRate
+    }
+
+    return c.json({
+      basket: currentBasket,
+      totalCost: getCost(currentBasket),
+      candidates: scoredDeals.slice(0, 50) // Kembalikan sampel kandidat untuk animasi
+    })
+  } catch (error) {
+    console.error('Error in /api/perform-optimization:', error)
+    return c.json({ error: 'Optimization failed' }, 500)
+  }
+})
+
 app.get('/game/:appid', async (c) => {
   try {
     const appId = parseInt(c.req.param('appid'))

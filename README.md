@@ -20,12 +20,11 @@ flowchart TD
     C --> D[Top played games for profiling]
 
     D --> E[FuzzyOwnGamesScorer]
-    E --> E1[Normalize playtime and activity]
-    E1 --> E2[Fuzzify playtime, recency, activity]
-    E2 --> E3[Apply owned-game rules]
-    E3 --> E4[Owned preference score]
+    E --> E1[Fuzzify playtime, recency, activity]
+    E1 --> E2[Apply owned-game rules]
+    E2 --> E3[Owned preference score]
 
-    E4 --> F[Fetch Steam Store metadata]
+    E3 --> F[Fetch Steam Store metadata]
     F --> G[Sanitize technical Steam tags]
     G --> H[Build weighted tag profile]
     F --> I[Compute publisher affinity]
@@ -60,8 +59,7 @@ The system uses a **dual-scorer fuzzy architecture**:
 
 Evaluates games already owned by the user.
 
-- **Inputs**: `playtime_forever`, `playtime_2weeks`, `days_since_played`.
-- **Normalization**: playtime and recent activity are normalized against the user's own maximum values.
+- **Inputs**: `playtime_forever` (minutes), `playtime_2weeks` (minutes), `days_since_played` (days).
 - **Fuzzy labels**: examples include `tidak_dimainkan`, `dicoba`, `cukup`, `sering`, `sangat_banyak`, `baru_main`, and `ditinggal`.
 - **Output**: a 0-1 preference score used to weight tags and publisher affinity.
 

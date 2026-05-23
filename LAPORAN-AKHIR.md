@@ -74,7 +74,7 @@ Transformasi dari data Steam menjadi rekomendasi dilakukan dalam lima tahap beri
 Setiap variabel input awalnya berupa angka tegas (*crisp*), misalnya `playtime_forever = 1200 menit` atau `review_positivity = 0.84`. Angka tersebut sulit langsung dipakai sebagai keputusan karena batas antar-kategori tidak selalu tajam. Karena itu, sistem mengubah angka menjadi derajat keanggotaan fuzzy menggunakan fungsi trapezoidal ($TrapMF$).
 
 Contoh interpretasi:
-- `playtime_norm = 0.80` dapat memiliki keanggotaan tinggi pada kategori `sangat_banyak`.
+- `playtime = 12000 menit` dapat memiliki keanggotaan tinggi pada kategori `sangat_banyak`.
 - `review_positivity = 0.65` dapat mulai masuk kategori `bagus`, tetapi belum sepenuhnya kuat.
 - `tag_similarity = 0.30` dapat dianggap `lumayan`, bukan langsung gagal total.
 
@@ -134,21 +134,13 @@ Faktor determinan untuk modul `FuzzyOwnGamesScorer`:
 
 | Variabel | Unit Basis | Justifikasi Semantik |
 | :--- | :--- | :--- |
-| **Playtime Forever** | Relatif (Max) | Jam terbang kumulatif, diamortisasi dengan durasi game paling sering dimainkan untuk rentang normalisasi 0-1. |
-| **Recency** | Hari $(t)$ | Tenggat waktu sejak paparan terakhir. Merepresentasikan relevansi ketertarikan aktif dan mengurangi "nostalgia bias". |
-| **Recent Activity** | Menit (2 Minggu) | Intensitas ledakan pemain saat ini (*burst*). Memberikan insentif kuat pada minat game baru/hype. |
+| **Playtime Forever** | Menit | Jam terbang kumulatif dalam menit. Digunakan untuk menilai seberapa dalam pengguna mendalami game tersebut. |
+| **Recency** | Hari $(t)$ | Jumlah hari sejak game terakhir dimainkan. Merepresentasikan relevansi ketertarikan aktif dan mengurangi "nostalgia bias". |
+| **Recent Activity** | Menit (2 Minggu) | Intensitas bermain dalam dua minggu terakhir (menit). Memberikan insentif kuat pada minat game baru/hype. |
 
-Normalisasi yang dipakai:
+Berbeda dengan pendekatan normalisasi klasik, sistem ini menggunakan nilai **raw** (mentah) yang langsung dipetakan ke fungsi keanggotaan fuzzy. Hal ini dilakukan karena batas-batas psikologis gamer (seperti "300 menit untuk mencoba" atau "100 jam untuk sangat banyak") bersifat absolut dan tidak tergantung pada perbandingan antar game di library.
 
-```math
-PlaytimeNorm_i = \frac{PlaytimeForever_i}{\max(PlaytimeForever)}
-```
-
-```math
-ActivityNorm_i = \frac{Playtime2Weeks_i}{\max(Playtime2Weeks)}
-```
-
-Jika tidak ada aktivitas dua minggu terakhir, `ActivityNorm` bernilai 0. Jika `rtime_last_played` tidak tersedia, sistem memakai nilai konservatif 365 hari agar game tersebut tidak dianggap baru dimainkan.
+Jika `rtime_last_played` tidak tersedia, sistem memakai nilai konservatif 365 hari agar game tersebut tidak dianggap baru dimainkan.
 
 ### 2.4. Ekstraksi Fitur: Skor Prediktif (Candidate Games)
 Faktor determinan untuk modul `FuzzyNonOwnGamesScorer`:
@@ -278,7 +270,7 @@ Untuk menangani limitasi IP Datacenter, CPU, dan timeout pada Cloudflare Workers
 Halaman sentral untuk meninjau secara gamblang preferensi pengguna hasil dari kalkulasi Fuzzy Scorer. Selain mendistribusikan skor kecocokan game di masa lalu, Analyzer juga memvisualisasikan:
 -   **Top 12 Preferred Tags**: Diekstrak dari riwayat jam terbang menggunakan fungsi algoritma sentral `buildUserProfile`. Tag disajikan berdampingan dan memberikan insight mendalam tentang *genre* yang paling mendominasi.
 -   **Top 8 Affinity Publishers**: Menyajikan relasi antara loyalitas (*playtime*) dan penilaian pengguna atas game yang dirilis tiap perusahaan, lengkap dengan grafik progres bar.
--   **Mathematical Process Audit**: Kartu game pada Analyzer membuka modal perhitungan yang tidak lagi memakai pecahan *floating cards*, melainkan alur LaTeX penuh. Urutannya adalah input mentah, normalisasi, fungsi keanggotaan trapezoidal, aktivasi rule Mamdani, agregasi output, hingga defuzzifikasi akhir.
+-   **Mathematical Process Audit**: Kartu game pada Analyzer membuka modal perhitungan yang tidak lagi memakai pecahan *floating cards*, melainkan alur LaTeX penuh. Urutannya adalah input mentah, fungsi keanggotaan trapezoidal, aktivasi rule Mamdani, agregasi output, hingga defuzzifikasi akhir.
 
 ### 3.6. Sanitasi Tag dan Konsistensi Metadata
 Seluruh jalur rekomendasi menerapkan filter tag yang sama:

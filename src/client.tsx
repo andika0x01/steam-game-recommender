@@ -2,10 +2,12 @@ import React from 'react'
 import { hydrateRoot } from 'react-dom/client'
 import { InfiniteGrid } from './components/InfiniteGrid'
 import { AnalyzerModal } from './components/AnalyzerModal'
+import { OptimizationApp } from './components/OptimizationApp'
 
 const components: Record<string, React.ComponentType<any>> = {
   InfiniteGrid,
   AnalyzerModal,
+  OptimizationApp,
 }
 
 const hydrateAll = () => {

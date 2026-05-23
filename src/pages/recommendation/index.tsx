@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import React from 'react'
 import { SteamAPI, isAllowedSteamTag } from '../../lib/steam'
-import { FuzzyOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
-import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-non-own-games-scorer'
+import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-own-games-scorer'
+import { FuzzyNonOwnGamesScorer as Scorer2 } from '../../lib/fuzzy-non-own-games-scorer'
 import { GameCard } from '../../components/GameCard'
 import { getIdrRate } from '../../lib/currency'
 import { InfiniteGrid } from '../../components/InfiniteGrid'
@@ -14,11 +14,8 @@ const app = new Hono<{ Bindings: any, Variables: any }>()
 /**
  * Halaman Recommendation
  * 
- * Mengoptimalkan anggaran pengguna untuk mendapatkan kombinasi game terbaik
- * yang sedang diskon di Steam Store. Menggunakan algoritma Simulated Annealing
- * untuk menyelesaikan masalah optimasi kombinatorial dengan mempertimbangkan 
- * 'density' (skor preferensi per satuan harga) dan maksimalisasi budget.
- * Mendukung eksplorasi pasar berkelanjutan (Infinite Scrolling).
+ * Versi Refactor: Menggunakan Client-Side Optimization App.
+ * SSR hanya menangani kerangka dasar dan feed discovery.
  */
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
@@ -31,209 +28,34 @@ app.get('/', async (c) => {
   const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
   const userGames = await steamAPI.getOwnedGames(steamId)
 
-  const { publisherScores, userProfileTags, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
+  const { publisherScores, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
   const allowedTagWeights = Object.fromEntries(
     Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))
   ) as Record<string, number>;
-  const nonOwnScorer = new FuzzyNonOwnGamesScorer();
+  
   const topProfileTags = Object.entries(allowedTagWeights)
     .sort(([, left], [, right]) => (right as number) - (left as number))
     .slice(0, 8)
+  
   const latexName = (value: string) => value.replace(/\\/g, '\\textbackslash{}').replace(/_/g, '\\_').replace(/&/g, '\\&')
   const topProfileTagLatexRows = topProfileTags
     .map(([tag, weight], index) => `W_{\\mathrm{${latexName(tag)}}} &= ${Number(weight).toFixed(3)}\\quad\\text{rank ${index + 1}}`)
     .join('\\\\')
 
-  let scoredDeals: any[] = []
+  // Kita tetap butuh discoveryItems untuk pre-render grid bawah
+  let discoveryItems: any[] = []
   try {
-    const basePoolSize = 30
-    const dynamicPoolSize = budgetIDR > 0 ? Math.min(500, Math.max(basePoolSize, Math.floor(budgetIDR / 5000))) : basePoolSize
-    
     const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
-    const candidateIds = saleResults.slice(0, dynamicPoolSize).map(r => r.id).filter(Boolean) as number[]
+    const nonOwnScorer = new Scorer2();
     
-    const detailPromises = candidateIds.map(id => steamAPI.getAppStoreDetails(id, 'english', 'id'))
-    const rawDetails = await Promise.all(detailPromises)
-    const reviewPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
-    const rawReviews = await Promise.all(reviewPromises)
-
-    scoredDeals = rawDetails
-      .map((d: any, idx: number) => ({ d, reviews: rawReviews[idx] }))
-      .filter(({ d }: any) => d && d.price_overview)
-      .map(({ d, reviews }: any) => {
-        const price = d!.price_overview!.final / 100
-        const candidateTags = [
-          ...(d.genres || []).map((g: any) => g.description),
-          ...(d.categories || []).map((c: any) => c.description)
-        ].filter(isAllowedSteamTag);
-
-        let candidatePS = 0;
-        if (d.publishers) {
-          candidatePS = d.publishers.reduce((max: number, pub: string) => Math.max(max, publisherScores[pub] || 0), 0);
-        }
-
-        const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
-        const similarity = calculateWeightedSimilarity(candidateTags, allowedTagWeights);
-        const volume = reviews ? reviews.total_reviews : 0;
-
-        const detailed = nonOwnScorer.getGameScoreDetailed(positivity, similarity, volume, candidatePS);
-        const score = detailed.score;
-        const lowerTagWeights: Record<string, number> = {};
-        Object.entries(allowedTagWeights).forEach(([tag, weight]) => {
-          lowerTagWeights[tag.toLowerCase()] = weight as number;
-        });
-        const matchedTags = candidateTags
-          .filter((tag: string) => lowerTagWeights[tag.toLowerCase()])
-          .sort((left: string, right: string) => lowerTagWeights[right.toLowerCase()] - lowerTagWeights[left.toLowerCase()])
-          .slice(0, 8);
-        
-        /**
-         * Penanganan Game Gratis (Price = 0)
-         * Gunakan minimal Rp1 untuk menghindari Division by Zero.
-         */
-        const safePrice = price > 0 ? price : 1;
-        const density = score / safePrice;
-
-        return {
-          appid: d!.steam_appid,
-          name: d!.name,
-          salePrice: price, 
-          normalPrice: d!.price_overview!.initial / 100,
-          savings: d!.price_overview!.discount_percent.toString(),
-          score: score,
-          fuzzyDetails: detailed.details,
-          source: {
-            reviewPositivity: positivity,
-            tagSimilarity: similarity,
-            reviewVolume: volume,
-            publisherScore: candidatePS,
-            matchedTags,
-            publishers: d.publishers || [],
-            price: d!.price_overview!.final_formatted,
-            originalPrice: d!.price_overview!.initial_formatted,
-            discount: d!.price_overview!.discount_percent.toString()
-          },
-          density: density,
-          formattedPrice: d!.price_overview!.final_formatted,
-          formattedInitial: d!.price_overview!.initial_formatted,
-          tags: candidateTags
-        }
-      })
+    discoveryItems = saleResults.slice(0, 24).map(r => {
+       // Mock minimal data for discoveryItems pre-render if needed, 
+       // but InfiniteGrid will fetch actual details anyway.
+       return { appid: r.id, name: r.name, hideTags: true };
+    }).filter(i => i.appid);
   } catch (e) {
-    console.error('Steam Search error:', e)
+    console.error('Discovery pre-render error:', e)
   }
-
-  let basketItems: any[] = []
-  let totalCostIDR = 0
-  let saExecutionTimeMs = 0
-
-  if (budgetIDR > 0 && scoredDeals.length > 0) {
-    const startTime = Date.now()
-    console.log(`\n[Simulated Annealing] Mulai optimasi untuk budget Rp${budgetIDR.toLocaleString('id-ID')} dengan ${scoredDeals.length} item kandidat...`)
-
-    /**
-     * Solusi Awal: Ambil set acak yang PASTI di bawah budget.
-     * Jika tidak ada yang di bawah budget, basket kosong.
-     */
-    let currentBasket: any[] = []
-    const sortedByPrice = [...scoredDeals].sort((a, b) => a.salePrice - b.salePrice)
-    let tempCost = 0
-    for (const deal of sortedByPrice) {
-      if (tempCost + deal.salePrice <= budgetIDR) {
-        currentBasket.push(deal)
-        tempCost += deal.salePrice
-      } else {
-        break
-      }
-    }
-
-    const getCost = (items: any[]) => items.reduce((sum, item) => sum + item.salePrice, 0)
-    
-    /**
-     * getEnergy: Prioritaskan solusi dalam budget.
-     * Solusi overbudget diberi nilai negatif sangat besar.
-     */
-    const getEnergy = (items: any[]) => {
-      const cost = getCost(items)
-      if (cost > budgetIDR || cost === 0) return Number.NEGATIVE_INFINITY
-      
-      const totalDensity = items.reduce((sum, item) => sum + item.density, 0)
-      const budgetUtilization = cost / budgetIDR
-      
-      return totalDensity * Math.pow(budgetUtilization, 2)
-    }
-
-    let temp = 3000.0 
-    const coolingRate = 0.998 
-
-    while (temp > 1) {
-      let neighbor = [...currentBasket]
-      const action = Math.random()
-      
-      if (action < 0.4 && neighbor.length < scoredDeals.length) {
-        // Tambah item: Pastikan hanya tambah jika masih muat budget
-        const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
-        if (available.length > 0) {
-          const randomItem = available[Math.floor(Math.random() * available.length)]
-          if (getCost(neighbor) + randomItem.salePrice <= budgetIDR) {
-             neighbor.push(randomItem)
-          }
-        }
-      } else if (action < 0.6 && neighbor.length > 0) {
-        // Hapus item
-        neighbor.splice(Math.floor(Math.random() * neighbor.length), 1)
-      } else if (neighbor.length > 0) {
-        // Ganti item: Pastikan penggantinya tidak bikin overbudget
-        const idx = Math.floor(Math.random() * neighbor.length)
-        const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
-        if (available.length > 0) {
-          const newItem = available[Math.floor(Math.random() * available.length)]
-          const costWithoutOld = getCost(neighbor) - neighbor[idx].salePrice
-          if (costWithoutOld + newItem.salePrice <= budgetIDR) {
-            neighbor[idx] = newItem
-          }
-        }
-      }
-      
-      const currentEnergy = getEnergy(currentBasket)
-      const neighborEnergy = getEnergy(neighbor)
-
-      if (neighborEnergy > currentEnergy || Math.random() < Math.exp((neighborEnergy - currentEnergy) / temp)) {
-        currentBasket = neighbor
-      }
-      temp *= coolingRate
-    }
-    basketItems = currentBasket
-    totalCostIDR = getCost(basketItems)
-    const endTime = Date.now()
-    saExecutionTimeMs = endTime - startTime
-    console.log(`[Simulated Annealing] Selesai dalam ${saExecutionTimeMs}ms. Terpilih ${basketItems.length} item dengan total Rp${totalCostIDR.toLocaleString('id-ID')}.\n`)
-  }
-
-  const remainingIDR = budgetIDR - totalCostIDR
-
-  const discoveryItems = [...scoredDeals]
-    .sort((a, b) => b.density - a.density)
-    .slice(0, 24)
-    .map(d => ({
-       appid: d.appid,
-       name: d.name,
-       score: d.score,
-       price: d.formattedPrice,
-       originalPrice: d.formattedInitial,
-       discount: d.savings,
-       tags: d.tags,
-       hideScore: false,
-       hideTags: true,
-       density: d.density,
-       analyzerData: {
-         appId: d.appid,
-         name: d.name,
-         score: d.score,
-         fuzzyStats: d.fuzzyDetails,
-         source: d.source
-       }
-    }))
 
   return c.render(
     <>
@@ -255,137 +77,71 @@ app.get('/', async (c) => {
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white uppercase leading-[0.9]">1 USD = Rp{idrRate.toLocaleString('id-ID')}</h1>
           </div>
           
-          <form method="get" action="/recommendation" className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-8">
-            <div className="relative flex-1 max-w-sm">
-              <input 
-                type="number" 
-                name="budget" 
-                placeholder="Target Budget (IDR)..." 
-                defaultValue={budgetIDR > 0 ? budgetIDR.toString() : ''}
-                className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-widest text-zinc-500">IDR</div>
-            </div>
-            <button type="submit" className="px-8 py-4 bg-orange-500 text-black text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-orange-400 active:scale-95 transition-all shadow-xl shadow-orange-500/10">
-              Mulai Optimasi
-            </button>
-          </form>
-
-          <div className="space-y-3 pt-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-zinc-600">Source Data</p>
-            <p className="max-w-xl text-sm leading-relaxed text-zinc-500">
-              Rekomendasi dibentuk dari top tags library yang sudah diberi bobot fuzzy, review Steam, volume review, dan affinity publisher. Tag dominan saat ini:
-            </p>
-            <div className="max-w-xl rounded-2xl border border-orange-500/10 bg-orange-500/[0.04] p-4 text-sm leading-relaxed text-zinc-500">
-              <div className="overflow-x-auto py-1 text-zinc-200 [&_.mjx-container]:my-0 [&_.mjx-container]:text-left">
-                {`\\[
-\\begin{aligned}
-W_t &= \\sum_{g\\in L,\\ t\\in T_g} score_g\\\\
-${topProfileTagLatexRows || 'W_t &= 0'}\\\\
-s &= \\frac{\\sum_{t\\in C\\cap P}W_t}{\\sum_{i=1}^{|C|}W_{(i)}}
-\\end{aligned}
-\\]`}
-              </div>
-              <p>
-                Baris tag menunjukkan bobot aktual dari library Anda. Nilai similarity kandidat dihitung dari jumlah bobot tag kandidat yang cocok dibandingkan bobot top tag profil dengan ukuran set kandidat yang sama.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {topProfileTags.map(([tag, weight]) => (
-                <span key={tag} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-300">
-                  {tag} <span className="ml-1 font-mono text-orange-400">{(weight as number).toFixed(1)}</span>
-                </span>
-              ))}
+          {/* React Optimization Engine */}
+          <div data-hydrate="OptimizationApp" data-props={JSON.stringify({ defaultBudget: budgetIDR })}>
+            <div className="w-full">
+              <form className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-8">
+                <div className="relative flex-1 max-w-sm">
+                  <input 
+                    type="number" 
+                    name="budget" 
+                    placeholder="Target Budget (IDR)..." 
+                    defaultValue={budgetIDR > 0 ? budgetIDR.toString() : ''}
+                    className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
+                    required
+                    min="1000"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-widest text-zinc-500 pointer-events-none">IDR</div>
+                </div>
+                <button 
+                  type="submit" 
+                  className="px-8 py-4 bg-orange-500 text-black text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-orange-400 active:scale-95 transition-all shadow-xl shadow-orange-500/10 whitespace-nowrap"
+                >
+                  Mulai Optimasi
+                </button>
+              </form>
             </div>
           </div>
-        </div>
 
-        {budgetIDR > 0 && (
-          <div className="w-full lg:w-auto">
-            <div className="glass p-8 rounded-[2.5rem] border-white/10 space-y-8 relative overflow-hidden group min-w-[340px]">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-[80px] -mr-16 -mt-16 group-hover:bg-orange-500/20 transition-all duration-700" />
-              <div className="space-y-1 relative">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500">Steam Optimization</p>
-                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Budget Summary</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-8 relative">
-                <div className="space-y-1 col-span-2">
-                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Belanja</p>
-                  <p className="text-5xl md:text-7xl font-black text-white tracking-tighter leading-none">Rp{totalCostIDR.toLocaleString('id-ID')}</p>
-                </div>
-                <div className="space-y-1 col-span-2">
-                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sisa Budget</p>
-                  <p className={`text-3xl md:text-5xl font-mono font-black ${remainingIDR >= 0 ? 'text-orange-500' : 'text-rose-500'}`}>
-                    {remainingIDR >= 0 ? '+' : ''}Rp{remainingIDR.toLocaleString('id-ID')}
+          <div className="space-y-6 pt-10 border-t border-white/5">
+            <div className="flex flex-col md:flex-row gap-10 items-start">
+              <div className="flex-1 space-y-4">
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.35em] text-zinc-600">Source Data Engine</p>
+                  <p className="text-sm leading-relaxed text-zinc-500">
+                    Rekomendasi dibentuk dari top tags library yang sudah diberi bobot fuzzy, review Steam, volume review, dan affinity publisher. Nilai similarity kandidat dihitung dari jumlah bobot tag kandidat yang cocok.
                   </p>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  {topProfileTags.map(([tag, weight]) => (
+                    <span key={tag} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-300 transition-colors hover:border-orange-500/30">
+                      {tag} <span className="ml-1 font-mono text-orange-400">{(weight as number).toFixed(1)}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-3 relative">
-                <div className="flex justify-between items-end">
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Waktu Proses SA</p>
-                    <p className="text-xs font-black text-orange-500">{saExecutionTimeMs}ms</p>
+              
+              <div className="w-full md:w-72 shrink-0 rounded-3xl border border-orange-500/10 bg-orange-500/[0.03] p-5 text-[10px] leading-relaxed text-zinc-500 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 blur-2xl rounded-full -mr-8 -mt-8" />
+                <div className="overflow-x-auto py-1 text-zinc-300 [&_.mjx-container]:my-0 [&_.mjx-container]:text-left">
+                  {`\\[
+  \\begin{aligned}
+  W_t &= \\sum_{g\\in L,\\ t\\in T_g} score_g\\\\
+  ${topProfileTagLatexRows || 'W_t &= 0'}\\\\
+  s &= \\frac{\\sum_{t\\in C\\cap P}W_t}{\\sum_{i=1}^{|C|}W_{(i)}}
+  \\end{aligned}
+  \\]`}
                 </div>
-                <div className="flex justify-between items-end">
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Target Efisiensi</p>
-                    <p className="text-xs font-black text-zinc-300">Target: Rp{budgetIDR.toLocaleString('id-ID')}</p>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-400">
-                    <span className="text-orange-500">{Math.round((totalCostIDR / (budgetIDR || 1)) * 100)}% Used</span>
-                  </div>
-                  <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
-                    <div 
-                      className="h-full bg-gradient-to-r from-orange-600 to-orange-400 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(249,115,22,0.3)]" 
-                      style={{ width: `${Math.min(100, (totalCostIDR / (budgetIDR || 1)) * 100)}%` }}
-                    />
-                  </div>
-                </div>
+                <p className="mt-3 text-[9px] font-medium opacity-50 group-hover:opacity-100 transition-opacity">
+                  *Matematika pembobotan tag profil vs kandidat (C) untuk menentukan skor relevansi.
+                </p>
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {budgetIDR > 0 && basketItems.length > 0 && (
-        <div className="space-y-10">
-          <div className="flex items-center gap-6">
-            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-white/10" />
-            <h3 className="text-xs font-black uppercase tracking-[0.5em] text-orange-500 whitespace-nowrap bg-orange-500/10 px-6 py-2 rounded-full border border-orange-500/20">Optimized Selection</h3>
-            <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-white/10" />
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-6">
-            {basketItems.map((deal: any) => {
-              const gameData = {
-                appId: deal.appid,
-                name: deal.name,
-                score: deal.score,
-                fuzzyStats: deal.fuzzyDetails,
-                source: deal.source
-              }
-
-              return (
-                <div
-                  key={deal.appid}
-                  className="cursor-pointer recommendation-card-trigger"
-                  data-game={JSON.stringify(gameData)}
-                >
-                  <GameCard 
-                    appId={deal.appid}
-                    name={deal.name}
-                    score={deal.score}
-                    price={deal.formattedPrice}
-                    discount={deal.savings}
-                    hideScore={false}
-                    hideTags={true}
-                    actionLabel="Lihat Analisis"
-                    isActionDiv={true}
-                  />
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      <div id="optimization-results-portal"></div>
 
       <div className="space-y-10">
         <div className="flex items-center gap-6">
@@ -395,24 +151,27 @@ s &= \\frac{\\sum_{t\\in C\\cap P}W_t}{\\sum_{i=1}^{|C|}W_{(i)}}
           </h3>
           <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-white/10" />
         </div>
-        {discoveryItems.length > 0 ? (
-          <div data-hydrate="InfiniteGrid" data-props={JSON.stringify({ initialItems: discoveryItems, endpoint: '/api/recommendation-deals', type: 'deal' })}>
-            <InfiniteGrid initialItems={discoveryItems} endpoint="/api/recommendation-deals" type="deal" />
+        <div data-hydrate="InfiniteGrid" data-props={JSON.stringify({ initialItems: [], endpoint: '/api/recommendation-deals', type: 'deal' })}>
+          <div className="space-y-10">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-6 md:gap-10">
+               {[...Array(12)].map((_, i) => (
+                 <div key={i} className="aspect-[3/4] bg-white/5 rounded-[2rem] animate-pulse"></div>
+               ))}
+            </div>
           </div>
-        ) : (
-          <div className="glass p-20 rounded-[3rem] text-center border border-dashed border-white/10">
-            <p className="text-zinc-500 font-mono text-sm uppercase tracking-widest">Mencari penawaran aktif di database Steam Indonesia...</p>
-          </div>
-        )}
+        </div>
       </div>
+      
       <script dangerouslySetInnerHTML={{
         __html: `
           if (typeof document !== 'undefined') {
             document.addEventListener('click', function(e) {
               var trigger = e.target.closest('.recommendation-card-trigger');
               if (trigger) {
-                var gameData = JSON.parse(trigger.getAttribute('data-game'));
-                window.dispatchEvent(new CustomEvent('open-analyzer-modal', { detail: gameData }));
+                var gameData = trigger.getAttribute('data-game');
+                if (gameData) {
+                  window.dispatchEvent(new CustomEvent('open-analyzer-modal', { detail: JSON.parse(gameData) }));
+                }
               }
             });
           }

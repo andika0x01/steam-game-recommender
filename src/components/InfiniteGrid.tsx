@@ -65,37 +65,44 @@ export const InfiniteGrid: React.FC<InfiniteGridProps> = ({ initialItems, endpoi
   return (
     <div className="space-y-10">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-6 md:gap-10">
-        {items.map((item, idx) => {
-          const card = (
-            <GameCard 
-              appId={item.appid || item.appId}
-              name={item.name}
-              score={item.score}
-              tags={item.tags}
-              price={item.price}
-              originalPrice={item.originalPrice}
-              discount={item.discount}
-              hideScore={item.hideScore}
-              hideTags={item.hideTags}
-              actionLabel={item.analyzerData ? 'Lihat Analisis' : undefined}
-              isActionDiv={Boolean(item.analyzerData)}
-            />
-          )
+        {items.length > 0 ? (
+          items.map((item, idx) => {
+            const card = (
+              <GameCard 
+                appId={item.appid || item.appId}
+                name={item.name}
+                score={item.score}
+                tags={item.tags}
+                price={item.price}
+                originalPrice={item.originalPrice}
+                discount={item.discount}
+                hideScore={item.hideScore}
+                hideTags={item.hideTags}
+                actionLabel={item.analyzerData ? 'Lihat Analisis' : undefined}
+                isActionDiv={Boolean(item.analyzerData)}
+              />
+            )
 
-          return item.analyzerData ? (
-            <div
-              key={`${item.appid || item.appId}-${idx}`}
-              className="cursor-pointer recommendation-card-trigger"
-              data-game={JSON.stringify(item.analyzerData)}
-            >
-              {card}
-            </div>
-          ) : (
-            <React.Fragment key={`${item.appid || item.appId}-${idx}`}>
-              {card}
-            </React.Fragment>
-          )
-        })}
+            return item.analyzerData ? (
+              <div
+                key={`${item.appid || item.appId}-${idx}`}
+                className="cursor-pointer recommendation-card-trigger"
+                data-game={JSON.stringify(item.analyzerData)}
+              >
+                {card}
+              </div>
+            ) : (
+              <React.Fragment key={`${item.appid || item.appId}-${idx}`}>
+                {card}
+              </React.Fragment>
+            )
+          })
+        ) : (
+          /* Skeletons match server-side placeholder */
+          [...Array(12)].map((_, i) => (
+            <div key={i} className="aspect-[3/4] bg-white/5 rounded-[2rem] animate-pulse"></div>
+          ))
+        )}
       </div>
       
       {hasMore && (
