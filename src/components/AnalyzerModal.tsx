@@ -285,7 +285,6 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
     }
 
     const inputs = fuzzyProcess.fuzzification.inputs
-    const normalization = fuzzyProcess.fuzzification.normalization
     const memberships = fuzzyProcess.fuzzification.memberships
     const activation = fuzzyProcess.inference.activation
     const defuzzification = fuzzyProcess.defuzzification
@@ -326,15 +325,13 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
 \\text{Input mentah:}\\quad
 p &= ${inputs.playtime_forever}\\ \\text{menit total playtime}\\\\
 a &= ${inputs.playtime_2weeks}\\ \\text{menit activity 2 minggu}\\\\
-r &= ${latexNumber(inputs.days_since_played, 1)}\\ \\text{hari sejak terakhir dimainkan}\\\\
-p_{max} &= ${inputs.max_playtime_forever}\\ \\text{menit playtime terbesar di library}\\\\
-a_{max} &= ${inputs.max_playtime_2weeks}\\ \\text{menit activity terbesar di library}
+r &= ${latexNumber(inputs.days_since_played, 1)}\\ \\text{hari sejak terakhir dimainkan}
 \\end{aligned}
 \\]`,
       fuzzification: `\\[
 \\begin{aligned}
-x_p &= \\frac{p}{p_{max}} = \\frac{${inputs.playtime_forever}}{${inputs.max_playtime_forever}} = ${latexNumber(normalization.playtime)}\\\\
-x_a &= \\frac{a}{a_{max}} = \\frac{${inputs.playtime_2weeks}}{${inputs.max_playtime_2weeks}} = ${latexNumber(normalization.activity)}\\\\
+x_p &= p = ${inputs.playtime_forever}\\\\
+x_a &= a = ${inputs.playtime_2weeks}\\\\
 x_r &= r = ${latexNumber(inputs.days_since_played, 1)}
 \\end{aligned}
 \\]
