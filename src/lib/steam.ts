@@ -460,7 +460,9 @@ export class SteamAPI {
     if (this.kv) {
       const cached = await this.kv.get(cacheKey, 'json');
       if (cached) {
-        return cached as SteamStoreAppDetails;
+        const detail = cached as SteamStoreAppDetails;
+        if (isGame18Plus(detail)) return null;
+        return detail;
       }
     }
 
@@ -490,6 +492,9 @@ export class SteamAPI {
       await this.kv.put(cacheKey, JSON.stringify(result));
     }
 
+    // Global 18+ Filter
+    if (isGame18Plus(result)) return null;
+
     return result;
   }
 
@@ -510,7 +515,10 @@ export class SteamAPI {
         const cacheKey = `steam_appdetails_${id}_${language}_${cc || ''}`;
         const cached = await this.kv!.get(cacheKey, 'json');
         if (cached) {
-          results[idx] = cached as SteamStoreAppDetails;
+          const detail = cached as SteamStoreAppDetails;
+          if (!isGame18Plus(detail)) {
+            results[idx] = detail;
+          }
         } else {
           missingIndices.push(idx);
           missingIds.push(id);
@@ -546,9 +554,13 @@ export class SteamAPI {
         
         if (data && data[id.toString()] && data[id.toString()].success) {
           const gameData = data[id.toString()].data as SteamStoreAppDetails;
-          results[originalIdx] = gameData;
           
-          // Simpan ke KV
+          // Global 18+ Filter
+          if (!isGame18Plus(gameData)) {
+            results[originalIdx] = gameData;
+          }
+          
+          // Simpan ke KV (tetap simpan yang 18+ agar selanjutnya langsung kena filter tanpa fetch)
           if (this.kv) {
             const cacheKey = `steam_appdetails_${id}_${language}_${cc || ''}`;
             await this.kv.put(cacheKey, JSON.stringify(gameData));

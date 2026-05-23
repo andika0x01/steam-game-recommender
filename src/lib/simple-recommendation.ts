@@ -183,9 +183,6 @@ export async function getSimpleRecommendations(
 
   candidateDetails.forEach((detail, idx) => {
     if (!detail || detail.type !== 'game') return;
-    
-    // Filter game 18+
-    if (isGame18Plus(detail)) return;
 
     const reviews = candidateReviews[idx];
 

@@ -17,6 +17,8 @@ export const OptimizationApp = ({ defaultBudget }: OptimizationAppProps) => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [basket, setBasket] = useState<Candidate[]>([]);
   const [computationTime, setComputationTime] = useState<number | null>(null);
+  const [totalIterations, setTotalIterations] = useState<number | null>(null);
+  const [animationSteps, setAnimationSteps] = useState<any[]>([]);
   const [budgetValue, setBudgetValue] = useState(defaultBudget > 0 ? defaultBudget.toString() : '');
   const [hasRun, setHasRun] = useState(false);
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
@@ -67,8 +69,10 @@ export const OptimizationApp = ({ defaultBudget }: OptimizationAppProps) => {
       // Simpan data untuk digunakan nanti setelah animasi
       setCandidates(data.candidates);
       setComputationTime(data.computationTimeMs);
+      setTotalIterations(data.totalIterations);
+      setAnimationSteps(data.animationSteps);
       
-      // Aktifkan overlay animasi (client-side SA tetap jalan sebagai visual)
+      // Aktifkan overlay animasi
       setIsOptimizing(true);
     } catch (err) {
       console.error("Failed to perform optimization", err);
@@ -100,12 +104,20 @@ export const OptimizationApp = ({ defaultBudget }: OptimizationAppProps) => {
             </div>
             <h3 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter italic">Engine Results</h3>
             <p className="text-zinc-500 text-sm md:text-base leading-relaxed">Sistem telah berhasil menyusun kombinasi game optimal dari katalog Steam Indonesia menggunakan budget Rp{targetBudgetNum.toLocaleString('id-ID')}.</p>
-            {computationTime !== null && (
-              <div className="inline-block px-4 py-2 bg-white/5 border border-white/10 rounded-xl">
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Server Computation Time</p>
-                <p className="text-lg font-black text-orange-500 font-mono">{computationTime}ms</p>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-3">
+              {computationTime !== null && (
+                <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Computation Time</p>
+                  <p className="text-lg font-black text-orange-500 font-mono">{computationTime}ms</p>
+                </div>
+              )}
+              {totalIterations !== null && (
+                <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Iterations</p>
+                  <p className="text-lg font-black text-white font-mono">{totalIterations.toLocaleString('id-ID')}</p>
+                </div>
+              )}
+            </div>
          </div>
          
          <div className="w-full lg:w-auto shrink-0">
@@ -286,6 +298,8 @@ export const OptimizationApp = ({ defaultBudget }: OptimizationAppProps) => {
         <SAAnimationOverlay 
           budget={targetBudgetNum} 
           candidates={candidates} 
+          animationSteps={animationSteps}
+          totalIterations={totalIterations || 0}
           onFinish={handleFinish} 
         />
       )}

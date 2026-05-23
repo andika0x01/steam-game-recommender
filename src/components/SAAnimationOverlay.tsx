@@ -18,125 +18,65 @@ export const PLACEHOLDER_IMAGE = 'https://placehold.co/600x900/18181b/71717a?tex
 interface SAAnimationOverlayProps {
   budget: number;
   candidates: Candidate[];
+  animationSteps: any[];
+  totalIterations: number;
   onFinish: (basket: Candidate[]) => void;
 }
 
 /**
  * SAAnimationOverlay
  * Tema warna Orange. Slot dinamis (Portrait). Responsive.
+ * Menampilkan animasi berdasarkan steps yang dihasilkan dari backend.
  */
-export const SAAnimationOverlay = ({ budget, candidates, onFinish }: SAAnimationOverlayProps) => {
+export const SAAnimationOverlay = ({ budget, candidates, animationSteps, totalIterations, onFinish }: SAAnimationOverlayProps) => {
   const [temp, setTemp] = useState(3000.0);
   const [currentBasket, setCurrentBasket] = useState<Candidate[]>([]);
   const [iteration, setIteration] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const [isDone, setIsDone] = useState(false);
-  
-  const currentBasketRef = useRef<Candidate[]>([]);
-  const tempRef = useRef(3000.0);
+  const [stepIndex, setStepIndex] = useState(0);
 
   const getCost = (items: Candidate[]) => items.reduce((sum, item) => sum + item.salePrice, 0);
-  
-  const getEnergy = (items: Candidate[]) => {
-    const cost = getCost(items);
-    if (cost > budget || cost === 0) return -1000000;
-    const totalDensity = items.reduce((sum, item) => sum + item.density, 0);
-    const budgetUtilization = cost / budget;
-    return totalDensity * Math.pow(budgetUtilization, 2);
-  };
 
   useEffect(() => {
-    const affordable = candidates.filter(c => c.salePrice <= budget);
-    let initial: Candidate[] = [];
-    if (affordable.length > 0) {
-      initial = [affordable[Math.floor(Math.random() * affordable.length)]];
-    }
-    setCurrentBasket(initial);
-    currentBasketRef.current = initial;
-    
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [candidates, budget]);
+  }, []);
 
   useEffect(() => {
-    if (isDone || candidates.length === 0 || (currentBasketRef.current.length === 0 && iteration > 0)) return;
+    if (animationSteps.length === 0 || isDone) return;
 
-    const timer = setTimeout(() => {
-      const coolingRate = 0.98;
-      const t = tempRef.current;
-      
-      let neighbor = [...currentBasketRef.current];
-      const actionRoll = Math.random();
-      let actionName = "";
-      let gameName = "";
-      
-      if (actionRoll < 0.4 && neighbor.length < candidates.length) {
-        actionName = "ADD";
-        const available = candidates.filter(c => !neighbor.find(n => n.appid === c.appid));
-        if (available.length > 0) {
-          const rand = available[Math.floor(Math.random() * available.length)];
-          if (getCost(neighbor) + rand.salePrice <= budget) {
-            neighbor.push(rand);
-            gameName = rand.name;
-          }
-        }
-      } else if (actionRoll < 0.6 && neighbor.length > 1) {
-        actionName = "REMOVE";
-        const idx = Math.floor(Math.random() * neighbor.length);
-        gameName = neighbor[idx].name;
-        neighbor.splice(idx, 1);
-      } else if (neighbor.length > 0) {
-        actionName = "SWAP";
-        const idx = Math.floor(Math.random() * neighbor.length);
-        const oldGame = neighbor[idx];
-        const available = candidates.filter(c => !neighbor.find(n => n.appid === c.appid));
-        if (available.length > 0) {
-          const rand = available[Math.floor(Math.random() * available.length)];
-          const costWithout = getCost(neighbor) - oldGame.salePrice;
-          if (costWithout + rand.salePrice <= budget) {
-            neighbor[idx] = rand;
-            gameName = `${oldGame.name.slice(0, 8)}.. -> ${rand.name.slice(0, 8)}..`;
-          }
-        }
-      }
+    // Hitung interval agar selesai dalam ~4 detik (4000ms)
+    // Minimal 30ms per frame untuk kelancaran visual
+    const intervalMs = Math.max(30, Math.floor(4000 / animationSteps.length));
 
-      if (!actionName) return;
-
-      const eCurrent = getEnergy(currentBasketRef.current);
-      const eNeighbor = getEnergy(neighbor);
-      const dE = eNeighbor - eCurrent;
-      
-      const prob = Math.exp(dE / t);
-      const metropolis = Math.random() < prob;
-      const accept = dE > 0 || metropolis;
-      
-      let reason = "REJECTED";
-      if (dE > 0) reason = "IMPROVED";
-      else if (metropolis) reason = `METROPOLIS (P=${(prob*100).toFixed(1)}%)`;
-
-      if (accept) {
-        currentBasketRef.current = neighbor;
-        setCurrentBasket(neighbor);
-      }
-
-      const costK = (getCost(neighbor) / 1000).toFixed(0);
-      const logT = t.toFixed(0).padStart(4, ' ');
-      const newLog = `[T:${logT}] ${actionName.padEnd(6)}: ${gameName.slice(0, 15).padEnd(15)} | dE:${(dE >= 0 ? '+' : '')}${dE.toExponential(1)} | Rp${costK}k | ${reason}`;
-      setLogs(prev => [newLog, ...prev].slice(0, 15));
-      
-      tempRef.current = t * coolingRate;
-      setTemp(tempRef.current);
-      setIteration(i => i + 1);
-
-      if (tempRef.current < 40 || iteration > 400) {
+    const timer = setInterval(() => {
+      if (stepIndex >= animationSteps.length) {
+        setIteration(totalIterations);
+        setTemp(1.0); // Final temp
         setIsDone(true);
+        clearInterval(timer);
+        return;
       }
-    }, 40);
 
-    return () => clearTimeout(timer);
-  }, [iteration, isDone, candidates, budget]);
+      const step = animationSteps[stepIndex];
+      
+      // Map appids ke Candidate objects
+      const stepBasket = step.basketIds
+        .map((id: number) => candidates.find(c => c.appid === id))
+        .filter(Boolean) as Candidate[];
+      
+      setCurrentBasket(stepBasket);
+      setTemp(step.temp);
+      setIteration(step.iteration);
+      setLogs(prev => [step.log, ...prev].slice(0, 15));
+      setStepIndex(prev => prev + 1);
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [stepIndex, animationSteps, candidates, isDone, totalIterations]);
 
   const totalCost = getCost(currentBasket);
   const slotCount = Math.max(4, currentBasket.length + 1);

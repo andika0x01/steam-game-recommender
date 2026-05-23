@@ -60,7 +60,7 @@ app.get('/recommendation-deals', async (c) => {
     
     const deals = rawDetails
       .map((d: any, idx: number) => ({ d, reviews: candidateReviews[idx] }))
-      .filter(({ d }: any) => d && d.price_overview && !isGame18Plus(d))
+      .filter(({ d }: any) => d && d.price_overview)
       .map(({ d, reviews }: any) => {
         const candidateTags = [
           ...(d.genres || []).map((g: any) => g.description),
@@ -126,83 +126,6 @@ app.get('/recommendation-deals', async (c) => {
   }
 })
 
-app.get('/optimization-candidates', async (c) => {
-  const steamId = getCookie(c, 'steam_id')
-  if (!steamId) return c.json({ error: 'Unauthorized' }, 401)
-
-  const budget = parseInt(c.req.query('budget') || '0')
-  const steamAPI = new SteamAPI(c.env.STEAM_API_KEY, c.env.KV)
-  
-  try {
-    const userGames = await steamAPI.getOwnedGames(steamId)
-    const { publisherScores, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
-    const allowedTagWeights = Object.fromEntries(
-      Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))
-    ) as Record<string, number>;
-    const nonOwnScorer = new FuzzyNonOwnGamesScorer();
-
-    const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
-    const poolSize = budget > 0 ? Math.min(100, Math.max(30, Math.floor(budget / 5000))) : 40
-    const ownedAppIds = new Set(userGames.map(g => g.appid))
-    const uniqueIds = [...new Set(saleResults.map(r => r.id).filter(Boolean) as number[])]
-    const newIds = uniqueIds.filter(id => !ownedAppIds.has(id))
-    const candidateIds = newIds.slice(0, poolSize)
-    
-    const rawDetails = await steamAPI.getAppStoreDetailsBatch(candidateIds, 'english', 'id')
-    const candidateReviewsPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
-    const candidateReviews = await Promise.all(candidateReviewsPromises)
-    
-    const candidates = rawDetails
-      .map((d: any, idx: number) => ({ d, reviews: candidateReviews[idx] }))
-      .filter(({ d }: any) => d && d.price_overview && !isGame18Plus(d))
-      .map(({ d, reviews }: any) => {
-        const price = d!.price_overview!.final / 100
-        const candidateTags = [
-          ...(d.genres || []).map((g: any) => g.description),
-          ...(d.categories || []).map((c: any) => c.description)
-        ].filter(isAllowedSteamTag);
-
-        let candidatePS = 0;
-        if (d.publishers) {
-          candidatePS = d.publishers.reduce((max: number, pub: string) => Math.max(max, publisherScores[pub] || 0), 0);
-        }
-
-        const positivity = reviews ? (reviews.total_positive / (reviews.total_reviews || 1)) : 0.5;
-        const similarity = calculateWeightedSimilarity(candidateTags, allowedTagWeights);
-        const volume = reviews ? reviews.total_reviews : 0;
-        
-        const detailed = nonOwnScorer.getGameScoreDetailed(positivity, similarity, volume, candidatePS);
-        const score = detailed.score;
-        const safePrice = price > 0 ? price : 1;
-        const density = score / safePrice;
-
-        return {
-          appid: d!.steam_appid,
-          name: d!.name,
-          salePrice: price,
-          score: score,
-          density: density,
-          image: `https://cdn.akamai.steamstatic.com/steam/apps/${d!.steam_appid}/header.jpg`,
-          fuzzyDetails: detailed.details,
-          source: {
-            reviewPositivity: positivity,
-            tagSimilarity: similarity,
-            reviewVolume: volume,
-            publisherScore: candidatePS,
-            publishers: d.publishers || [],
-            price: d!.price_overview!.final_formatted,
-            originalPrice: d!.price_overview!.initial_formatted,
-            discount: d!.price_overview!.discount_percent.toString()
-          }
-        }
-      })
-
-    return c.json(candidates)
-  } catch (error) {
-    console.error('Error in /api/optimization-candidates:', error)
-    return c.json({ error: 'Failed to fetch candidates' }, 500)
-  }
-})
 
 app.get('/perform-optimization', async (c) => {
   const steamId = getCookie(c, 'steam_id')
@@ -232,7 +155,7 @@ app.get('/perform-optimization', async (c) => {
     
     const scoredDeals = rawDetails
       .map((d: any, idx: number) => ({ d, reviews: candidateReviews[idx] }))
-      .filter(({ d }: any) => d && d.price_overview && !isGame18Plus(d))
+      .filter(({ d }: any) => d && d.price_overview)
       .map(({ d, reviews }: any) => {
         const price = d!.price_overview!.final / 100
         const candidateTags = [
@@ -303,6 +226,7 @@ app.get('/perform-optimization', async (c) => {
     let temp = 3000.0 
     const coolingRate = 0.998 
     let iteration = 0
+    const animationSteps: any[] = []
 
     // Initial State Logs for Terminal
     console.log("\n" + "=".repeat(60));
@@ -317,29 +241,67 @@ app.get('/perform-optimization', async (c) => {
 
     while (temp > 1) {
       let neighbor = [...currentBasket]
-      const action = Math.random()
-      if (action < 0.4 && neighbor.length < scoredDeals.length) {
+      const actionRoll = Math.random()
+      let actionName = ""
+      let gameName = ""
+
+      if (actionRoll < 0.4 && neighbor.length < scoredDeals.length) {
+        actionName = "ADD"
         const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
         if (available.length > 0) {
           const randomItem = available[Math.floor(Math.random() * available.length)]
-          if (getCost(neighbor) + randomItem.salePrice <= budgetIDR) neighbor.push(randomItem)
+          if (getCost(neighbor) + randomItem.salePrice <= budgetIDR) {
+            neighbor.push(randomItem)
+            gameName = randomItem.name
+          }
         }
-      } else if (action < 0.6 && neighbor.length > 0) {
-        neighbor.splice(Math.floor(Math.random() * neighbor.length), 1)
-      } else if (neighbor.length > 0) {
+      } else if (actionRoll < 0.6 && neighbor.length > 0) {
+        actionName = "REMOVE"
         const idx = Math.floor(Math.random() * neighbor.length)
+        gameName = neighbor[idx].name
+        neighbor.splice(idx, 1)
+      } else if (neighbor.length > 0) {
+        actionName = "SWAP"
+        const idx = Math.floor(Math.random() * neighbor.length)
+        const oldGame = neighbor[idx]
         const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
         if (available.length > 0) {
           const newItem = available[Math.floor(Math.random() * available.length)]
-          const costWithoutOld = getCost(neighbor) - neighbor[idx].salePrice
-          if (costWithoutOld + newItem.salePrice <= budgetIDR) neighbor[idx] = newItem
+          const costWithoutOld = getCost(neighbor) - oldGame.salePrice
+          if (costWithoutOld + newItem.salePrice <= budgetIDR) {
+            neighbor[idx] = newItem
+            gameName = `${oldGame.name.slice(0, 8)}.. -> ${newItem.name.slice(0, 8)}..`
+          }
         }
       }
       
       const currentEnergy = getEnergy(currentBasket)
       const neighborEnergy = getEnergy(neighbor)
-      if (neighborEnergy > currentEnergy || Math.random() < Math.exp((neighborEnergy - currentEnergy) / temp)) {
+      const dE = neighborEnergy - currentEnergy
+      const prob = Math.exp(dE / temp)
+      const metropolis = Math.random() < prob
+      const accept = neighborEnergy > currentEnergy || metropolis
+
+      let reason = "REJECTED"
+      if (neighborEnergy > currentEnergy) reason = "IMPROVED"
+      else if (metropolis) reason = `METRO (P=${(prob*100).toFixed(1)}%)`
+
+      if (accept) {
         currentBasket = neighbor
+      }
+
+      // Record animation step every 40 iterations
+      if (iteration % 40 === 0) {
+        const costK = (getCost(currentBasket) / 1000).toFixed(0)
+        const logT = temp.toFixed(0).padStart(4, ' ')
+        const log = `[T:${logT}] ${actionName.padEnd(6)}: ${gameName.slice(0, 15).padEnd(15)} | dE:${(dE >= 0 ? '+' : '')}${dE.toExponential(1)} | Rp${costK}k | ${reason}`
+        
+        animationSteps.push({
+          iteration,
+          temp,
+          log,
+          basketIds: currentBasket.map(g => g.appid)
+        })
       }
 
       // Per 500 Iterations Logs for Terminal
@@ -381,7 +343,9 @@ app.get('/perform-optimization', async (c) => {
       basket: currentBasket,
       totalCost: finalCost,
       computationTimeMs: computationTimeMs,
-      candidates: scoredDeals.slice(0, 50) 
+      totalIterations: iteration,
+      animationSteps: animationSteps,
+      candidates: scoredDeals 
     })
   } catch (error) {
     console.error('Error in /api/perform-optimization:', error)
