@@ -203,7 +203,20 @@ app.get('/perform-optimization', async (c) => {
     // Start time tracking
     const startTime = performance.now();
 
-    // Algoritma SA yang sama dengan di backend asli
+    // ─── Helper Functions ──────────────────────────────────────────────────────
+
+    const getCost = (items: any[]) => items.reduce((sum, item) => sum + item.salePrice, 0)
+
+    const getEnergy = (items: any[]) => {
+      const cost = getCost(items)
+      if (cost > budgetIDR || cost === 0) return Number.NEGATIVE_INFINITY
+      const totalDensity = items.reduce((sum, item) => sum + item.density, 0)
+      const budgetUtilization = cost / budgetIDR
+      return totalDensity * Math.pow(budgetUtilization, 2)
+    }
+
+    // ─── Greedy Initialization ────────────────────────────────────────────────
+
     let currentBasket: any[] = []
     const sortedByPrice = [...scoredDeals].sort((a, b) => a.salePrice - b.salePrice)
     let tempCost = 0
@@ -214,14 +227,12 @@ app.get('/perform-optimization', async (c) => {
       } else break
     }
 
-    const getCost = (items: any[]) => items.reduce((sum, item) => sum + item.salePrice, 0)
-    const getEnergy = (items: any[]) => {
-      const cost = getCost(items)
-      if (cost > budgetIDR || cost === 0) return Number.NEGATIVE_INFINITY
-      const totalDensity = items.reduce((sum, item) => sum + item.density, 0)
-      const budgetUtilization = cost / budgetIDR
-      return totalDensity * Math.pow(budgetUtilization, 2)
-    }
+    // ─── FIX #2: Track best solution ever found ───────────────────────────────
+    let bestBasket = [...currentBasket]
+    let bestEnergy = getEnergy(currentBasket)
+
+    // ─── FIX #4: Pre-build appid Set for O(1) membership check ───────────────
+    // Rebuilt every iteration from neighbor — see loop below.
 
     let temp = 3000.0 
     const coolingRate = 0.998 
@@ -245,9 +256,12 @@ app.get('/perform-optimization', async (c) => {
       let actionName = ""
       let gameName = ""
 
+      // FIX #4: Use Set for O(1) lookups instead of O(n) find() inside filter()
+      const neighborIds = new Set(neighbor.map((n: any) => n.appid))
+
       if (actionRoll < 0.4 && neighbor.length < scoredDeals.length) {
         actionName = "ADD"
-        const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
+        const available = scoredDeals.filter(d => !neighborIds.has(d.appid))
         if (available.length > 0) {
           const randomItem = available[Math.floor(Math.random() * available.length)]
           if (getCost(neighbor) + randomItem.salePrice <= budgetIDR) {
@@ -264,7 +278,10 @@ app.get('/perform-optimization', async (c) => {
         actionName = "SWAP"
         const idx = Math.floor(Math.random() * neighbor.length)
         const oldGame = neighbor[idx]
-        const available = scoredDeals.filter(d => !neighbor.find(n => n.appid === d.appid))
+        // Exclude oldGame from neighbor set so it can be a swap candidate
+        const swapIds = new Set(neighborIds)
+        swapIds.delete(oldGame.appid)
+        const available = scoredDeals.filter(d => !swapIds.has(d.appid) && d.appid !== oldGame.appid)
         if (available.length > 0) {
           const newItem = available[Math.floor(Math.random() * available.length)]
           const costWithoutOld = getCost(neighbor) - oldGame.salePrice
@@ -278,16 +295,32 @@ app.get('/perform-optimization', async (c) => {
       const currentEnergy = getEnergy(currentBasket)
       const neighborEnergy = getEnergy(neighbor)
       const dE = neighborEnergy - currentEnergy
-      const prob = Math.exp(dE / temp)
-      const metropolis = Math.random() < prob
-      const accept = neighborEnergy > currentEnergy || metropolis
 
-      let reason = "REJECTED"
-      if (neighborEnergy > currentEnergy) reason = "IMPROVED"
-      else if (metropolis) reason = `METRO (P=${(prob*100).toFixed(1)}%)`
+      // FIX #1: Correct Metropolis criterion
+      // - Accept immediately if neighbor is better (dE > 0)
+      // - Accept probabilistically only when neighbor is worse (dE < 0)
+      // - Old code: Math.exp(dE / temp) when dE > 0 gives prob > 1, making
+      //   the metropolis branch almost always true — redundant and misleading.
+      let accept: boolean
+      let reason: string
+      if (neighborEnergy > currentEnergy) {
+        accept = true
+        reason = "IMPROVED"
+      } else {
+        const prob = Math.exp(dE / temp) // dE <= 0, so prob in (0, 1]
+        const metropolis = Math.random() < prob
+        accept = metropolis
+        reason = metropolis ? `METRO (P=${(prob * 100).toFixed(1)}%)` : "REJECTED"
+      }
 
       if (accept) {
         currentBasket = neighbor
+
+        // FIX #2: Update best solution if current is better than all-time best
+        if (neighborEnergy > bestEnergy) {
+          bestBasket = [...neighbor]
+          bestEnergy = neighborEnergy
+        }
       }
 
       // Record animation step every 40 iterations
@@ -319,18 +352,19 @@ app.get('/perform-optimization', async (c) => {
     const endTime = performance.now();
     const computationTimeMs = Math.round(endTime - startTime);
 
-    const finalCost = getCost(currentBasket);
-    const finalEnergy = getEnergy(currentBasket);
+    // FIX #2: Return bestBasket (global best), not currentBasket (last state)
+    const finalCost = getCost(bestBasket);
+    const finalEnergy = getEnergy(bestBasket);
     console.log("-".repeat(60));
     console.log("SIMULATED ANNEALING - COMPLETED");
     console.log(`Final Iteration  : ${iteration}`);
     console.log(`Final Temp       : ${temp.toFixed(2)}`);
     console.log(`Final Cost       : Rp${finalCost.toLocaleString('id-ID')}`);
     console.log(`Final Energy     : ${(finalEnergy * 1000).toFixed(4)} (Scaled x1000)`);
-    console.log(`Total Games      : ${currentBasket.length}`);
+    console.log(`Total Games      : ${bestBasket.length}`);
     console.log(`Computation Time : ${computationTimeMs}ms`);
     console.log("=".repeat(60));
-    console.table(currentBasket.map(g => ({
+    console.table(bestBasket.map(g => ({
       AppID: g.appid,
       Name: g.name.length > 30 ? g.name.substring(0, 27) + "..." : g.name,
       Price: `Rp${g.salePrice.toLocaleString('id-ID')}`,
@@ -340,7 +374,7 @@ app.get('/perform-optimization', async (c) => {
     console.log("=".repeat(60) + "\n");
 
     return c.json({
-      basket: currentBasket,
+      basket: bestBasket,
       totalCost: finalCost,
       computationTimeMs: computationTimeMs,
       totalIterations: iteration,
