@@ -53,10 +53,6 @@ type FuzzyProcess = {
       max_playtime_forever: number
       max_playtime_2weeks: number
     }
-    normalization: {
-      playtime: number
-      activity: number
-    }
     memberships: {
       playtime: Record<string, number>
       recency: Record<string, number>
@@ -560,6 +556,22 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
                 >
                   Lihat Game
                 </a>
+
+                {fuzzyProcess?.defuzzification && (
+                  <div className={`mt-4 rounded-xl border p-4 ${fuzzyProcess.defuzzification.usedFallback ? 'border-red-500/30 bg-red-500/5' : 'border-emerald-500/30 bg-emerald-500/5'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`h-2 w-2 rounded-full ${fuzzyProcess.defuzzification.usedFallback ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+                      <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${fuzzyProcess.defuzzification.usedFallback ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {fuzzyProcess.defuzzification.usedFallback ? 'Calculation Mode: Fallback Active' : 'Calculation Mode: Normal Inference'}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                      {fuzzyProcess.defuzzification.usedFallback 
+                        ? 'Sistem tidak menemukan rule yang cocok dengan kriteria game ini, menggunakan nilai default (0.5/0.0) sebagai pengaman.' 
+                        : 'Engine berhasil mencocokkan input dengan rule-rule fuzzy yang ada untuk menghasilkan skor yang akurat.'}
+                    </p>
+                  </div>
+                )}
               </section>
             </div>
           </div>

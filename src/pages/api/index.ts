@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import { SteamAPI, isAllowedSteamTag } from '../../lib/steam'
+import { SteamAPI, isAllowedSteamTag, isGame18Plus } from '../../lib/steam'
 import { getSimpleRecommendations, buildUserProfile, calculateWeightedSimilarity } from '../../lib/simple-recommendation'
 import { FuzzyNonOwnGamesScorer } from '../../lib/fuzzy-non-own-games-scorer'
 
@@ -57,7 +57,7 @@ app.get('/recommendation-deals', async (c) => {
     
     const deals = rawDetails
       .map((d: any, idx: number) => ({ d, reviews: candidateReviews[idx] }))
-      .filter(({ d }: any) => d && d.price_overview)
+      .filter(({ d }: any) => d && d.price_overview && !isGame18Plus(d))
       .map(({ d, reviews }: any) => {
         const candidateTags = [
           ...(d.genres || []).map((g: any) => g.description),

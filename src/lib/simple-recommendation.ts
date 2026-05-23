@@ -1,4 +1,4 @@
-import { SteamAPI, SteamGame, isAllowedSteamTag } from './steam';
+import { SteamAPI, SteamGame, isAllowedSteamTag, isGame18Plus } from './steam';
 import { FuzzyOwnGamesScorer } from './fuzzy-own-games-scorer';
 import { FuzzyNonOwnGamesScorer } from './fuzzy-non-own-games-scorer';
 
@@ -183,6 +183,10 @@ export async function getSimpleRecommendations(
 
   candidateDetails.forEach((detail, idx) => {
     if (!detail || detail.type !== 'game') return;
+    
+    // Filter game 18+
+    if (isGame18Plus(detail)) return;
+
     const reviews = candidateReviews[idx];
 
     const candidateTags = [

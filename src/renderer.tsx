@@ -10,7 +10,6 @@ declare module 'hono' {
 
 export const renderer = reactRenderer(({ children, title, c }: { children?: React.ReactNode, title?: string, c?: any }) => {
   const steamId = c?.var?.steamId
-  const scoringMode = c?.var?.scoringMode
   
   return (
     <html lang="en">
@@ -41,7 +40,7 @@ export const renderer = reactRenderer(({ children, title, c }: { children?: Reac
         ` }} />
       </head>
       <body className="min-h-[100dvh] bg-background text-foreground selection:bg-white/20 pt-20">
-        <Nav steamId={steamId} scoringMode={scoringMode} />
+        <Nav steamId={steamId} />
         <div className="fixed inset-0 z-50 pointer-events-none opacity-[0.03] bg-[url('/noise.svg')]"></div>
         <main id="root">{children}</main>
       </body>

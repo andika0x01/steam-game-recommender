@@ -125,7 +125,12 @@ app.get('/', async (c) => {
 
   let basketItems: any[] = []
   let totalCostIDR = 0
+  let saExecutionTimeMs = 0
+
   if (budgetIDR > 0 && scoredDeals.length > 0) {
+    const startTime = Date.now()
+    console.log(`\n[Simulated Annealing] Mulai optimasi untuk budget Rp${budgetIDR.toLocaleString('id-ID')} dengan ${scoredDeals.length} item kandidat...`)
+
     /**
      * Solusi Awal: Ambil set acak yang PASTI di bawah budget.
      * Jika tidak ada yang di bawah budget, basket kosong.
@@ -200,6 +205,9 @@ app.get('/', async (c) => {
     }
     basketItems = currentBasket
     totalCostIDR = getCost(basketItems)
+    const endTime = Date.now()
+    saExecutionTimeMs = endTime - startTime
+    console.log(`[Simulated Annealing] Selesai dalam ${saExecutionTimeMs}ms. Terpilih ${basketItems.length} item dengan total Rp${totalCostIDR.toLocaleString('id-ID')}.\n`)
   }
 
   const remainingIDR = budgetIDR - totalCostIDR
@@ -313,6 +321,10 @@ s &= \\frac{\\sum_{t\\in C\\cap P}W_t}{\\sum_{i=1}^{|C|}W_{(i)}}
                 </div>
               </div>
               <div className="space-y-3 relative">
+                <div className="flex justify-between items-end">
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Waktu Proses SA</p>
+                    <p className="text-xs font-black text-orange-500">{saExecutionTimeMs}ms</p>
+                </div>
                 <div className="flex justify-between items-end">
                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Target Efisiensi</p>
                     <p className="text-xs font-black text-zinc-300">Target: Rp{budgetIDR.toLocaleString('id-ID')}</p>

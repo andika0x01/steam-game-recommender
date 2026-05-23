@@ -7,7 +7,6 @@ const app = new Hono<{ Bindings: any }>()
 
 app.get('/', async (c) => {
   const steamId = getCookie(c, 'steam_id')
-  const scoringMode = getCookie(c, 'scoring_mode') || 'fuzzy'
   
   if (!steamId) return c.redirect('/')
 
@@ -62,51 +61,11 @@ app.get('/', async (c) => {
               </button>
             </form>
           </div>
-
-          <div className="pt-8 border-t border-white/5 space-y-6">
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold">Mode Algoritma</h3>
-              <p className="text-sm text-zinc-500">Pilih mesin kecerdasan yang digunakan untuk menghitung skor.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <form action="/settings/update" method="POST">
-                <input type="hidden" name="mode" value="fuzzy" />
-                <button className={`w-full p-6 rounded-3xl border transition-all text-left space-y-3 ${scoringMode === 'fuzzy' ? 'border-orange-500 bg-orange-500/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}>
-                  <div className="flex justify-between items-center">
-                    <p className="font-bold text-white">Fuzzy Logic</p>
-                    {scoringMode === 'fuzzy' && <span className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]" />}
-                  </div>
-                  <p className="text-[10px] text-zinc-400 leading-relaxed uppercase tracking-wider">Sistem penilaian berbasis multi-kriteria yang fleksibel.</p>
-                </button>
-              </form>
-              
-              <form action="/settings/update" method="POST">
-                <input type="hidden" name="mode" value="bayesian" />
-                <button className={`w-full p-6 rounded-3xl border transition-all text-left space-y-3 ${scoringMode === 'bayesian' ? 'border-orange-500 bg-orange-500/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}>
-                  <div className="flex justify-between items-center">
-                    <p className="font-bold text-white">Bayesian Inference</p>
-                    {scoringMode === 'bayesian' && <span className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]" />}
-                  </div>
-                  <p className="text-[10px] text-zinc-400 leading-relaxed uppercase tracking-wider">Pendekatan probabilitas berdasarkan kebiasaan bermain.</p>
-                </button>
-              </form>
-            </div>
-          </div>
         </section>
       </div>
     </div>,
     { title: 'Settings' } as any
   )
-})
-
-app.post('/update', async (c) => {
-  const body = await c.req.parseBody()
-  const mode = body.mode as string
-  if (mode === 'fuzzy' || mode === 'bayesian') {
-    setCookie(c, 'scoring_mode', mode, { path: '/', maxAge: 60 * 60 * 24 * 365 })
-  }
-  return c.redirect('/settings')
 })
 
 app.post('/manual', async (c) => {

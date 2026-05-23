@@ -20,7 +20,6 @@ type Bindings = {
 
 type Variables = {
   steamId?: string
-  scoringMode: 'bayesian' | 'fuzzy'
 }
 
 const app = new Hono<{ Bindings: Bindings, Variables: Variables }>()
@@ -47,9 +46,7 @@ app.use('/src/*', serveAssets)
 // Middleware untuk mendeteksi sesi pengguna
 app.use('*', async (c, next) => {
   const steamId = getCookie(c, 'steam_id')
-  const scoringMode = getCookie(c, 'scoring_mode') || 'fuzzy'
   c.set('steamId', steamId)
-  c.set('scoringMode', scoringMode as any)
   await next()
 })
 

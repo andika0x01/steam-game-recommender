@@ -159,6 +159,10 @@ export interface SteamStoreAppDetails {
   };
   developers: string[];
   publishers: string[];
+  content_descriptors: {
+    ids: number[];
+    notes: string | null;
+  };
   price_overview?: {
     currency: string;
     initial: number;
@@ -180,6 +184,26 @@ export interface SteamStoreAppDetails {
     date: string;
   };
 }
+
+/**
+ * Mendeteksi apakah game termasuk kategori 18+ (Mature/NSFW).
+ */
+export const isGame18Plus = (detail: any): boolean => {
+  if (!detail) return false;
+  
+  // 1. Cek umur yang diwajibkan (biasanya 18 untuk Mature)
+  if (detail.required_age >= 18) return true;
+  
+  // 2. Cek Steam Content Descriptors
+  // ID 3: Nudity, ID 4: Sexual Content, ID 5: Mature Content (General)
+  if (detail.content_descriptors && detail.content_descriptors.ids) {
+    const adultIds = [3, 4]; // Kita fokus pada konten seksual/nudity eksplisit
+    const hasAdultDescriptor = detail.content_descriptors.ids.some((id: number) => adultIds.includes(id));
+    if (hasAdultDescriptor) return true;
+  }
+
+  return false;
+};
 
 export interface SteamStoreAppDetailsResponse {
   [appid: string]: {

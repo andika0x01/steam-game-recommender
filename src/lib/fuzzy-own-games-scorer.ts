@@ -55,8 +55,7 @@ export class FuzzyOwnGamesScorer {
             recency: any,
             activity: any
           }
-        },
-        inference: {
+        },        inference: {
           rules: Array<{
             output: string,
             label: string,
@@ -260,6 +259,70 @@ export class FuzzyOwnGamesScorer {
         antecedents: [
           { variable: 'recency', term: 'ditinggal', value: recency.ditinggal },
           { variable: 'activity', term: 'tidak_aktif', value: activity.tidak_aktif }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'playtime', term: 'sangat_banyak', value: playtime.sangat_banyak },
+          { variable: 'recency', term: 'lama', value: recency.lama }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'playtime', term: 'sangat_banyak', value: playtime.sangat_banyak },
+          { variable: 'recency', term: 'sangat_lama', value: recency.sangat_lama }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'playtime', term: 'sangat_banyak', value: playtime.sangat_banyak },
+          { variable: 'recency', term: 'ditinggal', value: recency.ditinggal }
+        ]
+      },
+      {
+        output: 'TINGGI',
+        label: 'Tinggi',
+        antecedents: [
+          { variable: 'playtime', term: 'sering', value: playtime.sering },
+          { variable: 'recency', term: 'agak_lama', value: recency.agak_lama }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'playtime', term: 'sering', value: playtime.sering },
+          { variable: 'recency', term: 'sangat_lama', value: recency.sangat_lama }
+        ]
+      },
+      {
+        output: 'SEDANG',
+        label: 'Sedang',
+        antecedents: [
+          { variable: 'playtime', term: 'cukup', value: playtime.cukup },
+          { variable: 'recency', term: 'baru_main', value: recency.baru_main }
+        ]
+      },
+      {
+        output: 'RENDAH',
+        label: 'Rendah',
+        antecedents: [
+          { variable: 'playtime', term: 'dicoba', value: playtime.dicoba },
+          { variable: 'recency', term: 'baru_main', value: recency.baru_main }
+        ]
+      },
+      {
+        output: 'SANGAT_RENDAH',
+        label: 'Sangat rendah',
+        antecedents: [
+          { variable: 'playtime', term: 'dicoba', value: playtime.dicoba },
+          { variable: 'recency', term: 'agak_lama', value: recency.agak_lama }
         ]
       }
     ] as const;
