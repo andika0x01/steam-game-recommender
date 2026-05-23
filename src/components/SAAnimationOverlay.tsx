@@ -230,17 +230,6 @@ export const SAAnimationOverlay = ({ budget, candidates, onFinish }: SAAnimation
                   </div>
                 </div>
 
-                <div className="bg-black/60 rounded-2xl p-4 md:p-5 border border-white/5 h-[300px] md:h-[450px] overflow-hidden font-mono text-[9px] md:text-[10px] leading-relaxed">
-                   <p className="text-[8px] text-zinc-700 uppercase mb-3 tracking-widest">Deep Engine Logs</p>
-                   <div className="space-y-1.5">
-                     {logs.map((log, i) => (
-                       <div key={i} className={`${i === 0 ? 'text-orange-400' : 'text-zinc-600'} transition-opacity truncate`} style={{ opacity: 1 - i * 0.08 }}>
-                         {log}
-                       </div>
-                     ))}
-                   </div>
-                </div>
-
                 {isDone ? (
                   <button 
                     onClick={() => onFinish(currentBasket)}
@@ -253,6 +242,17 @@ export const SAAnimationOverlay = ({ budget, candidates, onFinish }: SAAnimation
                     <p className="text-[9px] md:text-[10px] font-bold text-zinc-600 uppercase animate-pulse">Running Heat Diffusion...</p>
                   </div>
                 )}
+
+                <div className="bg-black/60 rounded-2xl p-4 md:p-5 border border-white/5 h-[300px] md:h-[450px] overflow-hidden font-mono text-[9px] md:text-[10px] leading-relaxed">
+                   <p className="text-[8px] text-zinc-700 uppercase mb-3 tracking-widest">Deep Engine Logs</p>
+                   <div className="space-y-1.5">
+                     {logs.map((log, i) => (
+                       <div key={i} className={`${i === 0 ? 'text-orange-400' : 'text-zinc-600'} transition-opacity truncate`} style={{ opacity: 1 - i * 0.08 }}>
+                         {log}
+                       </div>
+                     ))}
+                   </div>
+                </div>
              </div>
           </div>
       </div>

@@ -49,7 +49,10 @@ app.get('/recommendation-deals', async (c) => {
 
     const start = (page - 1) * amount
     const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id', start })
-    const candidateIds = saleResults.slice(0, amount).map(r => r.id).filter(Boolean) as number[]
+    const ownedAppIds = new Set(userGames.map(g => g.appid))
+    const uniqueIds = [...new Set(saleResults.map(r => r.id).filter(Boolean) as number[])]
+    const newIds = uniqueIds.filter(id => !ownedAppIds.has(id))
+    const candidateIds = newIds.slice(0, amount)
     
     const rawDetails = await steamAPI.getAppStoreDetailsBatch(candidateIds, 'english', 'id')
     const candidateReviewsPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
@@ -140,7 +143,10 @@ app.get('/optimization-candidates', async (c) => {
 
     const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
     const poolSize = budget > 0 ? Math.min(100, Math.max(30, Math.floor(budget / 5000))) : 40
-    const candidateIds = saleResults.slice(0, poolSize).map(r => r.id).filter(Boolean) as number[]
+    const ownedAppIds = new Set(userGames.map(g => g.appid))
+    const uniqueIds = [...new Set(saleResults.map(r => r.id).filter(Boolean) as number[])]
+    const newIds = uniqueIds.filter(id => !ownedAppIds.has(id))
+    const candidateIds = newIds.slice(0, poolSize)
     
     const rawDetails = await steamAPI.getAppStoreDetailsBatch(candidateIds, 'english', 'id')
     const candidateReviewsPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
@@ -176,7 +182,18 @@ app.get('/optimization-candidates', async (c) => {
           salePrice: price,
           score: score,
           density: density,
-          image: `https://cdn.akamai.steamstatic.com/steam/apps/${d!.steam_appid}/header.jpg`
+          image: `https://cdn.akamai.steamstatic.com/steam/apps/${d!.steam_appid}/header.jpg`,
+          fuzzyDetails: detailed.details,
+          source: {
+            reviewPositivity: positivity,
+            tagSimilarity: similarity,
+            reviewVolume: volume,
+            publisherScore: candidatePS,
+            publishers: d.publishers || [],
+            price: d!.price_overview!.final_formatted,
+            originalPrice: d!.price_overview!.initial_formatted,
+            discount: d!.price_overview!.discount_percent.toString()
+          }
         }
       })
 
@@ -204,7 +221,10 @@ app.get('/perform-optimization', async (c) => {
 
     const saleResults = await steamAPI.searchGames({ specials: true, cc: 'id' })
     const dynamicPoolSize = budgetIDR > 0 ? Math.min(200, Math.max(30, Math.floor(budgetIDR / 5000))) : 30
-    const candidateIds = saleResults.slice(0, dynamicPoolSize).map(r => r.id).filter(Boolean) as number[]
+    const ownedAppIds = new Set(userGames.map(g => g.appid))
+    const uniqueIds = [...new Set(saleResults.map(r => r.id).filter(Boolean) as number[])]
+    const newIds = uniqueIds.filter(id => !ownedAppIds.has(id))
+    const candidateIds = newIds.slice(0, dynamicPoolSize)
     
     const rawDetails = await steamAPI.getAppStoreDetailsBatch(candidateIds, 'english', 'id')
     const candidateReviewsPromises = candidateIds.map(id => steamAPI.getAppReviews(id))
