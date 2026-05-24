@@ -1,9 +1,3 @@
-/**
- * Kelas FuzzyNonOwnGamesScorer
- * 
- * Sistem inferensi fuzzy untuk memprediksi tingkat ketertarikan pengguna
- * terhadap game yang belum mereka miliki.
- */
 export class FuzzyNonOwnGamesScorer {
   private trapMF(x: number, a: number, b: number, c: number, d: number): number {
     if (x <= a || x >= d) return 0;
@@ -40,169 +34,167 @@ export class FuzzyNonOwnGamesScorer {
 
     const logVolume = reviewVolume > 0 ? Math.log10(reviewVolume) : 0;
     const volume = {
-      sedikit: this.trapMF(logVolume, -1, 0, 1.5, 2.5),   
-      sedang: this.trapMF(logVolume, 1.5, 2.5, 3.5, 4.5),  
-      banyak: this.trapMF(logVolume, 3.5, 4.5, 10, 11),    
+      sedikit: this.trapMF(logVolume, -1, 0, 1.5, 2.5),
+      sedang: this.trapMF(logVolume, 1.5, 2.5, 3.5, 4.5),
+      banyak: this.trapMF(logVolume, 3.5, 4.5, 10, 11),
     };
 
     const ruleDefinitions = [
       {
-        output: 'SANGAT_TINGGI',
-        label: 'Sangat tinggi',
+        output: "SANGAT_TINGGI",
+        label: "Sangat tinggi",
         antecedents: [
-          { variable: 'similarity', term: 'sangat_cocok', value: similarity.sangat_cocok },
-          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
-          { variable: 'volume', term: 'banyak', value: volume.banyak }
-        ]
+          { variable: "similarity", term: "sangat_cocok", value: similarity.sangat_cocok },
+          { variable: "review", term: "sangat_bagus", value: review.sangat_bagus },
+          { variable: "volume", term: "banyak", value: volume.banyak },
+        ],
       },
       {
-        output: 'SANGAT_TINGGI',
-        label: 'Sangat tinggi',
+        output: "SANGAT_TINGGI",
+        label: "Sangat tinggi",
         antecedents: [
-          { variable: 'similarity', term: 'sangat_cocok', value: similarity.sangat_cocok },
-          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
-          { variable: 'volume', term: 'sedang', value: volume.sedang }
-        ]
+          { variable: "similarity", term: "sangat_cocok", value: similarity.sangat_cocok },
+          { variable: "review", term: "sangat_bagus", value: review.sangat_bagus },
+          { variable: "volume", term: "sedang", value: volume.sedang },
+        ],
       },
       {
-        output: 'SANGAT_TINGGI',
-        label: 'Sangat tinggi',
+        output: "SANGAT_TINGGI",
+        label: "Sangat tinggi",
         antecedents: [
-          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
-          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
-          { variable: 'volume', term: 'banyak', value: volume.banyak },
-          { variable: 'publisher', term: 'high', value: publisher.high }
-        ]
+          { variable: "similarity", term: "cocok", value: similarity.cocok },
+          { variable: "review", term: "sangat_bagus", value: review.sangat_bagus },
+          { variable: "volume", term: "banyak", value: volume.banyak },
+          { variable: "publisher", term: "high", value: publisher.high },
+        ],
       },
       {
-        output: 'TINGGI',
-        label: 'Tinggi',
+        output: "TINGGI",
+        label: "Tinggi",
         antecedents: [
-          { variable: 'similarity', term: 'sangat_cocok', value: similarity.sangat_cocok },
-          { variable: 'review', term: 'bagus', value: review.bagus },
-          { variable: 'volume', term: 'sedang', value: volume.sedang }
-        ]
+          { variable: "similarity", term: "sangat_cocok", value: similarity.sangat_cocok },
+          { variable: "review", term: "bagus", value: review.bagus },
+          { variable: "volume", term: "sedang", value: volume.sedang },
+        ],
       },
       {
-        output: 'TINGGI',
-        label: 'Tinggi',
+        output: "TINGGI",
+        label: "Tinggi",
         antecedents: [
-          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
-          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
-          { variable: 'volume', term: 'sedang', value: volume.sedang }
-        ]
+          { variable: "similarity", term: "cocok", value: similarity.cocok },
+          { variable: "review", term: "sangat_bagus", value: review.sangat_bagus },
+          { variable: "volume", term: "sedang", value: volume.sedang },
+        ],
       },
       {
-        output: 'TINGGI',
-        label: 'Tinggi',
+        output: "TINGGI",
+        label: "Tinggi",
         antecedents: [
-          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
-          { variable: 'review', term: 'bagus', value: review.bagus },
-          { variable: 'volume', term: 'banyak', value: volume.banyak }
-        ]
+          { variable: "similarity", term: "cocok", value: similarity.cocok },
+          { variable: "review", term: "bagus", value: review.bagus },
+          { variable: "volume", term: "banyak", value: volume.banyak },
+        ],
       },
       {
-        output: 'TINGGI',
-        label: 'Tinggi',
+        output: "TINGGI",
+        label: "Tinggi",
         antecedents: [
-          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
-          { variable: 'review', term: 'bagus', value: review.bagus },
-          { variable: 'publisher', term: 'high', value: publisher.high }
-        ]
+          { variable: "similarity", term: "cocok", value: similarity.cocok },
+          { variable: "review", term: "bagus", value: review.bagus },
+          { variable: "publisher", term: "high", value: publisher.high },
+        ],
       },
       {
-        output: 'SEDANG',
-        label: 'Sedang',
+        output: "SEDANG",
+        label: "Sedang",
         antecedents: [
-          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
-          { variable: 'review', term: 'bagus', value: review.bagus },
-          { variable: 'volume', term: 'sedang', value: volume.sedang }
-        ]
+          { variable: "similarity", term: "cocok", value: similarity.cocok },
+          { variable: "review", term: "bagus", value: review.bagus },
+          { variable: "volume", term: "sedang", value: volume.sedang },
+        ],
       },
       {
-        output: 'SEDANG',
-        label: 'Sedang',
+        output: "SEDANG",
+        label: "Sedang",
         antecedents: [
-          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
-          { variable: 'review', term: 'bagus', value: review.bagus },
-          { variable: 'volume', term: 'sedikit', value: volume.sedikit }
-        ]
+          { variable: "similarity", term: "cocok", value: similarity.cocok },
+          { variable: "review", term: "bagus", value: review.bagus },
+          { variable: "volume", term: "sedikit", value: volume.sedikit },
+        ],
       },
       {
-        output: 'SEDANG',
-        label: 'Sedang',
+        output: "SEDANG",
+        label: "Sedang",
         antecedents: [
-          { variable: 'similarity', term: 'lumayan', value: similarity.lumayan },
-          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus },
-          { variable: 'volume', term: 'sedang', value: volume.sedang }
-        ]
+          { variable: "similarity", term: "lumayan", value: similarity.lumayan },
+          { variable: "review", term: "sangat_bagus", value: review.sangat_bagus },
+          { variable: "volume", term: "sedang", value: volume.sedang },
+        ],
       },
       {
-        output: 'SEDANG',
-        label: 'Sedang',
+        output: "SEDANG",
+        label: "Sedang",
         antecedents: [
-          { variable: 'similarity', term: 'sangat_cocok', value: similarity.sangat_cocok },
-          { variable: 'review', term: 'mixed', value: review.mixed },
-          { variable: 'volume', term: 'banyak', value: volume.banyak }
-        ]
+          { variable: "similarity", term: "sangat_cocok", value: similarity.sangat_cocok },
+          { variable: "review", term: "mixed", value: review.mixed },
+          { variable: "volume", term: "banyak", value: volume.banyak },
+        ],
       },
       {
-        output: 'RENDAH',
-        label: 'Rendah',
+        output: "RENDAH",
+        label: "Rendah",
         antecedents: [
-          { variable: 'similarity', term: 'lumayan', value: similarity.lumayan },
-          { variable: 'review', term: 'bagus', value: review.bagus },
-          { variable: 'volume', term: 'sedikit', value: volume.sedikit }
-        ]
+          { variable: "similarity", term: "lumayan", value: similarity.lumayan },
+          { variable: "review", term: "bagus", value: review.bagus },
+          { variable: "volume", term: "sedikit", value: volume.sedikit },
+        ],
       },
       {
-        output: 'RENDAH',
-        label: 'Rendah',
+        output: "RENDAH",
+        label: "Rendah",
         antecedents: [
-          { variable: 'similarity', term: 'tidak_cocok', value: similarity.tidak_cocok },
-          { variable: 'review', term: 'sangat_bagus', value: review.sangat_bagus }
-        ]
+          { variable: "similarity", term: "tidak_cocok", value: similarity.tidak_cocok },
+          { variable: "review", term: "sangat_bagus", value: review.sangat_bagus },
+        ],
       },
       {
-        output: 'RENDAH',
-        label: 'Rendah',
+        output: "RENDAH",
+        label: "Rendah",
         antecedents: [
-          { variable: 'similarity', term: 'cocok', value: similarity.cocok },
-          { variable: 'review', term: 'mixed', value: review.mixed }
-        ]
+          { variable: "similarity", term: "cocok", value: similarity.cocok },
+          { variable: "review", term: "mixed", value: review.mixed },
+        ],
       },
       {
-        output: 'RENDAH',
-        label: 'Rendah',
+        output: "RENDAH",
+        label: "Rendah",
         antecedents: [
-          { variable: 'similarity', term: 'lumayan', value: similarity.lumayan },
-          { variable: 'review', term: 'mixed', value: review.mixed },
-          { variable: 'volume', term: 'sedang', value: volume.sedang }
-        ]
+          { variable: "similarity", term: "lumayan", value: similarity.lumayan },
+          { variable: "review", term: "mixed", value: review.mixed },
+          { variable: "volume", term: "sedang", value: volume.sedang },
+        ],
       },
       {
-        output: 'SANGAT_RENDAH',
-        label: 'Sangat rendah',
+        output: "SANGAT_RENDAH",
+        label: "Sangat rendah",
         antecedents: [
-          { variable: 'review', term: 'buruk', value: review.buruk },
-          { variable: 'similarity', term: 'tidak_cocok', value: similarity.tidak_cocok }
-        ]
+          { variable: "review", term: "buruk", value: review.buruk },
+          { variable: "similarity", term: "tidak_cocok", value: similarity.tidak_cocok },
+        ],
       },
       {
-        output: 'SANGAT_RENDAH',
-        label: 'Sangat rendah',
+        output: "SANGAT_RENDAH",
+        label: "Sangat rendah",
         antecedents: [
-          { variable: 'review', term: 'buruk', value: review.buruk },
-          { variable: 'volume', term: 'banyak', value: volume.banyak }
-        ]
+          { variable: "review", term: "buruk", value: review.buruk },
+          { variable: "volume", term: "banyak", value: volume.banyak },
+        ],
       },
       {
-        output: 'SANGAT_RENDAH',
-        label: 'Sangat rendah',
-        antecedents: [
-          { variable: 'similarity', term: 'tidak_cocok', value: similarity.tidak_cocok }
-        ]
-      }
+        output: "SANGAT_RENDAH",
+        label: "Sangat rendah",
+        antecedents: [{ variable: "similarity", term: "tidak_cocok", value: similarity.tidak_cocok }],
+      },
     ] as const;
 
     const activation = {
@@ -220,14 +212,12 @@ export class FuzzyNonOwnGamesScorer {
         label: rule.label,
         antecedents: rule.antecedents,
         alpha,
-        expression: `\\(${rule.antecedents.map((antecedent) => `\\mu_{${antecedent.variable},${antecedent.term}}`).join(' \\wedge ')}\\)`
+        expression: `\\(${rule.antecedents.map((antecedent) => `\\mu_{${antecedent.variable},${antecedent.term}}`).join(" \\wedge ")}\\)`,
       };
     });
 
     for (const output of Object.keys(activation) as Array<keyof typeof activation>) {
-      activation[output] = ruleResults
-        .filter((rule) => rule.output === output)
-        .reduce((maxValue, rule) => Math.max(maxValue, rule.alpha), 0);
+      activation[output] = ruleResults.filter((rule) => rule.output === output).reduce((maxValue, rule) => Math.max(maxValue, rule.alpha), 0);
     }
 
     const weights = {
@@ -259,25 +249,25 @@ export class FuzzyNonOwnGamesScorer {
         volume,
         activation,
         process: {
-          kind: 'recommendation',
+          kind: "recommendation",
           fuzzification: {
             inputs: {
               review_positivity: reviewPositivity,
               tag_similarity: tagSimilarity,
               review_volume: reviewVolume,
               log_review_volume: logVolume,
-              publisher_score: publisherScore
+              publisher_score: publisherScore,
             },
             memberships: {
               review,
               similarity,
               publisher,
-              volume
-            }
+              volume,
+            },
           },
           inference: {
             rules: ruleResults,
-            activation
+            activation,
           },
           defuzzification: {
             weights,
@@ -285,12 +275,10 @@ export class FuzzyNonOwnGamesScorer {
             denominator,
             score,
             usedFallback: denominator === 0,
-            formula: denominator > 0
-              ? '\\[\\begin{aligned}\\text{score} &= \\frac{\\sum(A_k \\cdot w_k)}{\\sum A_k}\\end{aligned}\\]'
-              : '\\[\\text{score} = 0\\]'
-          }
-        }
-      }
+            formula: denominator > 0 ? "\\[\\begin{aligned}\\text{score} &= \\frac{\\sum(A_k \\cdot w_k)}{\\sum A_k}\\end{aligned}\\]" : "\\[\\text{score} = 0\\]",
+          },
+        },
+      },
     };
   }
 }

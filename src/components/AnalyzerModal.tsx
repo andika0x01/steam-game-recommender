@@ -1,220 +1,219 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { isAllowedSteamTag } from '../lib/steam'
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { isAllowedSteamTag } from "../lib/steam";
 
 declare global {
   interface Window {
     MathJax?: {
-      typesetPromise?: (elements?: HTMLElement[]) => Promise<void>
-    }
+      typesetPromise?: (elements?: HTMLElement[]) => Promise<void>;
+    };
   }
 }
 
 type GamePayload = {
-  appId: number
-  name: string
-  score: number
-  fuzzyStats: any
+  appId: number;
+  name: string;
+  score: number;
+  fuzzyStats: any;
   raw?: {
-    playtime_forever: number
-    rtime_last_played: number
-    playtime_2weeks: number
-  }
+    playtime_forever: number;
+    rtime_last_played: number;
+    playtime_2weeks: number;
+  };
   source?: {
-    reviewPositivity?: number
-    tagSimilarity?: number
-    reviewVolume?: number
-    publisherScore?: number
-    matchedTags?: string[]
-    publishers?: string[]
-    price?: string
-    originalPrice?: string
-    discount?: string
-  }
-}
+    reviewPositivity?: number;
+    tagSimilarity?: number;
+    reviewVolume?: number;
+    publisherScore?: number;
+    matchedTags?: string[];
+    publishers?: string[];
+    price?: string;
+    originalPrice?: string;
+    discount?: string;
+  };
+};
 
 type FuzzyRule = {
-  output: string
-  label: string
+  output: string;
+  label: string;
   antecedents: Array<{
-    variable: string
-    term: string
-    value: number
-  }>
-  alpha: number
-  expression: string
-}
+    variable: string;
+    term: string;
+    value: number;
+  }>;
+  alpha: number;
+  expression: string;
+};
 
 type FuzzyProcess = {
   fuzzification: {
     inputs: {
-      playtime_forever: number
-      playtime_2weeks: number
-      days_since_played: number
-      max_playtime_forever: number
-      max_playtime_2weeks: number
-    }
+      playtime_forever: number;
+      playtime_2weeks: number;
+      days_since_played: number;
+      max_playtime_forever: number;
+      max_playtime_2weeks: number;
+    };
     memberships: {
-      playtime: Record<string, number>
-      recency: Record<string, number>
-      activity: Record<string, number>
-    }
-  }
+      playtime: Record<string, number>;
+      recency: Record<string, number>;
+      activity: Record<string, number>;
+    };
+  };
   inference: {
-    rules: FuzzyRule[]
-    activation: Record<string, number>
-  }
+    rules: FuzzyRule[];
+    activation: Record<string, number>;
+  };
   defuzzification: {
-    weights: Record<string, number>
-    numerator: number
-    denominator: number
-    score: number
-    usedFallback: boolean
-    formula: string
-  }
-}
+    weights: Record<string, number>;
+    numerator: number;
+    denominator: number;
+    score: number;
+    usedFallback: boolean;
+    formula: string;
+  };
+};
 
-const formatHours = (minutes: number) => `${(minutes / 60).toFixed(1)} jam`
+const formatHours = (minutes: number) => `${(minutes / 60).toFixed(1)} jam`;
 
 const formatLastPlayed = (seconds: number) => {
-  if (!seconds) return 'Tidak diketahui'
-  const days = Math.max(0, Math.floor((Date.now() / 1000 - seconds) / 86400))
-  if (days === 0) return 'Hari ini'
-  if (days === 1) return '1 hari yang lalu'
-  if (days < 7) return `${days} hari yang lalu`
-  if (days < 30) return `${Math.round(days / 7)} minggu yang lalu`
-  return `${Math.round(days / 30)} bulan yang lalu`
-}
+  if (!seconds) return "Tidak diketahui";
+  const days = Math.max(0, Math.floor((Date.now() / 1000 - seconds) / 86400));
+  if (days === 0) return "Hari ini";
+  if (days === 1) return "1 hari yang lalu";
+  if (days < 7) return `${days} hari yang lalu`;
+  if (days < 30) return `${Math.round(days / 7)} minggu yang lalu`;
+  return `${Math.round(days / 30)} bulan yang lalu`;
+};
 
 const SectionTitle = ({ title, subtitle }: { title: string; subtitle?: string }) => (
   <div className="space-y-1">
     <p className="text-[10px] font-black uppercase tracking-[0.35em] text-orange-400">{title}</p>
     {subtitle && <p className="text-xs text-zinc-500">{subtitle}</p>}
   </div>
-)
+);
 
-const SubtleLabel = ({ children }: { children: React.ReactNode }) => (
-  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">{children}</p>
-)
+const SubtleLabel = ({ children }: { children: React.ReactNode }) => <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">{children}</p>;
 
 const LatexBlock = ({ children }: { children: React.ReactNode }) => (
   <div className="w-full overflow-x-auto py-3 text-base leading-relaxed text-zinc-200 sm:text-lg [&_.mjx-container]:my-0 [&_.mjx-container]:max-w-none [&_.mjx-container]:whitespace-normal [&_.mjx-container]:text-left">
     {children}
   </div>
-)
+);
 
-const latexTerm = (value: string) => `\\mathrm{${value.replace(/_/g, '\\_')}}`
-const latexNumber = (value: number, digits = 3) => Number.isFinite(value) ? value.toFixed(digits) : '0.000'
+const latexTerm = (value: string) => `\\mathrm{${value.replace(/_/g, "\\_")}}`;
+const latexNumber = (value: number, digits = 3) => (Number.isFinite(value) ? value.toFixed(digits) : "0.000");
 const hasOwnGameProcess = (process: any): process is FuzzyProcess => {
-  return process?.fuzzification?.inputs?.playtime_forever !== undefined
-}
+  return process?.fuzzification?.inputs?.playtime_forever !== undefined;
+};
 
 export const AnalyzerModal = () => {
-  const [isOpen, setIsOpen] = useState(false)
-  const [game, setGame] = useState<GamePayload | null>(null)
-  const [details, setDetails] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const modalRef = useRef<HTMLDivElement | null>(null)
+  const [isOpen, setIsOpen] = useState(false);
+  const [game, setGame] = useState<GamePayload | null>(null);
+  const [details, setDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const modalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handleOpen = async (event: any) => {
-      setGame(event.detail)
-      setIsOpen(true)
-      setLoading(true)
-      setDetails(null)
+      setGame(event.detail);
+      setIsOpen(true);
+      setLoading(true);
+      setDetails(null);
 
       try {
-        const response = await fetch(`/api/game/${event.detail.appId}`)
+        const response = await fetch(`/api/game/${event.detail.appId}`);
         if (response.ok) {
-          setDetails(await response.json())
+          setDetails(await response.json());
         }
       } catch (error) {
-        console.error('Failed to fetch game details', error)
+        console.error("Failed to fetch game details", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false)
-    }
+      if (event.key === "Escape") setIsOpen(false);
+    };
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('open-analyzer-modal', handleOpen)
-      window.addEventListener('keydown', closeOnEscape)
+    if (typeof window !== "undefined") {
+      window.addEventListener("open-analyzer-modal", handleOpen);
+      window.addEventListener("keydown", closeOnEscape);
       return () => {
-        window.removeEventListener('open-analyzer-modal', handleOpen)
-        window.removeEventListener('keydown', closeOnEscape)
-      }
+        window.removeEventListener("open-analyzer-modal", handleOpen);
+        window.removeEventListener("keydown", closeOnEscape);
+      };
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    if (!isOpen || !game) return
-    const mathJax = window.MathJax
-    if (!mathJax?.typesetPromise || !modalRef.current) return
+    if (!isOpen || !game) return;
+    const mathJax = window.MathJax;
+    if (!mathJax?.typesetPromise || !modalRef.current) return;
 
     void mathJax.typesetPromise([modalRef.current]).catch((error) => {
-      console.error('Failed to typeset MathJax content', error)
-    })
-  }, [isOpen, game, details])
+      console.error("Failed to typeset MathJax content", error);
+    });
+  }, [isOpen, game, details]);
 
   const normalizedTags = useMemo(() => {
-    const tags = [
-      ...(details?.genres || []).map((g: any) => g.description),
-      ...(details?.categories || []).map((c: any) => c.description)
-    ]
+    const tags = [...(details?.genres || []).map((g: any) => g.description), ...(details?.categories || []).map((c: any) => c.description)];
 
-    return Array.from(new Set(tags)).filter(isAllowedSteamTag)
-  }, [details])
+    return Array.from(new Set(tags)).filter(isAllowedSteamTag);
+  }, [details]);
 
   const fuzzyProcess = useMemo<any | null>(() => {
-    return game?.fuzzyStats?.process || null
-  }, [game])
+    return game?.fuzzyStats?.process || null;
+  }, [game]);
 
   const activeRules = useMemo(() => {
-    return (fuzzyProcess?.inference.rules || [])
-      .filter((rule) => rule.alpha > 0)
-      .sort((left, right) => right.alpha - left.alpha)
-  }, [fuzzyProcess])
+    return (fuzzyProcess?.inference.rules || []).filter((rule) => rule.alpha > 0).sort((left, right) => right.alpha - left.alpha);
+  }, [fuzzyProcess]);
 
   const fuzzyLatex = useMemo(() => {
-    if (!fuzzyProcess) return null
+    if (!fuzzyProcess) return null;
     if (!hasOwnGameProcess(fuzzyProcess)) {
-      const inputs = fuzzyProcess.fuzzification.inputs
-      const memberships = fuzzyProcess.fuzzification.memberships
-      const activation = fuzzyProcess.inference.activation
-      const defuzzification = fuzzyProcess.defuzzification
+      const inputs = fuzzyProcess.fuzzification.inputs;
+      const memberships = fuzzyProcess.fuzzification.memberships;
+      const activation = fuzzyProcess.inference.activation;
+      const defuzzification = fuzzyProcess.defuzzification;
       const activationRows = Object.entries(activation)
         .map(([label, value]) => `A_{${latexTerm(label)}} &= \\max(\\alpha_i\\mid y_i=${latexTerm(label)}) = ${latexNumber(value as number)}`)
-        .join('\\\\')
+        .join("\\\\");
       const membershipRows = [
-        ['review', memberships.review],
-        ['similarity', memberships.similarity],
-        ['volume', memberships.volume],
-        ['publisher', memberships.publisher]
-      ].flatMap(([variable, values]) =>
-        Object.entries(values as Record<string, number>)
-          .map(([term, value]) => `\\mu_{${latexTerm(variable as string)},${latexTerm(term)}} &= ${latexNumber(value)}`)
-      ).join('\\\\')
-      const ruleRows = activeRules.length > 0
-        ? activeRules.map((rule, index) => {
-            const terms = rule.antecedents
-              .map((antecedent) => `\\mu_{${latexTerm(antecedent.variable)},${latexTerm(antecedent.term)}}=${latexNumber(antecedent.value)}`)
-              .join(', ')
-            return `\\alpha_{${index + 1}} &= \\min(${terms}) = ${latexNumber(rule.alpha)}\\Rightarrow y_{${index + 1}}=${latexTerm(rule.output)}`
-          }).join('\\\\')
-        : '\\alpha_i &= 0\\quad\\text{Tidak ada rule aktif}'
-      const weightedTerms = Object.entries(activation)
-        .filter(([, value]) => (value as number) > 0)
-        .map(([label, value]) => `${latexNumber(value as number)}\\cdot ${latexNumber(defuzzification.weights[label] || 0, 1)}`)
-        .join(' + ') || '0'
-      const denominatorTerms = Object.values(activation)
-        .filter((value) => (value as number) > 0)
-        .map((value) => latexNumber(value as number))
-        .join(' + ') || '0'
+        ["review", memberships.review],
+        ["similarity", memberships.similarity],
+        ["volume", memberships.volume],
+        ["publisher", memberships.publisher],
+      ]
+        .flatMap(([variable, values]) =>
+          Object.entries(values as Record<string, number>).map(([term, value]) => `\\mu_{${latexTerm(variable as string)},${latexTerm(term)}} &= ${latexNumber(value)}`)
+        )
+        .join("\\\\");
+      const ruleRows =
+        activeRules.length > 0
+          ? activeRules
+              .map((rule, index) => {
+                const terms = rule.antecedents
+                  .map((antecedent) => `\\mu_{${latexTerm(antecedent.variable)},${latexTerm(antecedent.term)}}=${latexNumber(antecedent.value)}`)
+                  .join(", ");
+                return `\\alpha_{${index + 1}} &= \\min(${terms}) = ${latexNumber(rule.alpha)}\\Rightarrow y_{${index + 1}}=${latexTerm(rule.output)}`;
+              })
+              .join("\\\\")
+          : "\\alpha_i &= 0\\quad\\text{Tidak ada rule aktif}";
+      const weightedTerms =
+        Object.entries(activation)
+          .filter(([, value]) => (value as number) > 0)
+          .map(([label, value]) => `${latexNumber(value as number)}\\cdot ${latexNumber(defuzzification.weights[label] || 0, 1)}`)
+          .join(" + ") || "0";
+      const denominatorTerms =
+        Object.values(activation)
+          .filter((value) => (value as number) > 0)
+          .map((value) => latexNumber(value as number))
+          .join(" + ") || "0";
       const weightRows = Object.entries(defuzzification.weights)
         .map(([label, value]) => `w_{${latexTerm(label)}} &= ${latexNumber(value as number, 1)}`)
-        .join('\\\\')
+        .join("\\\\");
 
       return {
         input: `\\[
@@ -276,44 +275,50 @@ score &=
 = ${latexNumber(defuzzification.score)}\\\\
 score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.round(defuzzification.score * 100)}\\%
 \\end{aligned}
-\\]`
-      }
+\\]`,
+      };
     }
 
-    const inputs = fuzzyProcess.fuzzification.inputs
-    const memberships = fuzzyProcess.fuzzification.memberships
-    const activation = fuzzyProcess.inference.activation
-    const defuzzification = fuzzyProcess.defuzzification
+    const inputs = fuzzyProcess.fuzzification.inputs;
+    const memberships = fuzzyProcess.fuzzification.memberships;
+    const activation = fuzzyProcess.inference.activation;
+    const defuzzification = fuzzyProcess.defuzzification;
     const activationRows = Object.entries(activation)
       .map(([label, value]) => `A_{${latexTerm(label)}} &= \\max(\\alpha_i\\mid y_i=${latexTerm(label)}) = ${latexNumber(value as number)}`)
-      .join('\\\\')
+      .join("\\\\");
     const membershipRows = [
-      ['playtime', memberships.playtime],
-      ['recency', memberships.recency],
-      ['activity', memberships.activity]
-    ].flatMap(([variable, values]) =>
-      Object.entries(values as Record<string, number>)
-        .map(([term, value]) => `\\mu_{${latexTerm(variable as string)},${latexTerm(term)}} &= ${latexNumber(value)}`)
-    ).join('\\\\')
-    const ruleRows = activeRules.length > 0
-      ? activeRules.map((rule, index) => {
-          const terms = rule.antecedents
-            .map((antecedent) => `\\mu_{${latexTerm(antecedent.variable)},${latexTerm(antecedent.term)}}=${latexNumber(antecedent.value)}`)
-            .join(', ')
-          return `\\alpha_{${index + 1}} &= \\min(${terms}) = ${latexNumber(rule.alpha)}\\Rightarrow y_{${index + 1}}=${latexTerm(rule.output)}`
-        }).join('\\\\')
-      : '\\alpha_i &= 0\\quad\\text{Tidak ada rule aktif}'
-    const weightedTerms = Object.entries(activation)
-      .filter(([, value]) => (value as number) > 0)
-      .map(([label, value]) => `${latexNumber(value as number)}\\cdot ${latexNumber(defuzzification.weights[label] || 0, 1)}`)
-      .join(' + ') || '0'
-    const denominatorTerms = Object.values(activation)
-      .filter((value) => (value as number) > 0)
-      .map((value) => latexNumber(value as number))
-      .join(' + ') || '0'
+      ["playtime", memberships.playtime],
+      ["recency", memberships.recency],
+      ["activity", memberships.activity],
+    ]
+      .flatMap(([variable, values]) =>
+        Object.entries(values as Record<string, number>).map(([term, value]) => `\\mu_{${latexTerm(variable as string)},${latexTerm(term)}} &= ${latexNumber(value)}`)
+      )
+      .join("\\\\");
+    const ruleRows =
+      activeRules.length > 0
+        ? activeRules
+            .map((rule, index) => {
+              const terms = rule.antecedents
+                .map((antecedent) => `\\mu_{${latexTerm(antecedent.variable)},${latexTerm(antecedent.term)}}=${latexNumber(antecedent.value)}`)
+                .join(", ");
+              return `\\alpha_{${index + 1}} &= \\min(${terms}) = ${latexNumber(rule.alpha)}\\Rightarrow y_{${index + 1}}=${latexTerm(rule.output)}`;
+            })
+            .join("\\\\")
+        : "\\alpha_i &= 0\\quad\\text{Tidak ada rule aktif}";
+    const weightedTerms =
+      Object.entries(activation)
+        .filter(([, value]) => (value as number) > 0)
+        .map(([label, value]) => `${latexNumber(value as number)}\\cdot ${latexNumber(defuzzification.weights[label] || 0, 1)}`)
+        .join(" + ") || "0";
+    const denominatorTerms =
+      Object.values(activation)
+        .filter((value) => (value as number) > 0)
+        .map((value) => latexNumber(value as number))
+        .join(" + ") || "0";
     const weightRows = Object.entries(defuzzification.weights)
       .map(([label, value]) => `w_{${latexTerm(label)}} &= ${latexNumber(value, 1)}`)
-      .join('\\\\')
+      .join("\\\\");
 
     return {
       input: `\\[
@@ -380,11 +385,11 @@ score &=
 = ${latexNumber(defuzzification.score)}\\\\
 score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.round(defuzzification.score * 100)}\\%
 \\end{aligned}
-\\]`
-    }
-  }, [activeRules, fuzzyProcess])
+\\]`,
+    };
+  }, [activeRules, fuzzyProcess]);
 
-  if (!isOpen || !game) return null
+  if (!isOpen || !game) return null;
 
   return (
     <div ref={modalRef} className="fixed inset-0 z-50 overflow-y-auto bg-black/85 px-3 py-3 backdrop-blur-xl">
@@ -401,11 +406,7 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
         </button>
 
         <div className="relative min-h-[320px] overflow-hidden border-b border-white/10 lg:min-h-full lg:border-b-0 lg:border-r lg:border-white/10">
-          <img
-            src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appId}/library_600x900.jpg`}
-            alt={game.name}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
+          <img src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appId}/library_600x900.jpg`} alt={game.name} className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/35 to-transparent lg:bg-gradient-to-r lg:from-zinc-950 lg:via-zinc-950/30 lg:to-transparent" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0)_0%,rgba(0,0,0,0.28)_45%,rgba(0,0,0,0.65)_100%)] lg:bg-[linear-gradient(90deg,rgba(0,0,0,0.05)_0%,rgba(0,0,0,0.42)_100%)]" />
 
@@ -461,12 +462,12 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">Tag Similarity</p>
                       <p className="mt-2 text-lg font-black text-white">{Math.round((game.source?.tagSimilarity || 0) * 100)}%</p>
-                      <p className="mt-1 text-[11px] text-zinc-500">{game.source?.matchedTags?.slice(0, 4).join(', ') || 'Tidak ada tag cocok'}</p>
+                      <p className="mt-1 text-[11px] text-zinc-500">{game.source?.matchedTags?.slice(0, 4).join(", ") || "Tidak ada tag cocok"}</p>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-500">Steam Reviews</p>
                       <p className="mt-2 text-lg font-black text-white">{Math.round((game.source?.reviewPositivity || 0) * 100)}% positif</p>
-                      <p className="mt-1 text-[11px] text-zinc-500">{(game.source?.reviewVolume || 0).toLocaleString('id-ID')} total review</p>
+                      <p className="mt-1 text-[11px] text-zinc-500">{(game.source?.reviewVolume || 0).toLocaleString("id-ID")} total review</p>
                     </div>
                   </div>
                 )}
@@ -482,7 +483,7 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
                       {loading ? (
                         <div className="mt-2 h-5 w-40 animate-pulse rounded bg-white/10" />
                       ) : (
-                        <p className="mt-2 text-lg font-bold text-white">{details?.publishers?.join(', ') || '-'}</p>
+                        <p className="mt-2 text-lg font-bold text-white">{details?.publishers?.join(", ") || "-"}</p>
                       )}
                     </div>
                     <div className="max-w-[18rem] text-right text-[11px] leading-relaxed text-zinc-500">
@@ -517,10 +518,7 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
               </section>
 
               <section className="space-y-6">
-                <SectionTitle
-                  title="Fuzzy Calculation"
-                  subtitle="Alur lengkap dari input mentah, fuzzifikasi, inference engine, sampai skor output."
-                />
+                <SectionTitle title="Fuzzy Calculation" subtitle="Alur lengkap dari input mentah, fuzzifikasi, inference engine, sampai skor output." />
 
                 {fuzzyLatex ? (
                   <div className="space-y-8">
@@ -545,7 +543,7 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
                     </div>
                   </div>
                 ) : (
-                  <LatexBlock>{'\\[\\text{Data proses fuzzy belum tersedia.}\\]'}</LatexBlock>
+                  <LatexBlock>{"\\[\\text{Data proses fuzzy belum tersedia.}\\]"}</LatexBlock>
                 )}
 
                 <a
@@ -558,17 +556,19 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
                 </a>
 
                 {fuzzyProcess?.defuzzification && (
-                  <div className={`mt-4 rounded-xl border p-4 ${fuzzyProcess.defuzzification.usedFallback ? 'border-red-500/30 bg-red-500/5' : 'border-emerald-500/30 bg-emerald-500/5'}`}>
+                  <div
+                    className={`mt-4 rounded-xl border p-4 ${fuzzyProcess.defuzzification.usedFallback ? "border-red-500/30 bg-red-500/5" : "border-emerald-500/30 bg-emerald-500/5"}`}
+                  >
                     <div className="flex items-center gap-3">
-                      <div className={`h-2 w-2 rounded-full ${fuzzyProcess.defuzzification.usedFallback ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
-                      <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${fuzzyProcess.defuzzification.usedFallback ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {fuzzyProcess.defuzzification.usedFallback ? 'Calculation Mode: Fallback Active' : 'Calculation Mode: Normal Inference'}
+                      <div className={`h-2 w-2 rounded-full ${fuzzyProcess.defuzzification.usedFallback ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`} />
+                      <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${fuzzyProcess.defuzzification.usedFallback ? "text-red-400" : "text-emerald-400"}`}>
+                        {fuzzyProcess.defuzzification.usedFallback ? "Calculation Mode: Fallback Active" : "Calculation Mode: Normal Inference"}
                       </p>
                     </div>
                     <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-                      {fuzzyProcess.defuzzification.usedFallback 
-                        ? 'Sistem tidak menemukan rule yang cocok dengan kriteria game ini, menggunakan nilai default (0.5/0.0) sebagai pengaman.' 
-                        : 'Engine berhasil mencocokkan input dengan rule-rule fuzzy yang ada untuk menghasilkan skor yang akurat.'}
+                      {fuzzyProcess.defuzzification.usedFallback
+                        ? "Sistem tidak menemukan rule yang cocok dengan kriteria game ini, menggunakan nilai default (0.5/0.0) sebagai pengaman."
+                        : "Engine berhasil mencocokkan input dengan rule-rule fuzzy yang ada untuk menghasilkan skor yang akurat."}
                     </p>
                   </div>
                 )}
@@ -578,5 +578,5 @@ score_{persen} &= ${latexNumber(defuzzification.score)}\\times 100\\% = ${Math.r
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
