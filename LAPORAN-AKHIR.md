@@ -53,14 +53,15 @@ Untuk memahami preferensi pengguna, sistem menilai tingkat "kesukaan" terhadap 1
 Sistem menggunakan **Trapezoidal Membership Function (TrapMF)** untuk memetakan input (seperti *playtime*, aktivitas 2 minggu terakhir, dan jarak sejak terakhir bermain) ke dalam himpunan fuzzy (misalnya: *tidak_dimainkan, dicoba, cukup, sering, sangat_banyak*).
 
 Persamaan matematis untuk fungsi TrapMF:
-$$
+
+```math
 \mu(x; a,b,c,d) = \begin{cases} 
 0 & \text{if } x \leq a \text{ or } x \geq d \\ 
 \frac{x - a}{b - a} & \text{if } a < x < b \\ 
 1 & \text{if } b \leq x \leq c \\ 
 \frac{d - x}{d - c} & \text{if } c < x < d 
 \end{cases}
-$$
+```
 
 *Snippet Code Implementation (`src/lib/fuzzy-own-games-scorer.ts`):*
 ```typescript
@@ -74,11 +75,11 @@ private trapMF(x: number, a: number, b: number, c: number, d: number): number {
 ```
 
 **2. Defuzzifikasi**
-Skor kesukaan game dihitung menggunakan **Weighted Average Defuzzification**. Nilai aktivasi ($\alpha_i$) dari setiap aturan dikalikan dengan bobot output dari aturan tersebut ($w_i$), lalu dibagi dengan total nilai aktivasi.
+Skor kesukaan game dihitung menggunakan **Weighted Average Defuzzification**. Nilai aktivasi (`\alpha_i`) dari setiap aturan dikalikan dengan bobot output dari aturan tersebut (`w_i`), lalu dibagi dengan total nilai aktivasi.
 
-$$
+```math
 \text{Score} = \frac{\sum_{i=1}^{n} (\alpha_i \cdot w_i)}{\sum_{i=1}^{n} \alpha_i}
-$$
+```
 
 *Snippet Code Implementation:*
 ```typescript
@@ -100,15 +101,15 @@ const score = denominator > 0 ? numerator / denominator : 0.5;
 
 Setelah profil terbentuk, setiap tag dari game pengguna mendapatkan bobot (`tagWeight`). Ketika mengevaluasi game kandidat, kemiripan dihitung berdasarkan interseksi tag antara game kandidat dengan profil pengguna, lalu dinormalisasi dengan total bobot maksimal yang mungkin.
 
-$$
+```math
 \text{Similarity} = \frac{\sum_{t \in T_{c} \cap T_{u}} W_u(t)}{\sum_{i=1}^{|T_c \cap T_u|} W_{u, \text{sorted}}[i]}
-$$
+```
 
 *Di mana:*
-- $T_c$: Himpunan tag game kandidat.
-- $T_u$: Himpunan tag pengguna.
-- $W_u(t)$: Bobot tag $t$ pada profil pengguna.
-- $W_{u, \text{sorted}}$: Array bobot pengguna yang diurutkan secara menurun (*descending*).
+- `T_c`: Himpunan tag game kandidat.
+- `T_u`: Himpunan tag pengguna.
+- `W_u(t)`: Bobot tag `t` pada profil pengguna.
+- `W_{u, \text{sorted}}`: Array bobot pengguna yang diurutkan secara menurun (*descending*).
 
 *Snippet Code Implementation (`src/lib/simple-recommendation.ts`):*
 ```typescript
@@ -134,15 +135,16 @@ export function calculateWeightedSimilarity(candidateTags: string[], userTagWeig
 
 ### C. Penentuan Skor Rekomendasi Akhir (Fuzzy Non-Own Games Scorer)
 
-Skor rekomendasi akhir menggunakan *Fuzzy Logic* untuk mengevaluasi empat variabel: `review_positivity`, `tag_similarity`, `review_volume` (dalam $\log_{10}$), dan `publisher_score`.
+Skor rekomendasi akhir menggunakan *Fuzzy Logic* untuk mengevaluasi empat variabel: `review_positivity`, `tag_similarity`, `review_volume` (dalam basis log 10), dan `publisher_score`.
 
 **1. Inferensi Aturan**
-Sistem menggunakan konjungsi AND ($\min$) untuk menggabungkan anteseden.
+Sistem menggunakan konjungsi AND (`\min`) untuk menggabungkan anteseden.
 
 Contoh aturan (R1): *IF similarity is sangat_cocok AND review is sangat_bagus AND volume is banyak THEN rekomendasi is SANGAT_TINGGI.*
-$$
+
+```math
 \alpha_1 = \min\left( \mu_{\text{similarity}}(\text{sangat\_cocok}), \mu_{\text{review}}(\text{sangat\_bagus}), \mu_{\text{volume}}(\text{banyak}) \right)
-$$
+```
 
 *Snippet Code Implementation (`src/lib/fuzzy-non-own-games-scorer.ts`):*
 ```typescript
