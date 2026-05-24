@@ -28,6 +28,8 @@ app.get("/", async (c) => {
     })
     .sort((a, b) => b.personalMatch - a.personalMatch);
 
+  const cleanAnalyzedGames = await steamAPI.getCleanDetailedGames(analyzedGames, 48);
+
   const userProfile = await buildUserProfile(steamAPI, games, steamId);
 
   const topTags = Object.entries(userProfile.tagWeights)
@@ -139,7 +141,7 @@ ${topPublisherLatexRows || "P_p^{norm} &= 0"}
         <div className="space-y-10">
           <p className="text-[11px] font-black tracking-[0.5em] uppercase text-zinc-500 px-2 text-center md:text-left">Distribusi Skor Preferensi Library</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-6 md:gap-10">
-            {analyzedGames.map((game, idx) => {
+            {cleanAnalyzedGames.map(({ game, detail }) => {
               const gameData = {
                 appId: game.appid,
                 name: game.name || "Unknown",
@@ -154,7 +156,14 @@ ${topPublisherLatexRows || "P_p^{norm} &= 0"}
 
               return (
                 <div key={game.appid} className="cursor-pointer group relative analyzer-card-trigger" data-game={JSON.stringify(gameData)}>
-                  <GameCard appId={game.appid} name={game.name || "Unknown"} score={game.personalMatch} actionLabel="Lihat Analisis" isActionDiv={true} />
+                  <GameCard
+                    appId={game.appid}
+                    name={game.name || "Unknown"}
+                    score={game.personalMatch}
+                    actionLabel="Lihat Analisis"
+                    isActionDiv={true}
+                    tags={detail.normalized_tags}
+                  />
                 </div>
               );
             })}

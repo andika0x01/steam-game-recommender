@@ -547,6 +547,7 @@ export interface SteamStoreAppDetails {
   };
   categories: Array<{ id: number; description: string }>;
   genres: Array<{ id: string; description: string }>;
+  normalized_tags?: string[];
   screenshots: Array<{ id: number; path_thumbnail: string; path_full: string }>;
   release_date: {
     coming_soon: boolean;
@@ -610,6 +611,24 @@ export class SteamAPI {
   constructor(apiKey: string, kv?: KVNamespace) {
     this.apiKey = apiKey;
     this.kv = kv;
+  }
+
+  private normalizeTags(detail: any): string[] {
+    const tags = [...(detail.genres || []).map((g: any) => g.description), ...(detail.categories || []).map((c: any) => c.description)];
+    return Array.from(new Set(tags)).filter((tag) => isAllowedSteamTag(tag)) as string[];
+  }
+
+  async getCleanDetailedGames(
+    games: SteamGame[],
+    limit: number = 20
+  ): Promise<{ game: SteamGame; detail: SteamStoreAppDetails }[]> {
+    const topGames = games.slice(0, limit);
+    const appIds = topGames.map((g) => g.appid);
+    const details = await this.getAppStoreDetailsBatch(appIds);
+
+    return topGames
+      .map((game, idx) => ({ game, detail: details[idx]! }))
+      .filter((item) => item.detail !== null);
   }
 
   async getPlayerSummaries(steamIds: string[]): Promise<SteamPlayer[]> {
@@ -855,6 +874,7 @@ export class SteamAPI {
     }
 
     const result = data[appId.toString()].data as SteamStoreAppDetails;
+    result.normalized_tags = this.normalizeTags(result);
 
     if (this.kv) {
       await this.kv.put(cacheKey, JSON.stringify(result));
@@ -914,6 +934,7 @@ export class SteamAPI {
 
         if (data && data[id.toString()] && data[id.toString()].success) {
           const gameData = data[id.toString()].data as SteamStoreAppDetails;
+          gameData.normalized_tags = this.normalizeTags(gameData);
 
           if (!isGame18Plus(gameData)) {
             results[originalIdx] = gameData;

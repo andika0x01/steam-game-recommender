@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { isAllowedSteamTag } from "../lib/steam";
 
 declare global {
   interface Window {
@@ -156,11 +155,7 @@ export const AnalyzerModal = () => {
     });
   }, [isOpen, game, details]);
 
-  const normalizedTags = useMemo(() => {
-    const tags = [...(details?.genres || []).map((g: any) => g.description), ...(details?.categories || []).map((c: any) => c.description)];
-
-    return Array.from(new Set(tags)).filter(isAllowedSteamTag);
-  }, [details]);
+  const normalizedTags = details?.normalized_tags || [];
 
   const fuzzyProcess = useMemo<any | null>(() => {
     return game?.fuzzyStats?.process || null;

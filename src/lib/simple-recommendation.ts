@@ -1,4 +1,4 @@
-import { SteamAPI, SteamGame, isAllowedSteamTag, isGame18Plus } from "./steam";
+import { SteamAPI, SteamGame, isGame18Plus } from "./steam";
 import { FuzzyOwnGamesScorer } from "./fuzzy-own-games-scorer";
 import { FuzzyNonOwnGamesScorer } from "./fuzzy-non-own-games-scorer";
 
@@ -11,17 +11,14 @@ export interface RecommendationResult {
 }
 
 export function calculateWeightedSimilarity(candidateTags: string[], userTagWeights: Record<string, number>): number {
-  const allowedCandidateTags = candidateTags.filter(isAllowedSteamTag);
-  const allowedUserTagWeights = Object.fromEntries(Object.entries(userTagWeights).filter(([tag]) => isAllowedSteamTag(tag))) as Record<string, number>;
-
-  if (allowedCandidateTags.length === 0 || Object.keys(allowedUserTagWeights).length === 0) return 0;
+  if (candidateTags.length === 0 || Object.keys(userTagWeights).length === 0) return 0;
 
   const lowerTagWeights: Record<string, number> = {};
-  for (const [tag, weight] of Object.entries(allowedUserTagWeights)) {
+  for (const [tag, weight] of Object.entries(userTagWeights)) {
     lowerTagWeights[tag.toLowerCase()] = weight;
   }
 
-  const set1 = new Set(allowedCandidateTags.map((t) => t.toLowerCase()));
+  const set1 = new Set(candidateTags.map((t) => t.toLowerCase()));
   let intersectionWeight = 0;
 
   for (const tag of set1) {
@@ -30,7 +27,7 @@ export function calculateWeightedSimilarity(candidateTags: string[], userTagWeig
     }
   }
 
-  const sortedWeights = Object.values(allowedUserTagWeights).sort((a, b) => b - a);
+  const sortedWeights = Object.values(userTagWeights).sort((a, b) => b - a);
   const maxPossibleWeight = sortedWeights.slice(0, set1.size).reduce((sum, w) => sum + w, 0);
 
   return maxPossibleWeight > 0 ? intersectionWeight / maxPossibleWeight : 0;
@@ -66,7 +63,7 @@ export async function buildUserProfile(api: SteamAPI, ownedGames: SteamGame[], s
     const game = topPlayed[idx];
     const score = ownScorer.getGameScore(game.appid);
 
-    const tags = [...(detail.genres || []).map((g) => g.description), ...(detail.categories || []).map((c) => c.description)].filter(isAllowedSteamTag);
+    const tags = detail.normalized_tags || [];
 
     tags.forEach((tag) => {
       tagWeights[tag] = (tagWeights[tag] || 0) + score;
@@ -106,13 +103,12 @@ export async function getSimpleRecommendations(api: SteamAPI, ownedGames: SteamG
   if (ownedGames.length === 0) return [];
 
   const { tagWeights, totalTagWeight, publisherScores, userProfileTags } = await buildUserProfile(api, ownedGames, steamId);
-  const allowedTagWeights = Object.fromEntries(Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))) as Record<string, number>;
   const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
   console.log(`[Engine] totalTagWeight: ${totalTagWeight}, profile tags: ${userProfileTags.length}`);
-  if (Object.keys(allowedTagWeights).length === 0) return [];
+  if (Object.keys(tagWeights).length === 0) return [];
 
-  const sortedTags = Object.entries(allowedTagWeights)
+  const sortedTags = Object.entries(tagWeights)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
@@ -150,7 +146,7 @@ export async function getSimpleRecommendations(api: SteamAPI, ownedGames: SteamG
 
     const reviews = candidateReviews[idx];
 
-    const candidateTags = [...(detail.genres || []).map((g) => g.description), ...(detail.categories || []).map((c) => c.description)].filter(isAllowedSteamTag);
+    const candidateTags = detail.normalized_tags || [];
 
     let candidatePS = 0;
     if (detail.publishers) {
@@ -158,7 +154,7 @@ export async function getSimpleRecommendations(api: SteamAPI, ownedGames: SteamG
     }
 
     const positivity = reviews ? reviews.total_positive / (reviews.total_reviews || 1) : 0.5;
-    const similarity = calculateWeightedSimilarity(candidateTags, allowedTagWeights);
+    const similarity = calculateWeightedSimilarity(candidateTags, tagWeights);
     const volume = reviews ? reviews.total_reviews : 0;
 
     const finalScore = nonOwnScorer.getGameScore(positivity, similarity, volume, candidatePS);

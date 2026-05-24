@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import React from "react";
-import { SteamAPI, isAllowedSteamTag } from "../../lib/steam";
+import { SteamAPI } from "../../lib/steam";
 import { FuzzyOwnGamesScorer } from "../../lib/fuzzy-own-games-scorer";
 import { FuzzyNonOwnGamesScorer as Scorer2 } from "../../lib/fuzzy-non-own-games-scorer";
 import { GameCard } from "../../components/GameCard";
@@ -23,9 +23,8 @@ app.get("/", async (c) => {
   const userGames = await steamAPI.getOwnedGames(steamId);
 
   const { publisherScores, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
-  const allowedTagWeights = Object.fromEntries(Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))) as Record<string, number>;
 
-  const topProfileTags = Object.entries(allowedTagWeights)
+  const topProfileTags = Object.entries(tagWeights)
     .sort(([, left], [, right]) => (right as number) - (left as number))
     .slice(0, 8);
 

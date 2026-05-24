@@ -17,7 +17,8 @@ app.get("/", async (c) => {
 
   if (!player) return c.redirect("/auth/logout");
 
-  const topGames = games.sort((a, b) => b.playtime_forever - a.playtime_forever).slice(0, 12);
+  const sortedGames = games.sort((a, b) => b.playtime_forever - a.playtime_forever);
+  const cleanTopGames = await steamAPI.getCleanDetailedGames(sortedGames, 12);
 
   const totalPlaytimeMinutes = games.reduce((acc, g) => acc + g.playtime_forever, 0);
   const totalPlaytimeHours = (totalPlaytimeMinutes / 60).toFixed(0);
@@ -119,7 +120,7 @@ app.get("/", async (c) => {
             <span className="text-[10px] font-mono text-zinc-400 uppercase">Paling sering dimainkan</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {topGames.map((game) => (
+            {cleanTopGames.map(({ game }) => (
               <GameCard key={game.appid} appId={game.appid} name={game.name || "Unknown"} actionLabel="Mainkan" />
             ))}
           </div>

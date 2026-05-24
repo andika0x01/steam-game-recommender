@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { SteamAPI, isAllowedSteamTag, isGame18Plus } from "../../lib/steam";
+import { SteamAPI, isGame18Plus } from "../../lib/steam";
 import { getSimpleRecommendations, buildUserProfile, calculateWeightedSimilarity } from "../../lib/simple-recommendation";
 import { FuzzyNonOwnGamesScorer } from "../../lib/fuzzy-non-own-games-scorer";
 
@@ -38,7 +38,6 @@ app.get("/recommendation-deals", async (c) => {
     const userGames = await steamAPI.getOwnedGames(steamId);
 
     const { publisherScores, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
-    const allowedTagWeights = Object.fromEntries(Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))) as Record<string, number>;
     const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
     const start = (page - 1) * amount;
@@ -56,7 +55,7 @@ app.get("/recommendation-deals", async (c) => {
       .map((d: any, idx: number) => ({ d, reviews: candidateReviews[idx] }))
       .filter(({ d }: any) => d && d.price_overview)
       .map(({ d, reviews }: any) => {
-        const candidateTags = [...(d.genres || []).map((g: any) => g.description), ...(d.categories || []).map((c: any) => c.description)].filter(isAllowedSteamTag);
+        const candidateTags = d.normalized_tags || [];
 
         let candidatePS = 0;
         if (d.publishers) {
@@ -64,13 +63,13 @@ app.get("/recommendation-deals", async (c) => {
         }
 
         const positivity = reviews ? reviews.total_positive / (reviews.total_reviews || 1) : 0.5;
-        const similarity = calculateWeightedSimilarity(candidateTags, allowedTagWeights);
+        const similarity = calculateWeightedSimilarity(candidateTags, tagWeights);
         const volume = reviews ? reviews.total_reviews : 0;
 
         const detailed = nonOwnScorer.getGameScoreDetailed(positivity, similarity, volume, candidatePS);
         const score = detailed.score;
         const lowerTagWeights: Record<string, number> = {};
-        Object.entries(allowedTagWeights).forEach(([tag, weight]) => {
+        Object.entries(tagWeights).forEach(([tag, weight]) => {
           lowerTagWeights[tag.toLowerCase()] = weight as number;
         });
         const matchedTags = candidateTags
@@ -127,7 +126,6 @@ app.get("/perform-optimization", async (c) => {
   try {
     const userGames = await steamAPI.getOwnedGames(steamId);
     const { publisherScores, tagWeights } = await buildUserProfile(steamAPI, userGames, steamId);
-    const allowedTagWeights = Object.fromEntries(Object.entries(tagWeights).filter(([tag]) => isAllowedSteamTag(tag))) as Record<string, number>;
     const nonOwnScorer = new FuzzyNonOwnGamesScorer();
 
     const saleResults = await steamAPI.searchGames({ specials: true, cc: "id" });
@@ -146,7 +144,7 @@ app.get("/perform-optimization", async (c) => {
       .filter(({ d }: any) => d && d.price_overview)
       .map(({ d, reviews }: any) => {
         const price = d!.price_overview!.final / 100;
-        const candidateTags = [...(d.genres || []).map((g: any) => g.description), ...(d.categories || []).map((c: any) => c.description)].filter(isAllowedSteamTag);
+        const candidateTags = d.normalized_tags || [];
 
         let candidatePS = 0;
         if (d.publishers) {
@@ -154,7 +152,7 @@ app.get("/perform-optimization", async (c) => {
         }
 
         const positivity = reviews ? reviews.total_positive / (reviews.total_reviews || 1) : 0.5;
-        const similarity = calculateWeightedSimilarity(candidateTags, allowedTagWeights);
+        const similarity = calculateWeightedSimilarity(candidateTags, tagWeights);
         const volume = reviews ? reviews.total_reviews : 0;
 
         const detailed = nonOwnScorer.getGameScoreDetailed(positivity, similarity, volume, candidatePS);
