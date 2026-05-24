@@ -1,10 +1,10 @@
 # Laporan Akhir: Algoritma Steam Game Recommender
 
-Laporan ini mendokumentasikan alur kerja program, perhitungan algoritma *Fuzzy Logic*, representasi matematis, dan implementasi kode pada Steam Game Recommender.
+Laporan ini mendokumentasikan alur kerja program, perhitungan algoritma *Fuzzy Logic*, representasi matematis *Simulated Annealing*, dan implementasi kode pada Steam Game Recommender.
 
 ## 1. Flowchart Keseluruhan Sistem
 
-Flowchart di bawah ini menjelaskan alur sistem, mulai dari memuat profil pengguna dari Steam hingga menghasilkan rekomendasi akhir.
+Flowchart di bawah ini menjelaskan alur sistem, mulai dari memuat profil pengguna dari Steam hingga menghasilkan rekomendasi dan merancang keranjang belanja paling optimal dengan batasan anggaran (*budget*).
 
 ```mermaid
 flowchart TD
@@ -35,22 +35,37 @@ flowchart TD
         M1 --> N[Skor Rekomendasi Akhir]
     end
     
-    N --> O[Urutkan Berdasarkan Skor Tertinggi]
-    O --> P[Selesai: Tampilkan Rekomendasi]
+    subgraph Optimisasi [Simulated Annealing Budget Optimizer]
+        N --> O[Filter Game Diskon]
+        O --> P[Hitung Density (Skor / Harga)]
+        P --> Q[Inisialisasi Keranjang Sesuai Budget]
+        Q --> R{Loop: Suhu T > 1?}
+        R -- Ya --> S[Mutasi Keranjang: ADD/REMOVE/SWAP]
+        S --> T[Hitung Delta Energy]
+        T --> U{Energi Naik ATAU Metropolis diterima?}
+        U -- Ya --> V[Terima Keranjang Baru]
+        U -- Tidak --> W[Tolak Keranjang]
+        V --> X[Suhu T = T * Cooling Rate]
+        W --> X
+        X --> R
+        R -- Tidak --> Y[Keranjang Optimal]
+    end
+
+    Y --> Z[Selesai: Tampilkan Keranjang & Rekomendasi]
 ```
 
 ---
 
-## 2. Detail Proses dan Algoritma
+## 2. Detail Proses dan Algoritma (Fuzzy Logic)
 
-Sistem ini membagi algoritma menjadi dua tahap *Fuzzy Logic*: Evaluasi game yang dimiliki (untuk membentuk profil) dan evaluasi game kandidat (untuk rekomendasi).
+Sistem membagi algoritma dasar menjadi dua tahap *Fuzzy Logic*: Evaluasi game yang dimiliki pengguna (untuk membentuk profil) dan evaluasi game kandidat baru.
 
 ### A. Pembentukan Profil Pengguna (Fuzzy Own Games Scorer)
 
-Untuk memahami preferensi pengguna, sistem menilai tingkat "kesukaan" terhadap 15 game teratas mereka berdasarkan metrik waktu bermain (*playtime*).
+Sistem menilai tingkat "kesukaan" terhadap 15 game teratas mereka berdasarkan metrik waktu bermain (*playtime*).
 
 **1. Fuzzifikasi**
-Sistem menggunakan **Trapezoidal Membership Function (TrapMF)** untuk memetakan input (seperti *playtime*, aktivitas 2 minggu terakhir, dan jarak sejak terakhir bermain) ke dalam himpunan fuzzy (misalnya: *tidak_dimainkan, dicoba, cukup, sering, sangat_banyak*).
+Sistem menggunakan **Trapezoidal Membership Function (TrapMF)** untuk memetakan input (*playtime*, aktivitas 2 minggu terakhir, dan kelamaan sejak terakhir bermain) ke dalam himpunan fuzzy (*tidak_dimainkan, dicoba, cukup, sering, sangat_banyak*).
 
 Persamaan matematis untuk fungsi TrapMF:
 
@@ -75,95 +90,119 @@ private trapMF(x: number, a: number, b: number, c: number, d: number): number {
 ```
 
 **2. Defuzzifikasi**
-Skor kesukaan game dihitung menggunakan **Weighted Average Defuzzification**. Nilai aktivasi (`\alpha_i`) dari setiap aturan dikalikan dengan bobot output dari aturan tersebut (`w_i`), lalu dibagi dengan total nilai aktivasi.
+Skor kesukaan game dihitung menggunakan **Weighted Average Defuzzification**. Nilai aktivasi (`\alpha_i`) dikalikan dengan bobot output dari aturan tersebut (`w_i`), dibagi total aktivasi.
 
 ```math
 \text{Score} = \frac{\sum_{i=1}^{n} (\alpha_i \cdot w_i)}{\sum_{i=1}^{n} \alpha_i}
-```
-
-*Snippet Code Implementation:*
-```typescript
-let numerator = 0;
-let denominator = 0;
-for (const key in activation) {
-  const k = key as keyof typeof activation;
-  if (activation[k] > 0) {
-    numerator += activation[k] * weights[k];
-    denominator += activation[k];
-  }
-}
-const score = denominator > 0 ? numerator / denominator : 0.5;
 ```
 
 ---
 
 ### B. Perhitungan Kemiripan Tag (Weighted Tag Similarity)
 
-Setelah profil terbentuk, setiap tag dari game pengguna mendapatkan bobot (`tagWeight`). Ketika mengevaluasi game kandidat, kemiripan dihitung berdasarkan interseksi tag antara game kandidat dengan profil pengguna, lalu dinormalisasi dengan total bobot maksimal yang mungkin.
+Kemiripan dihitung berdasarkan interseksi tag antara game kandidat dengan profil pengguna, dinormalisasi oleh bobot maksimal yang mungkin.
 
 ```math
 \text{Similarity} = \frac{\sum_{t \in T_{c} \cap T_{u}} W_u(t)}{\sum_{i=1}^{|T_c \cap T_u|} W_{u, \text{sorted}}[i]}
-```
-
-*Di mana:*
-- `T_c`: Himpunan tag game kandidat.
-- `T_u`: Himpunan tag pengguna.
-- `W_u(t)`: Bobot tag `t` pada profil pengguna.
-- `W_{u, \text{sorted}}`: Array bobot pengguna yang diurutkan secara menurun (*descending*).
-
-*Snippet Code Implementation (`src/lib/simple-recommendation.ts`):*
-```typescript
-export function calculateWeightedSimilarity(candidateTags: string[], userTagWeights: Record<string, number>): number {
-  // ... (setup dan normalisasi tag)
-  const set1 = new Set(allowedCandidateTags.map((t) => t.toLowerCase()));
-  let intersectionWeight = 0;
-
-  for (const tag of set1) {
-    if (lowerTagWeights[tag]) {
-      intersectionWeight += lowerTagWeights[tag];
-    }
-  }
-
-  const sortedWeights = Object.values(allowedUserTagWeights).sort((a, b) => b - a);
-  const maxPossibleWeight = sortedWeights.slice(0, set1.size).reduce((sum, w) => sum + w, 0);
-
-  return maxPossibleWeight > 0 ? intersectionWeight / maxPossibleWeight : 0;
-}
 ```
 
 ---
 
 ### C. Penentuan Skor Rekomendasi Akhir (Fuzzy Non-Own Games Scorer)
 
-Skor rekomendasi akhir menggunakan *Fuzzy Logic* untuk mengevaluasi empat variabel: `review_positivity`, `tag_similarity`, `review_volume` (dalam basis log 10), dan `publisher_score`.
+Skor rekomendasi menilai: `review_positivity`, `tag_similarity`, `review_volume` (skala log 10), dan `publisher_score`. 
 
 **1. Inferensi Aturan**
 Sistem menggunakan konjungsi AND (`\min`) untuk menggabungkan anteseden.
-
-Contoh aturan (R1): *IF similarity is sangat_cocok AND review is sangat_bagus AND volume is banyak THEN rekomendasi is SANGAT_TINGGI.*
+Contoh (R1): *IF similarity is sangat_cocok AND review is sangat_bagus AND volume is banyak THEN rekomendasi is SANGAT_TINGGI.*
 
 ```math
 \alpha_1 = \min\left( \mu_{\text{similarity}}(\text{sangat\_cocok}), \mu_{\text{review}}(\text{sangat\_bagus}), \mu_{\text{volume}}(\text{banyak}) \right)
 ```
 
-*Snippet Code Implementation (`src/lib/fuzzy-non-own-games-scorer.ts`):*
-```typescript
-const ruleDefinitions = [
-  {
-    output: "SANGAT_TINGGI",
-    label: "Sangat tinggi",
-    antecedents: [
-      { variable: "similarity", term: "sangat_cocok", value: similarity.sangat_cocok },
-      { variable: "review", term: "sangat_bagus", value: review.sangat_bagus },
-      { variable: "volume", term: "banyak", value: volume.banyak },
-    ],
-  },
-  // ... aturan lainnya
-] as const;
+**2. Defuzzifikasi**
+Dilakukan menggunakan Weighted Average yang sama untuk memproyeksikan nilai akhir 0.0 hingga 1.0.
 
-// ...
-const alpha = rule.antecedents.reduce((minValue, antecedent) => Math.min(minValue, antecedent.value), 1);
+---
+
+## 3. Optimisasi Keranjang Belanja (Simulated Annealing)
+
+Fitur unggulan pada program ini adalah rekomendasi keranjang belanja otomatis berdasarkan *budget* (*Optimization App*). Karena menemukan kombinasi item yang memberikan total "nilai" (*value*) tertinggi di bawah batasan *budget* adalah variasi dari *Knapsack Problem* (NP-Hard), sistem menggunakan algoritma meta-heuristik **Simulated Annealing (SA)**.
+
+### A. Metrik Fungsi Objektif (Energy)
+
+Program berupaya "memaksimalkan Energi" dari keranjang. Energi dihitung dari penjumlahan *Density* (Skor Rekomendasi dibagi Harga Game) yang dikalikan dengan pemanfaatan kuadrat dari budget (untuk memaksa sistem memakai budget sedekat mungkin ke batasnya).
+
+```math
+E = \left( \sum_{i \in \text{basket}} \frac{\text{score}_i}{\text{price}_i} \right) \times \left( \frac{\sum \text{price}_i}{\text{Budget}} \right)^2
 ```
 
-**2. Defuzzifikasi Skor Rekomendasi**
-Proses defuzzifikasi menggunakan metode yang sama (Weighted Average) untuk menghasilkan nilai antara 0.0 hingga 1.0. Nilai ini kemudian digunakan untuk mengurutkan rekomendasi akhir yang ditampilkan kepada pengguna.
+*Snippet Code Implementation (`src/pages/api/index.ts`):*
+```typescript
+const getEnergy = (items: any[]) => {
+  const cost = getCost(items);
+  if (cost > budgetIDR || cost === 0) return Number.NEGATIVE_INFINITY;
+  
+  // Total kepadatan nilai (Skor per Harga)
+  const totalDensity = items.reduce((sum, item) => sum + item.density, 0);
+  
+  // Penalti Pemanfaatan Budget
+  const budgetUtilization = cost / budgetIDR;
+  return totalDensity * Math.pow(budgetUtilization, 2);
+};
+```
+
+### B. Mutasi Ruang Pencarian (State Neighbors)
+
+SA menelusuri status keranjang saat ini ke keranjang tetangga (*neighbor*) dengan melakukan probabilitas salah satu dari tiga aksi per langkah iterasi:
+1. **ADD (40%)**: Menambahkan game acak yang masuk sisa *budget*.
+2. **REMOVE (20%)**: Menghapus satu game acak dari keranjang.
+3. **SWAP (40%)**: Menukar satu game di dalam keranjang dengan game lain dari kumpulan rekomendasi kandidat jika sisa budget mengizinkan.
+
+### C. Kriteria Penerimaan Metropolis (Metropolis-Hastings Criterion)
+
+Ketika keranjang hasil mutasi memiliki "Energi" yang **lebih tinggi** dari sebelumnya ($\Delta E > 0$), perubahan diterima otomatis. Namun, bila Energi menurun, perubahan **bisa tetap diterima** berdasarkan probabilitas suhu.
+
+```math
+P(\text{accept}) = \exp \left( \frac{\Delta E}{T} \right)
+```
+
+Semakin tinggi Suhu ($T$), semakin besar peluang menerima pilihan yang buruk untuk lolos dari *Local Optima*. Semakin rendah Suhu, penerimaan terhadap nilai buruk makin pelit.
+
+*Snippet Code Implementation:*
+```typescript
+const dE = neighborEnergy - currentEnergy;
+let accept: boolean;
+
+if (neighborEnergy > currentEnergy) {
+  accept = true; // IMPROVED
+} else {
+  // Metropolis Acceptance Criterion
+  const prob = Math.exp(dE / temp);
+  const metropolis = Math.random() < prob;
+  accept = metropolis; 
+}
+```
+
+### D. Penjadwalan Penurunan Suhu (Cooling Schedule)
+
+Suhu diinisialisasi pada $T_0 = 3000.0$ dan terus dikalikan dengan rasio pendinginan (*Cooling Rate*) per iterasi:
+
+```math
+T_{n+1} = T_n \times 0.998
+```
+
+Loop berlanjut hingga $T$ mencapai $1.0$.
+
+*Snippet Code Implementation:*
+```typescript
+let temp = 3000.0;
+const coolingRate = 0.998;
+
+while (temp > 1) {
+  // ... (Evolusi tetangga dan pengecekan metropolis)
+  temp *= coolingRate;
+  iteration++;
+}
+```
+Hasil akhirnya merupakan susunan keranjang (`bestBasket`) berisikan game-game dengan kepadatan rekomendasi tertinggi yang mengoptimalkan limit *budget* yang diberikan oleh pengguna.
